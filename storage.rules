@@ -1,0 +1,61 @@
+rules_version = '2';
+
+// Flow — Firebase Storage rules.
+//
+// Deploy with:  firebase deploy --only storage
+//
+// Upload paths come from StorageFolder in lib/data/firestore_paths.dart, and
+// files are named `{ownerId}_{millis}_{random}{ext}` by StorageRepository.
+// Profile photos, galleries and certificates must be publicly readable —
+// they are rendered as network images all over the app.
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // ImageService downscales to 1600px / q82 before upload (§12.1); 10 MB is
+    // a generous ceiling that still stops someone uploading a video.
+    function reasonableImage() {
+      return request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    match /profiles/{fileName} {
+      allow read: if true;
+      allow write: if signedIn() && reasonableImage();
+    }
+
+    match /galleries/{fileName} {
+      allow read: if true;
+      allow write: if signedIn() && reasonableImage();
+    }
+
+    // Certificates back a trainer's verification and are shown to staff in
+    // the admin console. PDFs allowed alongside images.
+    match /certificates/{fileName} {
+      allow read: if signedIn();
+      allow write: if signedIn()
+        && request.resource.size < 10 * 1024 * 1024
+        && (request.resource.contentType.matches('image/.*')
+            || request.resource.contentType == 'application/pdf');
+    }
+
+    // Moderation evidence: uploaded by users, read by staff. Not public.
+    match /reports/{fileName} {
+      allow read: if signedIn();
+      allow write: if signedIn() && reasonableImage();
+    }
+
+    match /appeals/{fileName} {
+      allow read: if signedIn();
+      allow write: if signedIn() && reasonableImage();
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

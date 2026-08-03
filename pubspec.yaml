@@ -1,0 +1,52 @@
+# `name` is the Dart package identifier behind every `package:flow/...`
+# import — it must stay lowercase and is not the user-facing app name. The
+# display name is `Flow`, set in AndroidManifest (android:label) and
+# MaterialApp.title. Application id: com.wlftech.flow.
+name: flow
+description: "Flow — kitesurfing lessons on the Red Sea. Find certified trainers, book hours on the water, check in with a QR ticket."
+publish_to: 'none'
+
+# FLOW 3.0.0 — ground-up UI redesign of v2.6.0 (see APP_LOGIC_BLUEPRINT.md).
+version: 3.0.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+  flutter_riverpod: ^3.4.2
+  go_router: ^17.3.0
+  firebase_core: ^4.12.1
+  firebase_auth: ^6.5.6
+  cloud_firestore: ^6.7.1
+  firebase_storage: ^13.4.5
+  firebase_messaging: ^16.4.3
+  shared_preferences: ^2.5.5
+  image_picker: ^1.2.3
+  mobile_scanner: ^7.4.0
+  qr_flutter: ^4.1.0
+  url_launcher: ^6.3.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/brand/
+
+  # Variable fonts — weight is selected with FontVariation('wght', …) in the
+  # theme (see lib/core/theme/typography.dart), so one file covers all weights.
+  fonts:
+    - family: Sora
+      fonts:
+        - asset: assets/fonts/Sora.ttf
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter.ttf

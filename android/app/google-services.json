@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "194435155894",
+    "project_id": "wlf-flow",
+    "storage_bucket": "wlf-flow.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:194435155894:android:6751bfee6f9b0b3c82e317",
+        "android_client_info": {
+          "package_name": "com.wlftech.flow"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyABA4JH1TeSECOEj8aAMKrm2tcRw4x1ico"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

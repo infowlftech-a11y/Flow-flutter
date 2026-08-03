@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Brand ink navy (#020F2B) so the native splash hands off seamlessly to
+     the Flutter splash screen. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <color android:color="#020F2B" />
+    </item>
+</layer-list>

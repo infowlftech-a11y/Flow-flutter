@@ -1,0 +1,16 @@
+# Normalize line endings so Windows and macOS/Linux checkouts don't churn
+# the whole tree on every commit.
+* text=auto eol=lf
+
+# Binary assets — never touch these.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ttf binary
+*.otf binary
+*.jks binary
+*.keystore binary
+
+# Generated / vendored — keep them out of diffs and language stats.
+pubspec.lock -diff

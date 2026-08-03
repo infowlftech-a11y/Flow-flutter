@@ -1,0 +1,242 @@
+rules_version = '2';
+
+// Flow — Firestore security rules.
+//
+// Deploy with:  firebase deploy --only firestore:rules
+//
+// A new project starts either locked (deny all) or in test mode (allow all,
+// expiring in 30 days). Neither is what this app needs, so these rules are
+// written against the collections in lib/data/firestore_paths.dart. Renaming
+// a collection there means updating this file in the same change.
+//
+// Principle: a user owns their own documents; staff moderate; the fields that
+// decide who someone *is* (role, status, blockedUntil) can only ever be
+// written by staff — otherwise any rider could self-approve as a trainer or
+// lift their own suspension.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function uid() {
+      return request.auth.uid;
+    }
+
+    function selfProfile() {
+      return get(/databases/$(database)/documents/users/$(uid())).data;
+    }
+
+    function isStaff() {
+      return signedIn()
+        && selfProfile().role in ['admin', 'owner', 'support'];
+    }
+
+    // Fields a user must never be able to set on themselves.
+    function privilegedFieldsUnchanged() {
+      return !request.resource.data.diff(resource.data).affectedKeys()
+        .hasAny(['role', 'status', 'blockedUntil', 'blockedAt', 'reviewedAt',
+                 'reviewNote']);
+    }
+
+    // ── users ────────────────────────────────────────────────────────────
+    // Any signed-in user can read profiles: Explore lists trainers, chat and
+    // bookings show partner names and photos.
+    match /users/{userId} {
+      allow read: if signedIn();
+
+      // Onboarding writes the profile once. `status` is pinned server-side:
+      // riders may self-activate, business accounts must start pending and
+      // wait for the admin console.
+      allow create: if signedIn() && userId == uid()
+        && (
+          (request.resource.data.role == 'kiter'
+            && request.resource.data.status == 'active')
+          || (request.resource.data.role == 'business'
+            && request.resource.data.status == 'pending')
+        );
+
+      allow update: if signedIn()
+        && ((userId == uid() && privilegedFieldsUnchanged()) || isStaff());
+
+      // Account deletion (§3.13) — own profile only.
+      allow delete: if signedIn() && userId == uid();
+
+      // Station catalogue: public to read, owner-managed.
+      match /station_instructors/{docId} {
+        allow read: if signedIn();
+        allow write: if signedIn() && (userId == uid() || isStaff());
+      }
+      match /station_services/{docId} {
+        allow read: if signedIn();
+        allow write: if signedIn() && (userId == uid() || isStaff());
+      }
+    }
+
+    // ── bookings ─────────────────────────────────────────────────────────
+    // Readable by the two parties. Queries filter on kiterId or instructorId,
+    // so a list request is authorised by its filter.
+    match /bookings/{bookingId} {
+      function isParty() {
+        return resource.data.kiterId == uid()
+            || resource.data.instructorId == uid();
+      }
+
+      allow read: if signedIn() && (isParty() || isStaff());
+      allow create: if signedIn()
+        && (request.resource.data.kiterId == uid()
+            || request.resource.data.instructorId == uid());
+      allow update: if signedIn() && (isParty() || isStaff());
+      allow delete: if isStaff();
+    }
+
+    // ── availability & vacations (trainer-owned calendar) ────────────────
+    // Readable by everyone signed in: the booking grid needs a trainer's
+    // blocks to compute what is actually free.
+    match /availability/{docId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.instructorId == uid();
+      allow update, delete: if signedIn()
+        && (resource.data.instructorId == uid() || isStaff());
+    }
+
+    match /vacations/{docId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.instructorId == uid();
+      allow update, delete: if signedIn()
+        && (resource.data.instructorId == uid() || isStaff());
+    }
+
+    // ── reviews ──────────────────────────────────────────────────────────
+    // Public to read (ratings drive Explore). Authors may delete their own.
+    // Eligibility — a completed, unreviewed booking — is enforced in the
+    // repository; the rules pin authorship and the 1–5 range.
+    match /reviews/{reviewId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.userId == uid()
+        && request.resource.data.rating is int
+        && request.resource.data.rating >= 1
+        && request.resource.data.rating <= 5;
+      allow update: if false;
+      allow delete: if signedIn()
+        && (resource.data.userId == uid() || isStaff());
+    }
+
+    // ── chats ────────────────────────────────────────────────────────────
+    match /chats/{chatId} {
+      function isParticipant() {
+        return uid() in resource.data.participants;
+      }
+
+      allow read: if signedIn() && isParticipant();
+      // The thread is created on first open, so authorise from the payload.
+      allow create: if signedIn()
+        && uid() in request.resource.data.participants;
+      allow update: if signedIn() && isParticipant();
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        function inThread() {
+          return uid() in
+            get(/databases/$(database)/documents/chats/$(chatId))
+              .data.participants;
+        }
+
+        allow read: if signedIn() && inThread();
+        allow create: if signedIn() && inThread()
+          && request.resource.data.senderId == uid();
+        // Messages are immutable once sent.
+        allow update, delete: if false;
+      }
+    }
+
+    // ── notifications ────────────────────────────────────────────────────
+    // Recipients read and mark their own read/deleted. Any signed-in user can
+    // create one, because the app notifies the *other* party (a rider's
+    // booking notifies the trainer). The Cloud Function reads these to send
+    // FCM; it runs with admin credentials and bypasses these rules.
+    match /notifications/{notificationId} {
+      allow read, update, delete: if signedIn()
+        && (resource.data.targetUserId == uid() || isStaff());
+      allow create: if signedIn();
+    }
+
+    // ── support tickets ──────────────────────────────────────────────────
+    match /tickets/{ticketId} {
+      allow read: if signedIn()
+        && (resource.data.userId == uid() || isStaff());
+      allow create: if signedIn()
+        && request.resource.data.userId == uid();
+      allow update: if signedIn()
+        && (resource.data.userId == uid() || isStaff());
+      allow delete: if isStaff();
+
+      match /messages/{messageId} {
+        function ownsTicket() {
+          return get(/databases/$(database)/documents/tickets/$(ticketId))
+            .data.userId == uid();
+        }
+
+        allow read: if signedIn() && (ownsTicket() || isStaff());
+        allow create: if signedIn() && (ownsTicket() || isStaff());
+        allow update, delete: if false;
+      }
+    }
+
+    // ── appeals ──────────────────────────────────────────────────────────
+    // Written by suspended users, so the rules cannot require an active
+    // account — only that they are authenticated and appealing for themselves.
+    match /appeals/{appealId} {
+      allow read: if signedIn()
+        && (resource.data.userId == uid() || isStaff());
+      allow create: if signedIn()
+        && request.resource.data.userId == uid();
+      // Both sides append to the `messages` array; staff also set `status`.
+      allow update: if signedIn()
+        && (resource.data.userId == uid() || isStaff());
+      allow delete: if isStaff();
+    }
+
+    // ── reports ──────────────────────────────────────────────────────────
+    // Write-only for riders: you may file one, but you may not read what
+    // others filed, or discover that you have been reported.
+    match /reports/{reportId} {
+      allow read: if isStaff();
+      allow create: if signedIn()
+        && request.resource.data.reporterId == uid();
+      allow update, delete: if isStaff();
+    }
+
+    // ── leave reasons (account-deletion feedback) ────────────────────────
+    match /leave_reasons/{docId} {
+      allow read: if isStaff();
+      allow create: if signedIn()
+        && request.resource.data.userId == uid();
+      allow update, delete: if false;
+    }
+
+    // ── safari trips ─────────────────────────────────────────────────────
+    // Public to read; the host manages them. `bookedSeats` is incremented
+    // inside the reservation transaction by the booking rider, so an update
+    // is allowed for any signed-in user — the transaction re-reads capacity
+    // and rejects overselling (§8.6).
+    match /safari_trips/{tripId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.hostId == uid();
+      allow update: if signedIn();
+      allow delete: if signedIn()
+        && (resource.data.hostId == uid() || isStaff());
+    }
+
+    // Anything not matched above is denied.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
