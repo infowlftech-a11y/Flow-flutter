@@ -118,8 +118,10 @@ class UserRepository {
     List<String>? gallery,
     List<String>? quiver,
     String? homeSpot,
+    Set<String> clear = const {},
   }) {
-    return _users.doc(uid).update(compact({
+    return _users.doc(uid).update({
+      ...compact({
       'name': name,
       'phoneNumber': phoneNumber,
       'nationality': nationality,
@@ -129,10 +131,20 @@ class UserRepository {
       'languages': languages,
       'photoURL': photoUrl,
       'gallery': gallery,
-      'quiver': quiver,
-      'homeSpot': homeSpot,
-      'updatedAt': FieldValue.serverTimestamp(),
-    }));
+        'quiver': quiver,
+        'homeSpot': homeSpot,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }),
+      // Fields the user deliberately emptied.
+      //
+      // `compact` drops nulls, so a null argument means "not editing this
+      // field" — that is what stops this form clobbering fields it doesn't
+      // show. It also left no way to express "remove my bio": the write
+      // silently no-opped while the UI reported success and popped, and the
+      // old value reappeared on reopening. Clearing is a separate intent and
+      // has to be named.
+      for (final field in clear) field: FieldValue.delete(),
+    });
   }
 
   /// Optimistic favourite toggle target.
@@ -146,6 +158,15 @@ class UserRepository {
 
   Future<void> saveFcmToken(String uid, String token) =>
       _users.doc(uid).update({'fcmToken': token});
+
+  /// Drops this device's token from [uid]'s profile on sign-out.
+  ///
+  /// Push tokens are per-device, not per-account: left behind, the previous
+  /// user's notifications keep arriving on this handset after somebody else
+  /// signs in. Must run *before* `signOut()` — once the session is gone the
+  /// rules reject the write.
+  Future<void> clearFcmToken(String uid) =>
+      _users.doc(uid).update({'fcmToken': FieldValue.delete()});
 
   Future<void> deleteProfile(String uid) => _users.doc(uid).delete();
 

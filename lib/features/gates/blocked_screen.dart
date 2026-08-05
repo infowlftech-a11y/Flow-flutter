@@ -93,7 +93,7 @@ class _BlockedScreenState extends ConsumerState<BlockedScreen> {
               Align(
                 alignment: Alignment.topRight,
                 child: TextButton.icon(
-                  onPressed: () => ref.read(authRepositoryProvider).signOut(),
+                  onPressed: () => ref.read(signOutProvider)(),
                   icon: const Icon(Icons.logout_rounded,
                       size: 18, color: FlowColors.haze),
                   label: Text('Sign out',
@@ -259,8 +259,11 @@ class _BlockedScreenState extends ConsumerState<BlockedScreen> {
                     onPressed: busy
                         ? null
                         : () async {
-                            final picked =
-                                await ImageService.pickWithSheet(sheetContext);
+                            // No crop: this is appeal evidence, and trimming
+                            // it is the last thing a moderator wants.
+                            final picked = await ImageService.pickWithSheet(
+                                sheetContext,
+                                shape: null);
                             if (picked != null) {
                               setSheet(() => evidence.add(picked));
                             }

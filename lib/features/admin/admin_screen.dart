@@ -485,7 +485,13 @@ class _ReportCard extends ConsumerWidget {
               destructive: true,
               onPressed: () async {
                 final admin = ref.read(adminRepositoryProvider);
-                final until = ymd(DateTime.now().add(const Duration(days: 7)));
+                // Full timestamp, not a bare `ymd`. A date-only value parses
+                // to midnight *starting* that day, so a suspension issued at
+                // 18:00 expired after 6 days and 6 hours — visible now that
+                // the gate actually enforces blockedUntil. `DateTime.tryParse`
+                // reads both forms, and prettyYmd still renders the date part.
+                final until =
+                    DateTime.now().add(const Duration(days: 7)).toIso8601String();
                 await admin.blockUser(report.reportedUserId, until: until);
                 await admin.closeReport(report.id,
                     upheld: true, note: note.text);
@@ -592,9 +598,28 @@ class _AppealCardState extends ConsumerState<_AppealCard> {
           );
       Haptics.light();
       _reply.clear();
-      await ref
-          .read(adminRepositoryProvider)
-          .setAppealStatus(widget.appeal.id, 'reviewed');
+
+      // Bumping the status is a follow-up to a reply that has already
+      // committed, so it needs its own guard. Sharing the outer catch meant a
+      // failure here restored the text and reported "Couldn't send" for a
+      // message that actually landed — and resending appends a second copy,
+      // because each AppealMessage carries a fresh id and timestamp, so
+      // arrayUnion's value-equality dedupe never matches.
+      //
+      // 'resolved' is terminal: a follow-up note sent after LIFT SUSPENSION
+      // must not drag the appeal back to 'reviewed', which would re-show the
+      // lift button on an account whose block was already lifted and flip the
+      // user's badge from RESOLVED back to REVIEWED.
+      if (widget.appeal.status != 'resolved') {
+        try {
+          await ref
+              .read(adminRepositoryProvider)
+              .setAppealStatus(widget.appeal.id, 'reviewed');
+        } catch (_) {
+          // The reply is the part that matters; the queue badge catches up on
+          // the next staff action rather than lying about a failed send.
+        }
+      }
     } catch (_) {
       if (mounted) {
         _reply.text = text;

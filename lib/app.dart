@@ -20,7 +20,7 @@ class _FlowAppState extends ConsumerState<FlowApp> {
   void initState() {
     super.initState();
     final push = ref.read(pushControllerProvider);
-    push.contextSupplier = () => rootNavigatorKey.currentContext!;
+    push.contextSupplier = () => rootNavigatorKey.currentContext;
     push.start();
   }
 
@@ -29,10 +29,15 @@ class _FlowAppState extends ConsumerState<FlowApp> {
     final router = ref.watch(routerProvider);
     final themeMode = ref.watch(themeModeProvider);
 
-    // Permission + token the first time a uid appears (§11.3).
+    // Permission + token the first time a uid appears (§11.3). On sign-out
+    // the token row is cleared by signOutProvider while the session is still
+    // valid; here we only drop the local latch so a re-login rewrites it.
     ref.listen(currentUidProvider, (_, uid) {
+      final push = ref.read(pushControllerProvider);
       if (uid != null) {
-        ref.read(pushControllerProvider).syncTokenFor(uid);
+        push.syncTokenFor(uid);
+      } else {
+        push.forgetSyncedUid();
       }
     });
 

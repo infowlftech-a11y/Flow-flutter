@@ -10,6 +10,7 @@ import '../../core/utils/date_x.dart';
 import '../../core/utils/haptics.dart';
 import '../../core/widgets/buttons.dart';
 import '../../core/widgets/feedback.dart';
+import '../../core/widgets/misc.dart';
 import '../../core/widgets/sheets.dart';
 import '../../data/models/booking.dart';
 import '../../providers/providers.dart';
@@ -334,17 +335,23 @@ class SessionCard extends ConsumerWidget {
                       style: inter(12.5, 500, color: tones.textFaint),
                     ),
                     const SizedBox(height: 6),
-                    Row(
+                    // Wraps rather than overflows: a completed session shows
+                    // two pills plus its sub-label, which does not fit on one
+                    // line on a small phone at the largest text scale.
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         StatusPill(status: booking.status),
-                        const SizedBox(width: 8),
-                        Flexible(
-                          child: Text(booking.subLabel,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: inter(11.5, 520,
-                                  color: tones.textFaint)),
-                        ),
+                        // Only once the session is over. Before that "Unpaid"
+                        // is technically true and completely unhelpful —
+                        // nobody pays for a lesson they have not had.
+                        if (booking.status == BookingStatus.completed)
+                          PaymentPill(booking.payment),
+                        Text(booking.subLabel,
+                            style:
+                                inter(11.5, 520, color: tones.textFaint)),
                       ],
                     ),
                   ],
@@ -430,9 +437,19 @@ class SessionCard extends ConsumerWidget {
               destructive: true,
             );
             if (!ok) return;
-            await ref.read(bookingRepositoryProvider).cancelByRider(booking);
-            if (context.mounted) {
-              showFlowToast(context, 'Session cancelled');
+            try {
+              await ref.read(bookingRepositoryProvider).cancelByRider(booking);
+              if (context.mounted) {
+                showFlowToast(context, 'Session cancelled');
+              }
+            } catch (_) {
+              // The rider was told their trainer would be notified. If the
+              // write failed they must not be left assuming it went through
+              // — they would simply not turn up.
+              if (context.mounted) {
+                showFlowToast(
+                    context, "Couldn't cancel the session. Try again.");
+              }
             }
           },
         ),

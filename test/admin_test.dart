@@ -55,6 +55,40 @@ void main() {
       expect(timed.isPermanentlyBlocked, isFalse);
       expect(timed.blockedUntil, DateTime(2026, 9, 1));
     });
+
+    group('a timed suspension lapses on its own (§2.4)', () {
+      // Regression: the session gate read only `status`, so a 7-day ban was
+      // permanent — the rules forbid a user rewriting their own status, and
+      // only a manual admin unblock ever cleared it. The blocked screen's
+      // one-minute ticker invalidates the profile stream expecting exactly
+      // this check.
+      AppUser blocked(String until) => AppUser.fromDoc('u', {
+            'role': 'kiter',
+            'status': 'blocked',
+            'blockedUntil': until,
+          });
+
+      test('a past date releases the account', () {
+        final past = DateTime.now().subtract(const Duration(days: 1));
+        expect(blocked(past.toIso8601String()).isBlockInForce, isFalse);
+      });
+
+      test('a future date keeps it blocked', () {
+        final future = DateTime.now().add(const Duration(days: 1));
+        expect(blocked(future.toIso8601String()).isBlockInForce, isTrue);
+      });
+
+      test("'forever' never lapses", () {
+        expect(blocked('forever').isBlockInForce, isTrue);
+      });
+
+      test('a missing or unparseable date fails closed', () {
+        // Failing open would let a malformed value unblock someone.
+        expect(
+            AppUser.fromDoc('u', {'status': 'blocked'}).isBlockInForce, isTrue);
+        expect(blocked('not-a-date').isBlockInForce, isTrue);
+      });
+    });
   });
 
   group('Report', () {
@@ -120,7 +154,16 @@ void main() {
       final restored = AppealMessage.fromMap(message.toMap());
       expect(restored.text, message.text);
       expect(restored.senderName, message.senderName);
-      expect(restored.timestamp, message.timestamp);
+
+      // The *instant* is what has to survive. `DocX.date` deliberately hands
+      // back local time, and Dart's DateTime.== compares the isUtc flag as
+      // well as the moment, so comparing the objects directly would assert
+      // the timezone rather than the payload. The web client writes these
+      // with JS toISOString(), which always carries a Z — reading those back
+      // as UTC is what made appeal replies show the wrong calendar day.
+      expect(restored.timestamp, isNotNull);
+      expect(restored.timestamp!.toUtc(), message.timestamp!.toUtc());
+      expect(restored.timestamp!.isUtc, isFalse);
     });
   });
 }

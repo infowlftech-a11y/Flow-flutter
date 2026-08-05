@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../data/models/payment.dart';
 import '../theme/app_theme.dart';
 import '../theme/typography.dart';
 
@@ -23,6 +24,35 @@ class SectionHeader extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+/// Where a booking's money stands, as a tag.
+///
+/// Renders **nothing** for [PaymentStatus.unknown]. Every booking made before
+/// payments were tracked carries that status, and a "Not tracked" pill on all
+/// of them would be noise on exactly the screens where the pill needs to mean
+/// something — people learn to ignore a badge that is always present.
+class PaymentPill extends StatelessWidget {
+  const PaymentPill(this.payment, {super.key});
+
+  final PaymentInfo payment;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!payment.status.isDisplayable) return const SizedBox.shrink();
+    final tones = context.tones;
+
+    final (color, icon) = switch (payment.status) {
+      PaymentStatus.paid => (tones.success, Icons.check_circle_rounded),
+      PaymentStatus.unpaid => (tones.warning, Icons.payments_outlined),
+      PaymentStatus.processing => (tones.azureBrand, Icons.sync_rounded),
+      PaymentStatus.failed => (tones.danger, Icons.error_outline_rounded),
+      PaymentStatus.refunded => (tones.textFaint, Icons.undo_rounded),
+      PaymentStatus.unknown => (tones.textFaint, Icons.help_outline_rounded),
+    };
+
+    return TagPill(payment.status.label, color: color, icon: icon);
   }
 }
 

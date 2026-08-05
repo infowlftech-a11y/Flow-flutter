@@ -12,9 +12,12 @@ import '../../core/utils/date_x.dart';
 import '../../core/utils/haptics.dart';
 import '../../core/widgets/buttons.dart';
 import '../../core/widgets/feedback.dart';
+import '../../core/widgets/picker_field.dart';
 import '../../data/firestore_paths.dart';
 import '../../providers/providers.dart';
 import '../../services/image_service.dart';
+import '../media/crop_screen.dart';
+import 'onboarding_validators.dart';
 import 'onboarding_widgets.dart';
 
 /// Trainer onboarding — 4 gated steps (§3.2, §9.3).
@@ -58,7 +61,8 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
   @override
   void initState() {
     super.initState();
-    _name.text = ref.read(sessionProvider).displayName;
+    // knownName, not displayName — an empty field is honest, "Rider" is not.
+    _name.text = ref.read(sessionProvider).knownName;
   }
 
   @override
@@ -72,21 +76,32 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
     super.dispose();
   }
 
-  // Per-step gates (§9.3).
-  bool get _step1Ok =>
-      _photo != null &&
-      _name.text.trim().length > 2 &&
-      _bio.text.trim().isNotEmpty &&
-      _languages.isNotEmpty;
-  bool get _step2Ok => _spot != null;
-  bool get _step3Ok {
-    final rate = int.tryParse(_rate.text.trim());
-    return rate != null &&
-        rate >= FlowConst.minHourlyRate &&
-        rate <= FlowConst.maxHourlyRate;
+  // Per-step gates (§9.3). Each defers to the shared validators so the
+  // Continue button and the inline messages below cannot drift apart.
+  String? get _nameError => OnboardingValidators.name(_name.text);
+  String? get _bioError => _bio.text.trim().isEmpty
+      ? 'Riders read this first — say something'
+      : OnboardingValidators.bio(_bio.text);
+  String? get _rateError => OnboardingValidators.rate(
+        _rate.text,
+        min: FlowConst.minHourlyRate,
+        max: FlowConst.maxHourlyRate,
+      );
+  String? get _ikoError {
+    final value = _ikoId.text.trim();
+    if (value.isEmpty) return 'Required';
+    if (value.length < 4) return 'That looks too short';
+    return null;
   }
 
-  bool get _step4Ok => _ikoId.text.trim().length > 3;
+  bool get _step1Ok =>
+      _photo != null &&
+      _nameError == null &&
+      _bioError == null &&
+      _languages.isNotEmpty;
+  bool get _step2Ok => _spot != null;
+  bool get _step3Ok => _rateError == null;
+  bool get _step4Ok => _ikoError == null;
 
   bool _stepOk(int step) =>
       [_step1Ok, _step2Ok, _step3Ok, _step4Ok][step];
@@ -339,11 +354,19 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
         FormGroup(
           label: 'Languages',
           required: true,
-          child: LanguagePicker(
-            selected: _languages,
-            errorText: attempted && _languages.isEmpty
-                ? 'Pick at least one language'
-                : null,
+          errorText: attempted && _languages.isEmpty
+              ? 'Pick at least one language'
+              : null,
+          child: FlowPickerField(
+            values: _languages,
+            options: FlowConst.languages,
+            sheetTitle: 'Languages',
+            sheetSubtitle: 'Riders filter by these. Add any that are missing.',
+            hintText: 'Languages you teach in',
+            multiSelect: true,
+            allowCustom: true,
+            enabled: !_busy,
+            hasError: attempted && _languages.isEmpty,
             onChanged: (v) => setState(() => _languages = v),
           ),
         ),
@@ -388,7 +411,8 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
                   onPressed: _busy
                       ? null
                       : () async {
-                          final picked = await ImageService.pickMulti();
+                          final picked =
+                              await ImageService.pickMultiCropped(context);
                           if (picked.isNotEmpty) {
                             setState(() => _gallery.addAll(picked));
                           }
@@ -418,10 +442,15 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
           required: true,
           errorText:
               attempted && _spot == null ? 'Pick your home spot' : null,
-          child: ChipSelect(
+          child: FlowPickerField(
+            values: [?_spot],
             options: FlowConst.kiteSpots,
-            value: _spot,
-            onChanged: (v) => setState(() => _spot = v),
+            sheetTitle: 'Kite spot',
+            sheetSubtitle: 'The beach you actually teach from.',
+            hintText: 'Select your spot',
+            enabled: !_busy,
+            hasError: attempted && _spot == null,
+            onChanged: (v) => setState(() => _spot = v.firstOrNull),
           ),
         ),
         FormGroup(
@@ -524,8 +553,12 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
                   onPressed: _busy
                       ? null
                       : () async {
-                          final picked =
-                              await ImageService.pickWithSheet(context);
+                          // Rectangular: a certificate is a document, and the
+                          // crop step lets them straighten out the desk
+                          // around a phone photo of it.
+                          final picked = await ImageService.pickWithSheet(
+                              context,
+                              shape: CropShape.rect);
                           if (picked != null) {
                             setState(() => _certificate = picked);
                           }

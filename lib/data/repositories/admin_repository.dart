@@ -90,20 +90,55 @@ class AdminRepository {
   // ── Suspensions ────────────────────────────────────────────────────────
 
   /// [until] is an ISO date string, or the literal `'forever'` (§5.1).
+  /// Suspends [uid], remembering what the account was before.
+  ///
+  /// The prior status has to be recorded here or [unblockUser] has nothing to
+  /// restore and can only guess.
   Future<void> blockUser(String uid, {required String until}) async {
-    await _users.doc(uid).update({
-      'status': 'blocked',
-      'blockedUntil': until,
-      'blockedAt': FieldValue.serverTimestamp(),
+    final ref = _users.doc(uid);
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      final previous = snap.data()?['status'];
+      tx.update(ref, {
+        'status': 'blocked',
+        'blockedUntil': until,
+        'blockedAt': FieldValue.serverTimestamp(),
+        // Guarded against a double-block overwriting the real prior status
+        // with 'blocked' and stranding the account there.
+        if (previous is String && previous.isNotEmpty && previous != 'blocked')
+          'statusBeforeBlock': previous,
+      });
     });
   }
 
-  /// Lifting a block clears `blockedUntil` too — the blocked gate reads it to
-  /// render its countdown, and a stale value would confuse the display.
+  /// Lifts a block, restoring the status the account actually had.
+  ///
+  /// This used to hardcode `status: 'active'`, which quietly promoted every
+  /// suspended account: a trainer still `pending` in the approvals queue — or
+  /// one already `rejected` — came back `active`, and `watchActiveTrainers()`
+  /// lists exactly `role == 'business' && status == 'active'`. Suspending and
+  /// unsuspending was therefore a way to make a never-reviewed trainer
+  /// bookable in Explore.
+  ///
+  /// With no recorded prior status (a block written before this field
+  /// existed) it fails **safe**: a business account returns to `pending` and
+  /// goes back through approvals rather than going live unreviewed.
   Future<void> unblockUser(String uid) async {
-    await _users.doc(uid).update({
-      'status': 'active',
-      'blockedUntil': FieldValue.delete(),
+    final ref = _users.doc(uid);
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      final data = snap.data();
+      final recorded = data?['statusBeforeBlock'];
+      final restored = (recorded is String && recorded.isNotEmpty)
+          ? recorded
+          : (data?['role'] == 'business' ? 'pending' : 'active');
+      tx.update(ref, {
+        'status': restored,
+        // Cleared alongside: the blocked gate reads blockedUntil for its
+        // countdown, and a stale value would keep the ban in force.
+        'blockedUntil': FieldValue.delete(),
+        'statusBeforeBlock': FieldValue.delete(),
+      });
     });
     await _notifications.notify(
       targetUserId: uid,

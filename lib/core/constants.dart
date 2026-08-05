@@ -16,11 +16,79 @@ abstract final class FlowConst {
     'Ras Soma Bay',
   ];
 
+  /// Where each spot in [kiteSpots] actually is, for the wind forecast.
+  ///
+  /// Approximate launch-area coordinates, not survey grade — a few hundred
+  /// metres either way changes nothing in a forecast whose native resolution
+  /// is measured in kilometres. Every key here must exist in [kiteSpots]; a
+  /// spot with no entry simply shows no wind rather than a wrong one, and
+  /// `test/core_logic_test.dart` asserts the two lists agree.
+  static const spotCoordinates = <String, (double lat, double lon)>{
+    'El Gouna': (27.3950, 33.6780),
+    'Abu Soma Bay': (26.8480, 33.9930),
+    'Safaga': (26.7330, 33.9380),
+    'LahamiBay': (24.0960, 35.4620),
+    'Dahab': (28.4810, 34.5130),
+    'Hurghada-Magawish': (27.1500, 33.8260),
+    'Marsa Alam Tulip': (25.0700, 34.8950),
+    'Soma Bay': (26.8440, 33.9830),
+    'Marsa Alam El Naaba': (25.0760, 34.8900),
+    'Ras Soma Bay': (26.8500, 33.9700),
+  };
+
+  /// Open-Meteo's free tier caps a forecast at 16 days, while the booking day
+  /// strip runs to [bookingDayStripLength]. Days past this simply carry no
+  /// wind — shown as nothing, never as a guess.
+  static const windForecastDays = 16;
+
   /// Suggested languages — users may add their own.
   static const languages = [
     'English', 'Arabic', 'German', 'French', 'Spanish', 'Italian',
     'Russian', 'Polish', 'Dutch', 'Portuguese', 'Czech', 'Turkish',
     'Mandarin', 'Hindi', 'Japanese', 'Korean',
+  ];
+
+  /// Nationalities as **demonyms** ("German", not "Germany") — the field asks
+  /// who you are, not where you were born. Searchable rather than scrolled,
+  /// so length costs nothing; the Red Sea draws riders from everywhere and a
+  /// short list would just push people into "Other".
+  ///
+  /// The nationalities most represented on Egyptian kite beaches lead the
+  /// list; the rest are alphabetical.
+  static const nationalities = [
+    'Egyptian', 'German', 'Russian', 'Polish', 'Italian', 'French', 'British',
+    'Dutch', 'Czech', 'Austrian', 'Swiss', 'Ukrainian', 'Spanish',
+    'Afghan', 'Albanian', 'Algerian', 'American', 'Andorran', 'Angolan',
+    'Argentine', 'Armenian', 'Australian', 'Azerbaijani', 'Bahamian',
+    'Bahraini', 'Bangladeshi', 'Barbadian', 'Belarusian', 'Belgian',
+    'Belizean', 'Beninese', 'Bhutanese', 'Bolivian', 'Bosnian', 'Botswanan',
+    'Brazilian', 'Bruneian', 'Bulgarian', 'Burkinabé', 'Burmese',
+    'Burundian', 'Cambodian', 'Cameroonian', 'Canadian', 'Cape Verdean',
+    'Chadian', 'Chilean', 'Chinese', 'Colombian', 'Comoran', 'Congolese',
+    'Costa Rican', 'Croatian', 'Cuban', 'Cypriot', 'Danish', 'Djiboutian',
+    'Dominican', 'Ecuadorean', 'Emirati', 'Equatorial Guinean', 'Eritrean',
+    'Estonian', 'Ethiopian', 'Fijian', 'Filipino', 'Finnish', 'Gabonese',
+    'Gambian', 'Georgian', 'Ghanaian', 'Greek', 'Grenadian', 'Guatemalan',
+    'Guinean', 'Guyanese', 'Haitian', 'Honduran', 'Hungarian', 'Icelandic',
+    'Indian', 'Indonesian', 'Iranian', 'Iraqi', 'Irish', 'Israeli',
+    'Ivorian', 'Jamaican', 'Japanese', 'Jordanian', 'Kazakh', 'Kenyan',
+    'Kuwaiti', 'Kyrgyz', 'Laotian', 'Latvian', 'Lebanese', 'Liberian',
+    'Libyan', 'Liechtensteiner', 'Lithuanian', 'Luxembourgish',
+    'Macedonian', 'Malagasy', 'Malawian', 'Malaysian', 'Maldivian',
+    'Malian', 'Maltese', 'Mauritanian', 'Mauritian', 'Mexican', 'Moldovan',
+    'Monacan', 'Mongolian', 'Montenegrin', 'Moroccan', 'Mozambican',
+    'Namibian', 'Nepalese', 'New Zealander', 'Nicaraguan', 'Nigerian',
+    'Nigerien', 'North Korean', 'Norwegian', 'Omani', 'Pakistani',
+    'Palestinian', 'Panamanian', 'Papua New Guinean', 'Paraguayan',
+    'Peruvian', 'Portuguese', 'Qatari', 'Romanian', 'Rwandan', 'Salvadoran',
+    'Samoan', 'Saudi', 'Senegalese', 'Serbian', 'Seychellois',
+    'Sierra Leonean', 'Singaporean', 'Slovak', 'Slovenian', 'Somali',
+    'South African', 'South Korean', 'South Sudanese', 'Sri Lankan',
+    'Sudanese', 'Surinamese', 'Swazi', 'Swedish', 'Syrian', 'Taiwanese',
+    'Tajik', 'Tanzanian', 'Thai', 'Togolese', 'Tongan', 'Trinidadian',
+    'Tunisian', 'Turkish', 'Turkmen', 'Ugandan', 'Uruguayan', 'Uzbek',
+    'Vanuatuan', 'Venezuelan', 'Vietnamese', 'Yemeni', 'Zambian',
+    'Zimbabwean',
   ];
 
   /// Rider skill levels (closed list).

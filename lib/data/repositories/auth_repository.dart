@@ -39,34 +39,36 @@ class AuthRepository {
     }
   }
 
-  /// Sign-up sets the Firebase displayName from the name field.
+  /// Creates the account. Credentials only — no display name.
   ///
-  /// Silent fallback (§3.1): an already-registered email attempts a sign-in
-  /// with the same credentials instead of erroring — someone re-registering
-  /// with their real password just gets logged in. If the password does *not*
-  /// match, the fallback's "incorrect email or password" would be baffling
-  /// mid-registration, so it is re-thrown with wording that fits the flow.
-  Future<void> signUp(String name, String email, String password) async {
+  /// Registration asks for email and password and nothing else. The name is
+  /// collected by the onboarding form that runs immediately afterwards, which
+  /// already owns it (it writes `name` onto the profile document, and that is
+  /// what the whole app reads). Asking twice bought nothing but a field the
+  /// user had to fill before they knew what they were signing up as.
+  ///
+  /// **No silent sign-in fallback.** v2.6 (§3.1) answered an already-taken
+  /// email by quietly attempting a log-in with the same credentials, so
+  /// filling in a registration form could drop you into an existing account
+  /// without ever saying so — and when the password did not match, the user
+  /// got a password error on a screen that had never asked them to remember
+  /// one. Both outcomes lie about what happened.
+  ///
+  /// The failure is now reported plainly and the sign-up screen turns it into
+  /// a one-tap offer to sign in instead, carrying the email across
+  /// (see [AuthRecovery]). Same number of taps when the guess was right,
+  /// honest when it was wrong.
+  Future<void> signUp(String email, String password) async {
     try {
-      final cred = await _auth.createUserWithEmailAndPassword(
+      await _auth.createUserWithEmailAndPassword(
           email: email.trim(), password: password);
-      await cred.user?.updateDisplayName(name.trim());
     } catch (error) {
       final failure = translate(error);
       if (failure.code == 'email-already-in-use') {
-        try {
-          await signIn(email, password);
-          return;
-        } on AuthFailure catch (signInFailure) {
-          if (_isCredentialMismatch(signInFailure.code)) {
-            throw const AuthFailure(
-              'An account with this email already exists. '
-              'Log in instead, or use "Forgot password?" to reset it.',
-              code: 'email-already-in-use',
-            );
-          }
-          rethrow;
-        }
+        throw const AuthFailure(
+          'An account with this email already exists.',
+          code: 'email-already-in-use',
+        );
       }
       throw failure;
     }
@@ -82,6 +84,23 @@ class AuthRepository {
 
   Future<void> signOut() => _auth.signOut();
 
+  /// Whether Firebase will refuse a destructive operation because the
+  /// session is stale.
+  ///
+  /// Firebase rejects `delete()` with `requires-recent-login` beyond roughly
+  /// five minutes since sign-in. That has to be asked *before* anything
+  /// irreversible: account deletion removes the Firestore profile first, and
+  /// the rules only let a signed-in user delete their own document — while
+  /// `allow create` forces a business account back to `pending`. So a
+  /// profile destroyed on the way to a failed auth deletion cannot be put
+  /// back, and an approved trainer would lose their approval, rate and
+  /// gallery while still being signed in.
+  bool get needsReauthForDeletion {
+    final lastSignIn = _auth.currentUser?.metadata.lastSignInTime;
+    if (lastSignIn == null) return true;
+    return DateTime.now().difference(lastSignIn) > const Duration(minutes: 5);
+  }
+
   /// Deletes the auth user. The caller deletes the Firestore profile first.
   Future<void> deleteAccount() async {
     try {
@@ -90,11 +109,6 @@ class AuthRepository {
       throw translate(error);
     }
   }
-
-  static bool _isCredentialMismatch(String? code) =>
-      code == 'wrong-password' ||
-      code == 'invalid-credential' ||
-      code == 'user-not-found';
 
   /// Turns anything thrown by the Firebase SDK into an [AuthFailure].
   ///

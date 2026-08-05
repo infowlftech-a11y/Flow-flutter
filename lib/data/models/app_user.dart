@@ -138,6 +138,23 @@ class AppUser {
       ? null
       : DateTime.tryParse(blockedUntilRaw ?? '');
 
+  /// Whether a `blocked` status is still in force (§2.4).
+  ///
+  /// A timed suspension has to lapse on its own: the user cannot rewrite
+  /// their own `status` (firestore.rules pins it to staff), so if the gate
+  /// only read `status` a 7-day ban would last until someone manually lifted
+  /// it. The blocked screen's one-minute ticker invalidates the profile
+  /// stream precisely so this getter is re-evaluated.
+  ///
+  /// Fails **closed**: `'forever'`, a missing date and an unparseable date
+  /// all keep the block. A malformed value must never let someone out.
+  bool get isBlockInForce {
+    if (isPermanentlyBlocked) return true;
+    final until = blockedUntil;
+    if (until == null) return true;
+    return DateTime.now().isBefore(until);
+  }
+
   int get bufferMinutes => travelBufferMinutes ?? FlowConst.defaultBufferMinutes;
   double get displayRate => hourlyRate ?? FlowConst.defaultDisplayRate;
   String get initial => name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();

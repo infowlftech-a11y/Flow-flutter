@@ -26,13 +26,44 @@ class ChatRepository {
         return list;
       });
 
+  /// Messages oldest-first, sorted **client-side** — and that is the fix, not
+  /// a stylistic choice.
+  ///
+  /// `orderBy('createdAt')` was wrong for the one message that matters most:
+  /// your own, a millisecond after you send it. `createdAt` is a
+  /// `serverTimestamp()`, which reads as `null` in the local snapshot until
+  /// the server acknowledges the write — and Firestore sorts null *first*. So
+  /// a message you just sent appeared at the very top of the thread, above
+  /// conversations from last week, then jumped to the bottom when the ack
+  /// landed. Latency compensation was painting the bubble instantly, in the
+  /// wrong place.
+  ///
+  /// The Dart SDK has no `ServerTimestampBehavior.estimate` to reach for
+  /// (it exists in the native SDKs, not in `cloud_firestore` for Flutter), so
+  /// the sort moves here, where a pending timestamp can be treated as what it
+  /// actually is: the newest message in the thread. Sorting client-side is
+  /// also what the rest of the app already does (§6.2).
   Stream<List<ChatMessage>> watchMessages(String chatId) => _chats
       .doc(chatId)
       .collection(Col.messages)
-      .orderBy('createdAt')
       .snapshots()
-      .map((qs) =>
-          [for (final d in qs.docs) ChatMessage.fromDoc(d.id, d.data())]);
+      .map((qs) {
+        final list = [
+          for (final d in qs.docs) ChatMessage.fromDoc(d.id, d.data()),
+        ];
+        list.sort((a, b) {
+          final at = a.createdAt;
+          final bt = b.createdAt;
+          // Both pending: keep them adjacent and stable rather than letting
+          // the comparator reorder them arbitrarily between frames.
+          if (at == null && bt == null) return 0;
+          // A pending write is the message being sent right now — newest.
+          if (at == null) return 1;
+          if (bt == null) return -1;
+          return at.compareTo(bt);
+        });
+        return list;
+      });
 
   /// Creates the thread document if needed and clears my unread counter
   /// (merge — only my entry changes) (§3.11, §6.3).

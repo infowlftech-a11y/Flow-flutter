@@ -49,10 +49,29 @@ void main() {
     });
   });
 
-  group('name validation', () {
-    test('required and trimmed', () {
-      expect(AuthValidators.name('   '), 'Tell us your name');
-      expect(AuthValidators.name('Lina'), isNull);
+  group('confirm password', () {
+    test('must be present and must match', () {
+      expect(AuthValidators.confirmPassword('', 'hunter22'),
+          'Re-enter your password');
+      expect(AuthValidators.confirmPassword('hunter23', 'hunter22'),
+          "Passwords don't match");
+      expect(AuthValidators.confirmPassword('hunter22', 'hunter22'), isNull);
+    });
+
+    test('does not compare while the password itself is still invalid', () {
+      // Otherwise a too-short password produces two errors for one mistake,
+      // and this field has to be fixed again after the other one is.
+      expect(AuthValidators.confirmPassword('abc', 'abcde'), isNull);
+      expect(AuthValidators.password('abcde', signUp: true), isNotNull);
+    });
+
+    test('compares raw — leading and trailing spaces are part of a password',
+        () {
+      // Firebase receives the password untrimmed, so trimming one side here
+      // would either mask a real mismatch or invent one.
+      expect(AuthValidators.confirmPassword('hunter22', 'hunter22 '),
+          "Passwords don't match");
+      expect(AuthValidators.confirmPassword(' hunter22', ' hunter22'), isNull);
     });
   });
 
@@ -185,6 +204,42 @@ void main() {
         expect(AuthController.fieldFor(code), isNull, reason: code);
       }
       expect(AuthRepository.isConfigCode('wrong-password'), isFalse);
+    });
+  });
+
+  group('wrong-door recovery', () {
+    // Firebase cannot tell us up front whether an email is registered —
+    // fetchSignInMethodsForEmail returns nothing once Email Enumeration
+    // Protection is on, and turning that off to enable an email-first flow
+    // would trade a real security property for a cosmetic one. So the flow
+    // finds out by trying, and turns the failure into a one-tap offer.
+    test('an existing email on sign-up offers sign-in', () {
+      expect(AuthController.recoveryFor('email-already-in-use'),
+          AuthRecovery.accountExists);
+    });
+
+    test('an unknown email on sign-in offers sign-up', () {
+      expect(AuthController.recoveryFor('user-not-found'),
+          AuthRecovery.noAccount);
+    });
+
+    test('a wrong password offers nothing — the door was right', () {
+      for (final code in [
+        'wrong-password',
+        'invalid-credential',
+        'too-many-requests',
+        'network-request-failed',
+        null,
+      ]) {
+        expect(AuthController.recoveryFor(code), AuthRecovery.none,
+            reason: '$code');
+      }
+    });
+
+    test('both recovery codes still place their message under a field', () {
+      // The offer supplements the inline error; it does not replace it.
+      expect(AuthController.fieldFor('email-already-in-use'), AuthField.email);
+      expect(AuthController.fieldFor('user-not-found'), AuthField.email);
     });
   });
 

@@ -111,7 +111,16 @@ extension DocX on Map<String, dynamic> {
   }
 }
 
-DateTime? _asDate(dynamic v) {
+/// Always **local** time. `Timestamp.toDate()` and
+/// `DateTime.fromMillisecondsSinceEpoch` already return local, but
+/// `DateTime.tryParse` returns a *UTC* instance for anything carrying a `Z`
+/// or an offset. Egypt is UTC+2/+3, so leaking that through would make every
+/// downstream `.day`/`.month`/`.hour` read the wrong calendar day for
+/// late-evening timestamps — the exact shift `date_x.dart` warns about. The
+/// instant is identical either way; only the field accessors differ.
+DateTime? _asDate(dynamic v) => _asDateRaw(v)?.toLocal();
+
+DateTime? _asDateRaw(dynamic v) {
   if (v == null) return null;
   if (v is Timestamp) return v.toDate();
   if (v is DateTime) return v;

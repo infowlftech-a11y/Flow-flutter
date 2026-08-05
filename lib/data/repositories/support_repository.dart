@@ -84,13 +84,27 @@ class SupportRepository {
 
   // ── Appeals (§3.14, §6.3) ──────────────────────────────────────────────
 
+  /// The user's **most recent** appeal.
+  ///
+  /// An unordered `limit(1)` returns an arbitrary document — Firestore falls
+  /// back to `__name__` ascending and auto-IDs are random — so a user
+  /// suspended a second time was handed their old *resolved* appeal. That
+  /// hides the "Appeal this decision" button (the screen only offers it when
+  /// there is no appeal), leaving them able to do nothing but reply into a
+  /// closed thread that the staff queue, which counts only `pending`, never
+  /// surfaces. Sorted client-side because an `orderBy` alongside the `where`
+  /// would require a composite index, which this app avoids by design (§6.2).
   Stream<Appeal?> watchMyAppeal(String uid) => _appeals
       .where('userId', isEqualTo: uid)
-      .limit(1)
       .snapshots()
-      .map((qs) => qs.docs.isEmpty
-          ? null
-          : Appeal.fromDoc(qs.docs.first.id, qs.docs.first.data()));
+      .map((qs) {
+        if (qs.docs.isEmpty) return null;
+        final appeals = [
+          for (final d in qs.docs) Appeal.fromDoc(d.id, d.data()),
+        ]..sort((a, b) => (b.createdAt ?? DateTime(0))
+            .compareTo(a.createdAt ?? DateTime(0)));
+        return appeals.first;
+      });
 
   Future<void> submitAppeal({
     required String userId,

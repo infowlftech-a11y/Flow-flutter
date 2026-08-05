@@ -25,7 +25,12 @@ class PushController {
   String? _tokenSyncedForUid;
 
   /// The shell's navigator context supplier — set by the app root.
-  BuildContext Function()? contextSupplier;
+  ///
+  /// Nullable on purpose: the navigator has no context before the first frame
+  /// or while it is being rebuilt, and a push can land in either window. The
+  /// callers below already guard for null — returning it (rather than
+  /// asserting) is what lets that guard actually run.
+  BuildContext? Function()? contextSupplier;
 
   void start() {
     // Foreground pushes → in-app snackbar with VIEW (Android suppresses the
@@ -110,10 +115,19 @@ class PushController {
     }
   }
 
+  /// Forget which uid this device's token was written for.
+  ///
+  /// Called on sign-out. Without it the latch in [syncTokenFor] still holds
+  /// the departed uid, so signing back in as that same user inside one app
+  /// session short-circuits and never rewrites the token that sign-out just
+  /// deleted — leaving them with no pushes until the next cold start.
+  void forgetSyncedUid() => _tokenSyncedForUid = null;
+
   void dispose() {
     for (final s in _subs) {
       s.cancel();
     }
+    _subs.clear();
   }
 }
 

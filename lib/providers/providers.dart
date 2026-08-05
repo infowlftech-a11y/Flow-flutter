@@ -13,6 +13,7 @@ import '../data/models/schedule.dart';
 import '../data/models/social.dart';
 import '../data/models/support.dart';
 import '../data/models/report.dart';
+import '../data/models/wind.dart';
 import '../data/repositories/admin_repository.dart';
 import '../data/repositories/auth_repository.dart';
 import '../data/repositories/booking_repository.dart';
@@ -23,6 +24,7 @@ import '../data/repositories/schedule_repository.dart';
 import '../data/repositories/storage_repository.dart';
 import '../data/repositories/support_repository.dart';
 import '../data/repositories/user_repository.dart';
+import '../services/wind_service.dart';
 
 // ── Infrastructure & repositories (§7.1) ─────────────────────────────────
 
@@ -61,6 +63,27 @@ final authStateProvider = StreamProvider<User?>(
 final currentUidProvider =
     Provider<String?>((ref) => ref.watch(authStateProvider).value?.uid);
 
+/// Sign-out, with this device's push token released first (§11.3).
+///
+/// Every sign-out goes through here rather than calling
+/// `authRepository.signOut()` directly. A token is bound to the *device*, not
+/// the account, so one left behind on the old profile keeps delivering that
+/// user's notifications to whoever signs in next. The clear has to happen
+/// while the session is still alive — afterwards the rules reject the write —
+/// and it is best-effort: a failed clear must never strand someone in an
+/// account they are trying to leave.
+final signOutProvider = Provider<Future<void> Function()>((ref) => () async {
+      final uid = ref.read(currentUidProvider);
+      if (uid != null) {
+        try {
+          await ref.read(userRepositoryProvider).clearFcmToken(uid);
+        } catch (_) {
+          // Offline, or the profile is already gone. Sign out regardless.
+        }
+      }
+      await ref.read(authRepositoryProvider).signOut();
+    });
+
 /// The profile document is **streamed, not fetched once** — approval or a
 /// block moves the app immediately, with no restart.
 final currentUserProvider = StreamProvider<AppUser?>((ref) {
@@ -95,12 +118,25 @@ class Session {
 
   String get uid => user?.uid ?? firebaseUser?.uid ?? '';
 
-  String get displayName {
+  /// The user's real name, or empty when nobody has told us one yet.
+  ///
+  /// Registration no longer asks for a name, so between sign-up and the
+  /// onboarding form this is genuinely blank. Anywhere that *prefills an
+  /// input* must use this rather than [displayName]: seeding the onboarding
+  /// name field with the "Rider" placeholder would put a fake name one tap
+  /// away from being saved as the real one.
+  String get knownName {
     final n = user?.name.trim();
     if (n != null && n.isNotEmpty) return n;
     final fn = firebaseUser?.displayName?.trim();
     if (fn != null && fn.isNotEmpty) return fn;
-    return 'Rider';
+    return '';
+  }
+
+  /// For display only — falls back to a neutral placeholder.
+  String get displayName {
+    final known = knownName;
+    return known.isEmpty ? 'Rider' : known;
   }
 }
 
@@ -132,8 +168,13 @@ final sessionProvider = Provider<Session>((ref) {
         stage: AppStage.chooseRole, user: user, firebaseUser: firebaseUser);
   }
 
-  // 5. blocked
-  if (user.status == AccountStatus.blocked) {
+  // 5. blocked — only while the ban is actually in force. §2.4 requires a
+  // lapsed suspension to release the user automatically, and the blocked
+  // screen's ticker invalidates this stream expecting exactly that. Gating
+  // on `status` alone made every timed suspension permanent, because the
+  // rules forbid the user from clearing their own status and only a manual
+  // admin unblock ever rewrites it.
+  if (user.status == AccountStatus.blocked && user.isBlockInForce) {
     return Session(
         stage: AppStage.blocked, user: user, firebaseUser: firebaseUser);
   }
@@ -362,6 +403,23 @@ final trainerMonthRevenueProvider = Provider<AsyncValue<double>>((ref) {
           0, (acc, b) => acc + (b.totalPrice ?? 0)));
 });
 
+/// Completed sessions the trainer has not been paid for.
+///
+/// Deliberately *not* subtracted from [trainerRevenueProvider]: "earned" has
+/// always meant work delivered, and silently redefining it as "cash in hand"
+/// would drop every historical session — none of which carry payment data —
+/// out of a number trainers already know. This is an additional figure, and
+/// it only ever counts bookings that explicitly say they are owing.
+final trainerUnpaidProvider = Provider<AsyncValue<List<Booking>>>((ref) =>
+    ref.watch(trainerCompletedProvider).whenData((list) => [
+          for (final b in list)
+            if (b.payment.isOutstanding) b,
+        ]));
+
+final trainerOutstandingProvider = Provider<AsyncValue<double>>((ref) => ref
+    .watch(trainerUnpaidProvider)
+    .whenData((list) => list.fold<double>(0, (acc, b) => acc + b.amountDue)));
+
 // ── Availability (§7.5) ──────────────────────────────────────────────────
 
 typedef DayKey = ({String instructorId, String date});
@@ -435,6 +493,34 @@ final myVacationsProvider = StreamProvider<List<Vacation>>((ref) {
 final instructorVacationsProvider =
     StreamProvider.autoDispose.family<List<Vacation>, String>((ref, id) =>
         ref.watch(scheduleRepositoryProvider).watchVacations(id));
+
+// ── Wind (§3.6) ──────────────────────────────────────────────────────────
+
+final windServiceProvider = Provider<WindService>((ref) => WindService());
+
+/// The forecast for one spot.
+///
+/// Not autoDispose: the service caches for 30 minutes anyway, and keeping the
+/// provider alive means moving between a trainer's profile and their booking
+/// screen reuses the same numbers instead of showing a second spinner over
+/// data that is already in memory.
+final windForecastProvider =
+    FutureProvider.family<WindForecast, String>((ref, spot) =>
+        ref.watch(windServiceProvider).forSpot(spot));
+
+/// The forecast at whichever spot a provider teaches from.
+///
+/// Resolves the spot from the trainer's profile rather than asking the caller
+/// for it, so the booking screen does not have to thread a location through
+/// [BookingTarget] — which is transient and deliberately knows nothing about
+/// the profile behind it (§5.5).
+final providerWindProvider =
+    FutureProvider.family<WindForecast, String>((ref, providerId) async {
+  final profile = await ref.watch(trainerProfileProvider(providerId).future);
+  final spot = profile?.location ?? profile?.homeSpot;
+  if (spot == null || spot.isEmpty) return WindForecast.empty;
+  return ref.watch(windForecastProvider(spot).future);
+});
 
 // ── Notifications & chat (§7.3, §8.11) ───────────────────────────────────
 

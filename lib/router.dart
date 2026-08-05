@@ -5,7 +5,10 @@ import 'package:go_router/go_router.dart';
 import 'core/widgets/feedback.dart';
 import 'data/models/catalogue.dart';
 import 'features/admin/admin_screen.dart';
-import 'features/auth/auth_screen.dart';
+import 'features/auth/reset_password_screen.dart';
+import 'features/auth/sign_in_screen.dart';
+import 'features/auth/sign_up_screen.dart';
+import 'features/auth/welcome_screen.dart';
 import 'features/booking/booking_screen.dart';
 import 'features/chat/chat_screen.dart';
 import 'features/chat/inbox_screen.dart';
@@ -58,7 +61,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         case AppStage.loading:
           return loc == '/' ? null : '/';
         case AppStage.signedOut:
-          return loc == '/auth' ? null : '/auth';
+          // Any /auth/* route is a legitimate place to be while signed out —
+          // pinning to a single path would bounce the user off Create
+          // account and Reset the moment they navigated there.
+          return loc == '/auth' || loc.startsWith('/auth/') ? null : '/auth';
         case AppStage.chooseRole:
           return loc.startsWith('/onboarding') ? null : '/onboarding/role';
         case AppStage.awaitingApproval:
@@ -74,6 +80,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         case AppStage.ready:
           if (loc == '/' ||
               loc == '/auth' ||
+              loc.startsWith('/auth/') ||
               loc == '/pending' ||
               loc == '/blocked' ||
               loc == '/rejected' ||
@@ -93,9 +100,26 @@ final routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) =>
             _fadePage(state, const SplashScreen()),
       ),
+      // Auth is four routes, not one screen with a mode toggle: the front
+      // door, and the three things you can do from it.
       GoRoute(
         path: '/auth',
-        pageBuilder: (context, state) => _fadePage(state, const AuthScreen()),
+        pageBuilder: (context, state) =>
+            _fadePage(state, const WelcomeScreen()),
+        routes: [
+          GoRoute(
+            path: 'sign-in',
+            builder: (context, state) => const SignInScreen(),
+          ),
+          GoRoute(
+            path: 'sign-up',
+            builder: (context, state) => const SignUpScreen(),
+          ),
+          GoRoute(
+            path: 'reset',
+            builder: (context, state) => const ResetPasswordScreen(),
+          ),
+        ],
       ),
       GoRoute(
         path: '/onboarding/role',

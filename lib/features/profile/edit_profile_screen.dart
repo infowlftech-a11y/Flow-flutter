@@ -12,6 +12,7 @@ import '../../core/theme/typography.dart';
 import '../../core/utils/haptics.dart';
 import '../../core/widgets/feedback.dart';
 import '../../core/widgets/flow_image.dart';
+import '../../core/widgets/picker_field.dart';
 import '../../core/widgets/sheets.dart';
 import '../../data/firestore_paths.dart';
 import '../../data/models/app_user.dart';
@@ -35,11 +36,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   final _name = TextEditingController();
   final _phone = TextEditingController();
-  final _nationality = TextEditingController();
   final _age = TextEditingController();
   final _bio = TextEditingController();
 
   XFile? _newAvatar;
+  String? _nationality;
   String? _level;
   List<String> _languages = [];
   List<String> _existingGallery = [];
@@ -53,7 +54,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     super.initState();
     final user = ref.read(currentUserProvider).value;
     if (user != null) _load(user);
-    for (final c in [_name, _phone, _nationality, _age, _bio]) {
+    for (final c in [_name, _phone, _age, _bio]) {
       c.addListener(() => setState(() {}));
     }
   }
@@ -62,7 +63,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _snapshot = user;
     _name.text = user.name;
     _phone.text = user.phoneNumber ?? '';
-    _nationality.text = user.nationality ?? '';
+    _nationality = user.nationality;
     _age.text = user.age?.toString() ?? '';
     _bio.text = user.bio ?? '';
     _level = user.level;
@@ -74,7 +75,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   void dispose() {
     _name.dispose();
     _phone.dispose();
-    _nationality.dispose();
     _age.dispose();
     _bio.dispose();
     super.dispose();
@@ -89,7 +89,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         _newGallery.isNotEmpty ||
         _name.text.trim() != s.name ||
         _phone.text.trim() != (s.phoneNumber ?? '') ||
-        _nationality.text.trim() != (s.nationality ?? '') ||
+        _nationality != s.nationality ||
         _age.text.trim() != (s.age?.toString() ?? '') ||
         _bio.text.trim() != (s.bio ?? '') ||
         _level != s.level ||
@@ -131,15 +131,21 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             name: _name.text.trim(),
             phoneNumber:
                 _phone.text.trim().isEmpty ? null : _phone.text.trim(),
-            nationality: _nationality.text.trim().isEmpty
-                ? null
-                : _nationality.text.trim(),
+            nationality: _nationality,
             age: int.tryParse(_age.text.trim()),
             level: s.isTrainer ? null : _level,
             bio: _bio.text.trim().isEmpty ? null : _bio.text.trim(),
             languages: _languages,
             photoUrl: photoUrl,
             gallery: gallery,
+            // A null above means "leave this alone", so an emptied optional
+            // field has to be named here or it is never actually removed.
+            clear: {
+              if (_phone.text.trim().isEmpty) 'phoneNumber',
+              if (_nationality == null) 'nationality',
+              if (_bio.text.trim().isEmpty) 'bio',
+              if (_age.text.trim().isEmpty) 'age',
+            },
           );
       Haptics.medium();
       if (mounted) {
@@ -238,8 +244,14 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             ),
             FormGroup(
               label: 'Email',
-              child: TextField(
-                controller: TextEditingController(text: user.email),
+              // initialValue, not a controller: this is read-only, and a
+              // controller built in build() leaks one undisposed instance per
+              // rebuild — and the state listeners rebuild this form on every
+              // keystroke in the fields above. TextFormField owns and
+              // disposes its own controller.
+              child: TextFormField(
+                key: ValueKey(user.email),
+                initialValue: user.email,
                 enabled: false,
                 decoration: const InputDecoration(
                     helperText: 'Your email is your sign-in and cannot change.'),
@@ -261,10 +273,13 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   flex: 3,
                   child: FormGroup(
                     label: 'Nationality',
-                    child: TextField(
-                      controller: _nationality,
+                    child: FlowPickerField(
+                      values: [?_nationality],
+                      options: FlowConst.nationalities,
+                      sheetTitle: 'Nationality',
                       enabled: !_busy,
-                      textCapitalization: TextCapitalization.words,
+                      onChanged: (v) =>
+                          setState(() => _nationality = v.firstOrNull),
                     ),
                   ),
                 ),
@@ -289,18 +304,22 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             if (!isTrainer)
               FormGroup(
                 label: 'Kite level',
-                child: ChipSelect(
+                child: FlowPickerField(
+                  values: [?_level],
                   options: FlowConst.riderLevels,
-                  value: _level,
-                  onChanged: (v) => setState(() => _level = v),
+                  sheetTitle: 'Kite level',
+                  enabled: !_busy,
+                  onChanged: (v) => setState(() => _level = v.firstOrNull),
                 ),
               ),
             if (isTrainer)
               FormGroup(
                 label: 'Training spot',
-                child: TextField(
-                  controller:
-                      TextEditingController(text: user.location ?? ''),
+                // Read-only — see the Email field above on why this is not a
+                // build-time TextEditingController.
+                child: TextFormField(
+                  key: ValueKey(user.location),
+                  initialValue: user.location ?? '',
                   enabled: false,
                   decoration: const InputDecoration(
                       helperText:
@@ -318,9 +337,17 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             FormGroup(
               label: 'Languages',
               required: true,
-              child: LanguagePicker(
-                selected: _languages,
-                errorText: _languagesError,
+              errorText: _languagesError,
+              child: FlowPickerField(
+                values: _languages,
+                options: FlowConst.languages,
+                sheetTitle: 'Languages',
+                sheetSubtitle: 'Search, or add one that is not listed.',
+                hintText: 'Languages you speak',
+                multiSelect: true,
+                allowCustom: true,
+                enabled: !_busy,
+                hasError: _languagesError != null,
                 onChanged: (v) => setState(() => _languages = v),
               ),
             ),
@@ -364,8 +391,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         onPressed: _busy
                             ? null
                             : () async {
-                                final picked =
-                                    await ImageService.pickMulti();
+                                final picked = await ImageService
+                                    .pickMultiCropped(context);
                                 if (picked.isNotEmpty) {
                                   setState(
                                       () => _newGallery.addAll(picked));

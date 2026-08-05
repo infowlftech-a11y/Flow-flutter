@@ -1,5 +1,6 @@
 import '../../core/utils/date_x.dart';
 import '../../core/utils/doc_x.dart';
+import 'payment.dart';
 
 /// Booking lifecycle (§5.2). `unknown` serialises back to `pending`.
 enum BookingStatus {
@@ -59,6 +60,7 @@ class Booking {
     this.reminderSent = false,
     this.checkedIn = false,
     this.tripId,
+    this.payment = PaymentInfo.none,
   });
 
   final String id;
@@ -92,6 +94,13 @@ class Booking {
   final bool reminderSent;
   final bool checkedIn;
   final String? tripId;
+
+  /// What is owed and whether it has been collected.
+  ///
+  /// Defaults to [PaymentInfo.none] — status [PaymentStatus.unknown] — for
+  /// every booking written before payments were tracked. That is not the same
+  /// as unpaid, and the UI treats it differently on purpose.
+  final PaymentInfo payment;
 
   /// Reads the canonical field names only.
   ///
@@ -127,7 +136,23 @@ class Booking {
         reminderSent: d.boolean('reminderSent'),
         checkedIn: d.boolean('checkedIn'),
         tripId: d.str('tripId'),
+        payment: PaymentInfo.fromDoc(d),
       );
+
+  /// What the rider owes, preferring the amount captured at booking time.
+  ///
+  /// Falls back to `totalPrice` so an older document still reports a figure —
+  /// the two agree for anything written since payments were tracked, and the
+  /// captured amount is the one that must win if a trainer ever changes their
+  /// rate after a booking was made.
+  double get amountDue => payment.amount ?? totalPrice ?? 0;
+
+  /// True when this session is finished and the trainer has not been paid.
+  ///
+  /// [PaymentStatus.unknown] is excluded deliberately: history from before
+  /// payment tracking must not be reported as money owed.
+  bool get awaitsPayment =>
+      status == BookingStatus.completed && payment.isOutstanding;
 
   bool get isManual => kiterId == 'manual_entry' || type == 'manual';
   bool get isSafari => type == 'safari';

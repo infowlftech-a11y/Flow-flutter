@@ -40,12 +40,33 @@ class _ScheduleTabState extends ConsumerState<ScheduleTab> {
     setState(() => _date = ymd(d));
   }
 
+  /// Rolls a stale selection forward when the day changes under the tab.
+  ///
+  /// `_date` is captured once, but this tab can outlive the day it was opened
+  /// on — a trainer who leaves the app here overnight returns to `_date`
+  /// pointing at yesterday. The header still claims TODAY, every hour reads
+  /// as free (`pastSlots` only masks the *current* day), and a walk-in would
+  /// be written into the past.
+  void _rollOverIfStale() {
+    if (_date.compareTo(todayYmd()) >= 0) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _date.compareTo(todayYmd()) < 0) {
+        setState(() => _date = todayYmd());
+      }
+    });
+  }
+
   Future<void> _pickDate() async {
     final now = DateTime.now();
+    final min = DateTime(now.year, now.month, now.day);
+    final current = parseYmd(_date);
     final picked = await showDatePicker(
       context: context,
-      initialDate: parseYmd(_date) ?? now,
-      firstDate: DateTime(now.year, now.month, now.day),
+      // Clamped: showDatePicker asserts initialDate is not before firstDate,
+      // and a stale `_date` from before midnight is exactly that.
+      initialDate:
+          (current == null || current.isBefore(min)) ? min : current,
+      firstDate: min,
       lastDate: now.add(const Duration(days: 365)),
     );
     if (picked != null) setState(() => _date = ymd(picked));
@@ -53,6 +74,7 @@ class _ScheduleTabState extends ConsumerState<ScheduleTab> {
 
   @override
   Widget build(BuildContext context) {
+    _rollOverIfStale();
     final uid = ref.watch(sessionProvider.select((s) => s.uid));
     final key = (instructorId: uid, date: _date);
     final availability = ref.watch(dayAvailabilityProvider(key));
@@ -254,6 +276,9 @@ class _ScheduleTabState extends ConsumerState<ScheduleTab> {
       builder: (sheetContext) => StatefulBuilder(
         builder: (sheetContext, setSheet) {
           bool slotRangeFree(Slot s, int hours) {
+            // Closing time first: isFree() is vacuously true past 17:00, so
+            // without this a 4h duration offers 17:00 and books to 21:00.
+            if (!BookingMath.fitsInDay(s, hours)) return false;
             for (var i = 0; i < hours; i++) {
               final probe = s.plusHours(i);
               if (!(day?.isFree(probe) ?? false)) return false;
@@ -381,7 +406,13 @@ class _ScheduleTabState extends ConsumerState<ScheduleTab> {
           );
         },
       ),
-    );
+      // Sheet-scoped controllers still need disposing — a trainer adding six
+      // walk-ins in a session otherwise leaks twelve of them plus their
+      // listener chains.
+    ).whenComplete(() {
+      name.dispose();
+      price.dispose();
+    });
   }
 
   /// Time-off sheet: the "to" picker can never precede "from" (§3.9).
@@ -477,7 +508,7 @@ class _ScheduleTabState extends ConsumerState<ScheduleTab> {
           );
         },
       ),
-    );
+    ).whenComplete(reason.dispose);
   }
 }
 
@@ -710,7 +741,18 @@ class _VacationList extends ConsumerWidget {
                   tooltip: 'Remove time off',
                   onPressed: () async {
                     final schedule = ref.read(scheduleRepositoryProvider);
-                    await schedule.removeVacation(v.id);
+                    try {
+                      await schedule.removeVacation(v.id);
+                    } catch (_) {
+                      // Unguarded, a rejected delete threw into the zone and
+                      // the row stayed put with no toast — indistinguishable
+                      // from nothing having been tapped.
+                      if (context.mounted) {
+                        showFlowToast(
+                            context, "Couldn't remove that time off. Try again.");
+                      }
+                      return;
+                    }
                     if (context.mounted) {
                       showFlowToast(
                         context,

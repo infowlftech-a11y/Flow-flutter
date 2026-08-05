@@ -185,7 +185,7 @@ class ProfileScreen extends ConsumerWidget {
                 body: "You'll need your email and password to get back in.",
                 confirmLabel: 'Sign out',
               );
-              if (ok) await ref.read(authRepositoryProvider).signOut();
+              if (ok) await ref.read(signOutProvider)();
             }),
           ]),
           const SizedBox(height: 28),
@@ -300,6 +300,19 @@ class ProfileScreen extends ConsumerWidget {
       ),
     );
     if (confirmed != true || !context.mounted) {
+      reason.dispose();
+      return;
+    }
+
+    // Checked *before* the profile is touched. The auth deletion below is the
+    // step that fails on a stale session, but the profile is deleted first
+    // and cannot be restored (the rules forbid re-creating a business
+    // account as anything but `pending`). Refusing early leaves the account
+    // intact; letting it through would strand a signed-in user with no
+    // profile and no way back.
+    if (ref.read(authRepositoryProvider).needsReauthForDeletion) {
+      showFlowToast(context,
+          'For your security, sign out and sign back in before deleting your account.');
       reason.dispose();
       return;
     }

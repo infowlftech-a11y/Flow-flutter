@@ -1,8 +1,14 @@
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:flow/core/constants.dart';
 import 'package:flow/core/utils/date_x.dart';
+import 'package:flow/core/utils/doc_x.dart';
+import 'package:flow/features/onboarding/onboarding_validators.dart';
 import 'package:flow/data/models/booking.dart';
 import 'package:flow/data/models/schedule.dart';
+import 'package:flow/data/models/payment.dart';
+import 'package:flow/dev/seed_data.dart';
+import 'package:flow/data/models/wind.dart';
 
 void main() {
   group('Slot', () {
@@ -164,6 +170,464 @@ void main() {
       expect(euro(120), '€120');
       expect(euro(72.5), '€72.50');
       expect(euro(null), '—');
+    });
+  });
+
+  group('BookingMath.leadingRun', () {
+    // Regression: pruning an hour that was taken mid-session used to leave a
+    // gapped selection. The write derives endTime from first→last, so
+    // {09,11} was written as 09:00–11:00 — booking straight across the 10:00
+    // someone else had just taken, and showing the trainer one unbroken
+    // 2-hour block.
+    test('an untouched run survives whole', () {
+      final run = BookingMath.leadingRun(
+          const [Slot('09:00'), Slot('10:00'), Slot('11:00')]);
+      expect([for (final s in run) s.value], ['09:00', '10:00', '11:00']);
+    });
+
+    test('a gap truncates to the leading run', () {
+      final run = BookingMath.leadingRun(
+          const [Slot('09:00'), Slot('11:00'), Slot('12:00')]);
+      expect([for (final s in run) s.value], ['09:00']);
+    });
+
+    test('a hole punched mid-run drops everything after it', () {
+      // 09,10,11,12 with 11:00 taken → prune leaves 09,10,12.
+      final run = BookingMath.leadingRun(
+          const [Slot('09:00'), Slot('10:00'), Slot('12:00')]);
+      expect([for (final s in run) s.value], ['09:00', '10:00']);
+    });
+
+    test('empty in, empty out', () {
+      expect(BookingMath.leadingRun(const <Slot>[]), isEmpty);
+    });
+  });
+
+  group('BookingMath.fitsInDay', () {
+    // Regression: the walk-in sheet probed a range with DayAvailability.isFree
+    // alone, which is vacuously true past 17:00 — nothing is ever booked,
+    // blocked or past at 19:00. A 4h walk-in was offered a 17:00 start and
+    // written as 17:00–21:00, holding hours no timeline renders.
+    test('a session ending exactly at the 18:00 close fits', () {
+      expect(BookingMath.fitsInDay(const Slot('17:00'), 1), isTrue);
+      expect(BookingMath.fitsInDay(const Slot('14:00'), 4), isTrue);
+    });
+
+    test('a session running past the close does not', () {
+      expect(BookingMath.fitsInDay(const Slot('17:00'), 4), isFalse);
+      expect(BookingMath.fitsInDay(const Slot('16:00'), 3), isFalse);
+    });
+
+    test('a start before opening does not', () {
+      expect(BookingMath.fitsInDay(const Slot('07:00'), 1), isFalse);
+    });
+
+    test('a non-positive duration does not', () {
+      expect(BookingMath.fitsInDay(const Slot('09:00'), 0), isFalse);
+    });
+  });
+
+  group('OnboardingValidators', () {
+    test('name: rejects empty, too short, symbol-only and overlong', () {
+      expect(OnboardingValidators.name('Lina'), isNull);
+      expect(OnboardingValidators.name('  Omar Farouk  '), isNull);
+      expect(OnboardingValidators.name(''), isNotNull);
+      expect(OnboardingValidators.name('   '), isNotNull);
+      expect(OnboardingValidators.name('L'), isNotNull);
+      // Symbols and digits are not a name — the old check only tested empty.
+      expect(OnboardingValidators.name('...'), isNotNull);
+      expect(OnboardingValidators.name('12345'), isNotNull);
+      expect(OnboardingValidators.name('x' * 61), isNotNull);
+    });
+
+    test('name: accepts non-Latin scripts', () {
+      // Arabic is a first-class case on this coast; a Latin-only rule would
+      // reject a real name.
+      expect(OnboardingValidators.name('كريم'), isNull);
+    });
+
+    test('age: bounded 8–99 and numeric', () {
+      expect(OnboardingValidators.age('27'), isNull);
+      expect(OnboardingValidators.age('8'), isNull);
+      expect(OnboardingValidators.age('99'), isNull);
+      expect(OnboardingValidators.age('7'), isNotNull);
+      expect(OnboardingValidators.age(''), isNotNull);
+      expect(OnboardingValidators.age('abc'), isNotNull);
+    });
+
+    test('bio: optional but bounded', () {
+      expect(OnboardingValidators.bio(''), isNull);
+      expect(OnboardingValidators.bio('Short and sweet.'), isNull);
+      expect(
+          OnboardingValidators.bio(
+              'x' * (OnboardingValidators.maxBioLength + 1)),
+          isNotNull);
+    });
+
+    test('phone: optional, shape-checked, not locale-locked', () {
+      expect(OnboardingValidators.phone(''), isNull);
+      expect(OnboardingValidators.phone('+20 100 123 4567'), isNull);
+      expect(OnboardingValidators.phone('(020) 7946-0958'), isNull);
+      expect(OnboardingValidators.phone('not a phone'), isNotNull);
+      expect(OnboardingValidators.phone('123'), isNotNull);
+    });
+
+    test('rate: held inside the platform band', () {
+      String? check(String v) => OnboardingValidators.rate(v,
+          min: FlowConst.minHourlyRate, max: FlowConst.maxHourlyRate);
+      expect(check('${FlowConst.minHourlyRate}'), isNull);
+      expect(check('${FlowConst.maxHourlyRate}'), isNull);
+      expect(check('${FlowConst.minHourlyRate - 1}'), isNotNull);
+      expect(check('${FlowConst.maxHourlyRate + 1}'), isNotNull);
+      expect(check(''), isNotNull);
+    });
+  });
+
+  group('nationality list', () {
+    test('has no duplicates', () {
+      final seen = <String>{};
+      final dupes = [
+        for (final n in FlowConst.nationalities)
+          if (!seen.add(n)) n,
+      ];
+      expect(dupes, isEmpty, reason: 'duplicate demonyms: $dupes');
+    });
+
+    test('is long enough to be worth searching', () {
+      expect(FlowConst.nationalities.length, greaterThan(150));
+    });
+  });
+
+  group('DocX.date normalises to local', () {
+    // Regression: DateTime.tryParse returns a *UTC* instance for anything
+    // carrying a Z or an offset, while Timestamp.toDate() and
+    // fromMillisecondsSinceEpoch both return local. Downstream code reads
+    // .day/.month/.hour off the result, so a UTC leak showed the wrong
+    // calendar day — in Egypt (UTC+2/+3) a 23:00Z stamp is already tomorrow.
+    test('a Z-suffixed ISO string is converted, not left in UTC', () {
+      final d = <String, dynamic>{'createdAt': '2026-08-04T23:00:00Z'}
+          .date('createdAt');
+      expect(d, isNotNull);
+      expect(d!.isUtc, isFalse, reason: 'must be local for .day/.hour reads');
+      // Same instant — only the field accessors change.
+      expect(d.toUtc(), DateTime.utc(2026, 8, 4, 23));
+    });
+
+    test('an explicit offset is also converted', () {
+      final d =
+          <String, dynamic>{'t': '2026-08-04T23:00:00+05:00'}.date('t');
+      expect(d!.isUtc, isFalse);
+      expect(d.toUtc(), DateTime.utc(2026, 8, 4, 18));
+    });
+
+    test('a naive ISO string keeps its wall-clock reading', () {
+      final d = <String, dynamic>{'t': '2026-08-04T23:00:00'}.date('t');
+      expect(d!.isUtc, isFalse);
+      expect(d.hour, 23);
+    });
+
+    test('epoch seconds and millis resolve to the same local instant', () {
+      final millis = <String, dynamic>{'t': 1785970800000}.date('t');
+      final seconds = <String, dynamic>{'t': 1785970800}.date('t');
+      expect(millis, seconds);
+      expect(millis!.isUtc, isFalse);
+    });
+  });
+
+  group('seed cast', () {
+    test('every email is unique', () {
+      // A duplicate would make two accounts collide on the same auth user and
+      // silently overwrite one profile with the other.
+      final emails = [for (final a in seedAccounts) a.email];
+      expect(emails.toSet(), hasLength(emails.length));
+    });
+
+    test('every account sits on a real kite spot', () {
+      for (final a in seedAccounts) {
+        expect(FlowConst.kiteSpots.contains(a.spot), isTrue,
+            reason: '${a.email} is at "${a.spot}"');
+      }
+    });
+
+    test('every spot has at least one bookable business', () {
+      // The point of the cast: no spot filter in Explore should come back
+      // empty, because an empty result is indistinguishable from a bug.
+      final covered = {
+        for (final a in seedAccounts)
+          if (a.isBusiness && !a.keepPending) a.spot,
+      };
+      for (final spot in FlowConst.kiteSpots) {
+        expect(covered.contains(spot), isTrue, reason: 'nothing at $spot');
+      }
+    });
+
+    test('rates stay inside the platform band', () {
+      for (final a in seedAccounts.where((a) => a.isBusiness)) {
+        expect(a.rate,
+            inInclusiveRange(FlowConst.minHourlyRate, FlowConst.maxHourlyRate),
+            reason: a.email);
+      }
+      // And both ends are actually exercised.
+      final rates = [
+        for (final a in seedAccounts.where((a) => a.isBusiness)) a.rate,
+      ];
+      expect(rates, contains(FlowConst.minHourlyRate));
+      expect(rates, contains(FlowConst.maxHourlyRate));
+    });
+
+    test('all three operator kinds are represented', () {
+      final types = {
+        for (final a in seedAccounts.where((a) => a.isBusiness))
+          a.businessType,
+      };
+      expect(types, containsAll(['Instructor', 'Station', 'Safari operator']));
+    });
+
+    test('some accounts stay pending, and approve-all excludes them', () {
+      final pending = seedAccounts.where((a) => a.keepPending);
+      expect(pending, isNotEmpty,
+          reason: 'the admin console needs something in its queue');
+      for (final a in pending) {
+        expect(approvableAccounts.contains(a), isFalse, reason: a.email);
+      }
+      // And approve-all never reaches a rider or the admin.
+      for (final a in approvableAccounts) {
+        expect(a.isBusiness, isTrue, reason: a.email);
+      }
+    });
+
+    test('the layout stress cases are present', () {
+      final businesses = seedAccounts.where((a) => a.isBusiness).toList();
+      expect(businesses.any((a) => a.bio.isEmpty), isTrue,
+          reason: 'need a coach with no bio');
+      expect(businesses.any((a) => a.bio.length >= 200), isTrue,
+          reason: 'need a coach with a near-max bio');
+      expect(businesses.any((a) => a.languages.length >= 5), isTrue,
+          reason: 'need a coach with many languages');
+      expect(seedAccounts.any((a) => a.name.length >= 25), isTrue,
+          reason: 'need a long name');
+      // Non-Latin script, for RTL and avatar initials.
+      expect(seedAccounts.any((a) => RegExp(r'[؀-ۿ]').hasMatch(a.name)),
+          isTrue, reason: 'need a name in Arabic script');
+    });
+
+    test('bios respect the onboarding ceiling', () {
+      // Seeded profiles must be values the app itself would have accepted.
+      for (final a in seedAccounts) {
+        expect(OnboardingValidators.bio(a.bio), isNull, reason: a.email);
+        expect(OnboardingValidators.name(a.name), isNull, reason: a.email);
+      }
+    });
+  });
+
+  group('payments', () {
+    Booking bookingWith(Map<String, dynamic> extra) => Booking.fromDoc('b1', {
+          'date': '2026-08-05',
+          'status': 'completed',
+          'instructorId': 't1',
+          'kiterId': 'r1',
+          'totalPrice': 160,
+          ...extra,
+        });
+
+    test('a booking with no payment fields is "unknown", never "unpaid"', () {
+      // The whole point of the extra state. Every session written before
+      // payments were tracked would otherwise be reported as money owed, and
+      // every trainer would open the app to a debt that does not exist.
+      final legacy = bookingWith({});
+      expect(legacy.payment.status, PaymentStatus.unknown);
+      expect(legacy.payment.isOutstanding, isFalse);
+      expect(legacy.awaitsPayment, isFalse);
+      expect(legacy.payment.status.isDisplayable, isFalse);
+    });
+
+    test('an explicitly unpaid completed session is outstanding', () {
+      final owing = bookingWith({'paymentStatus': 'unpaid'});
+      expect(owing.payment.isOutstanding, isTrue);
+      expect(owing.awaitsPayment, isTrue);
+      expect(owing.payment.status.isDisplayable, isTrue);
+    });
+
+    test('an unpaid session that is not finished is not yet owed', () {
+      // You do not owe for a lesson you have not had.
+      final upcoming =
+          bookingWith({'paymentStatus': 'unpaid', 'status': 'confirmed'});
+      expect(upcoming.payment.isOutstanding, isTrue);
+      expect(upcoming.awaitsPayment, isFalse);
+    });
+
+    test('paid and refunded read back correctly', () {
+      expect(bookingWith({'paymentStatus': 'paid'}).payment.isSettled, isTrue);
+      expect(bookingWith({'paymentStatus': 'paid'}).awaitsPayment, isFalse);
+      final refunded = bookingWith({'paymentStatus': 'refunded'});
+      expect(refunded.payment.status, PaymentStatus.refunded);
+      // A refund is not an amount owing — nobody is chasing it.
+      expect(refunded.payment.isOutstanding, isFalse);
+    });
+
+    test('a failed card payment is money still owed', () {
+      final failed = bookingWith({'paymentStatus': 'failed'});
+      expect(failed.payment.isOutstanding, isTrue);
+      expect(failed.awaitsPayment, isTrue);
+    });
+
+    test('amountDue prefers the amount captured at booking time', () {
+      // If a trainer raises their rate, an old booking must still show what
+      // was agreed, not what the lesson would cost today.
+      final captured =
+          bookingWith({'amountDue': 140, 'totalPrice': 160});
+      expect(captured.amountDue, 140);
+      // And falls back for documents written before amountDue existed.
+      expect(bookingWith({}).amountDue, 160);
+      expect(bookingWith({'totalPrice': null}).amountDue, 0);
+    });
+
+    test('unrecognised wire values degrade instead of throwing', () {
+      expect(PaymentStatus.parse('something-new'), PaymentStatus.unknown);
+      expect(PaymentStatus.parse(null), PaymentStatus.unknown);
+      expect(PaymentMethod.parse('crypto'), PaymentMethod.cash);
+      expect(PaymentMethod.parse(null), PaymentMethod.cash);
+    });
+
+    test('only cash is offered, and only cash is settled by a person', () {
+      // Guards the seam: when a processor is wired in, these change together
+      // or the UI offers a method nothing can actually take.
+      expect(PaymentMethod.cash.isAvailable, isTrue);
+      expect(PaymentMethod.cash.isCollectedInPerson, isTrue);
+      for (final m in [
+        PaymentMethod.card,
+        PaymentMethod.wallet,
+        PaymentMethod.transfer,
+      ]) {
+        expect(m.isAvailable, isFalse, reason: m.name);
+        expect(m.isCollectedInPerson, isFalse, reason: m.name);
+      }
+    });
+
+    test('a new booking records what is owed, never that it is settled', () {
+      final fields = PaymentInfo.initialFields(amount: 160);
+      expect(fields['paymentStatus'], 'unpaid');
+      expect(fields['paymentMethod'], 'cash');
+      expect(fields['currency'], 'EUR');
+      expect(fields['amountDue'], 160);
+      // No paidAt on creation — nothing has been collected yet.
+      expect(fields.containsKey('paidAt'), isFalse);
+    });
+  });
+
+  group('wind', () {
+    test('every kite spot has coordinates', () {
+      // A spot missing here silently shows no wind. The lists are edited in
+      // different places, so this is the only thing keeping them in step.
+      for (final spot in FlowConst.kiteSpots) {
+        expect(FlowConst.spotCoordinates.containsKey(spot), isTrue,
+            reason: '$spot has no coordinates');
+      }
+      // And nothing coordinates a spot that no longer exists.
+      for (final spot in FlowConst.spotCoordinates.keys) {
+        expect(FlowConst.kiteSpots.contains(spot), isTrue,
+            reason: '$spot is not a kite spot');
+      }
+    });
+
+    test('coordinates land on the Egyptian Red Sea', () {
+      // Catches a transposed lat/lon or a stray sign, which would otherwise
+      // silently forecast the wrong hemisphere.
+      for (final entry in FlowConst.spotCoordinates.entries) {
+        final (lat, lon) = entry.value;
+        expect(lat, inInclusiveRange(22, 32), reason: entry.key);
+        expect(lon, inInclusiveRange(32, 37), reason: entry.key);
+      }
+    });
+
+    test('rating bands are the ones riders actually use', () {
+      expect(WindRating.fromKnots(0), WindRating.calm);
+      expect(WindRating.fromKnots(9.9), WindRating.calm);
+      expect(WindRating.fromKnots(10), WindRating.light);
+      expect(WindRating.fromKnots(14.9), WindRating.light);
+      expect(WindRating.fromKnots(15), WindRating.good);
+      expect(WindRating.fromKnots(24.9), WindRating.good);
+      expect(WindRating.fromKnots(25), WindRating.strong);
+      expect(WindRating.fromKnots(33.9), WindRating.strong);
+      expect(WindRating.fromKnots(34), WindRating.extreme);
+    });
+
+    test('only the middle bands suit beginners', () {
+      expect(WindRating.calm.suitsBeginners, isFalse);
+      expect(WindRating.light.suitsBeginners, isTrue);
+      expect(WindRating.good.suitsBeginners, isTrue);
+      expect(WindRating.strong.suitsBeginners, isFalse);
+      expect(WindRating.extreme.suitsBeginners, isFalse);
+    });
+
+    test('compass sectors centre on their label, and wrap', () {
+      WindDay at(int degrees) => WindDay(
+          date: '2026-08-05',
+          knots: 18,
+          gustKnots: 24,
+          directionDegrees: degrees);
+      expect(at(0).compass, 'N');
+      expect(at(359).compass, 'N');
+      expect(at(22).compass, 'N'); // Still inside N's sector, not NE.
+      expect(at(23).compass, 'NE');
+      expect(at(90).compass, 'E');
+      expect(at(180).compass, 'S');
+      expect(at(270).compass, 'W');
+      expect(at(315).compass, 'NW');
+      // 333° is the dominant direction El Gouna actually reported.
+      expect(at(333).compass, 'NW');
+      // Out-of-range values must not crash or index off the end.
+      expect(at(720).compass, 'N');
+      expect(at(-90).compass, 'W');
+    });
+
+    test('parses a real Open-Meteo daily block', () {
+      // Trimmed from the live response for El Gouna.
+      final forecast = WindForecast.fromOpenMeteo('El Gouna', {
+        'daily': {
+          'time': ['2026-08-05', '2026-08-06', '2026-08-11'],
+          'wind_speed_10m_max': [17.0, 18.5, 7.6],
+          'wind_gusts_10m_max': [31.9, 34.0, 20.2],
+          'wind_direction_10m_dominant': [333, 322, 34],
+        },
+      });
+
+      expect(forecast.days, hasLength(3));
+      final first = forecast.forDate('2026-08-05')!;
+      expect(first.displayKnots, 17);
+      expect(first.displayGustKnots, 32);
+      expect(first.compass, 'NW');
+      expect(first.rating, WindRating.good);
+      expect(forecast.forDate('2026-08-11')!.rating, WindRating.calm);
+      expect(forecast.forDate('2026-01-01'), isNull);
+    });
+
+    test('a ragged or malformed block degrades instead of throwing', () {
+      // Wind decorates the booking flow; it must never be able to break it.
+      final short = WindForecast.fromOpenMeteo('El Gouna', {
+        'daily': {
+          'time': ['2026-08-05', '2026-08-06', '2026-08-07'],
+          // Shorter than `time`, with a null hole.
+          'wind_speed_10m_max': [17.0, null],
+          'wind_gusts_10m_max': <dynamic>[],
+          'wind_direction_10m_dominant': <dynamic>[],
+        },
+      });
+      expect(short.days, hasLength(1));
+      final only = short.forDate('2026-08-05')!;
+      // Missing gust falls back to the sustained speed, never to zero.
+      expect(only.displayGustKnots, 17);
+      expect(only.directionDegrees, 0);
+
+      expect(WindForecast.fromOpenMeteo('x', {}).isEmpty, isTrue);
+      expect(
+          WindForecast.fromOpenMeteo('x', {'daily': 'nonsense'}).isEmpty,
+          isTrue);
+      expect(
+          WindForecast.fromOpenMeteo('x', {
+            'daily': {'time': 'not-a-list'},
+          }).isEmpty,
+          isTrue);
     });
   });
 }

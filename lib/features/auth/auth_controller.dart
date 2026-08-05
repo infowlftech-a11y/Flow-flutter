@@ -5,23 +5,40 @@ import '../../data/repositories/auth_repository.dart';
 import '../../providers/providers.dart';
 import 'auth_validators.dart';
 
-enum AuthMode { logIn, signUp }
+/// A one-tap way out of the wrong door.
+///
+/// Firebase cannot reliably tell us up front whether an email is registered:
+/// `fetchSignInMethodsForEmail` returns an empty list once Email Enumeration
+/// Protection is on, which it is by default. Branching the UI on it would be
+/// unreliable, and disabling the protection to make it work would trade a
+/// real security property for a cosmetic one.
+///
+/// So the flow finds out the honest way — by trying — and turns the resulting
+/// error into an offer instead of a dead end.
+enum AuthRecovery {
+  none,
 
-/// Everything the auth form needs to render, in one immutable value.
+  /// Sign-up hit an email that already has an account → offer sign-in.
+  accountExists,
+
+  /// Sign-in found no account for that email → offer sign-up.
+  noAccount,
+}
+
+/// Everything an auth form needs to render, in one immutable value.
 ///
 /// Errors are split by destination: [fieldErrors] render inline under the
 /// field that caused them, [banner] is for problems that belong to the whole
 /// form (no connection, rate limited, service down).
 class AuthState {
   const AuthState({
-    this.mode = AuthMode.logIn,
     this.busy = false,
     this.banner,
     this.fieldErrors = const {},
     this.notice,
+    this.recovery = AuthRecovery.none,
   });
 
-  final AuthMode mode;
   final bool busy;
   final String? banner;
   final Map<AuthField, String> fieldErrors;
@@ -29,31 +46,51 @@ class AuthState {
   /// Transient success message (e.g. "reset link sent").
   final String? notice;
 
-  bool get isSignUp => mode == AuthMode.signUp;
+  /// Set when the user is on the wrong screen for the email they typed.
+  final AuthRecovery recovery;
+
   bool get hasErrors => banner != null || fieldErrors.isNotEmpty;
 
   AuthState copyWith({
-    AuthMode? mode,
     bool? busy,
     String? banner,
     Map<AuthField, String>? fieldErrors,
     String? notice,
+    AuthRecovery? recovery,
     bool clearBanner = false,
     bool clearNotice = false,
   }) =>
       AuthState(
-        mode: mode ?? this.mode,
         busy: busy ?? this.busy,
         banner: clearBanner ? null : (banner ?? this.banner),
         fieldErrors: fieldErrors ?? this.fieldErrors,
         notice: clearNotice ? null : (notice ?? this.notice),
+        recovery: recovery ?? this.recovery,
       );
 }
 
 final authControllerProvider =
     NotifierProvider<AuthController, AuthState>(AuthController.new);
 
-/// Owns the submit lifecycle so the widget only renders.
+/// The email last typed on any auth screen.
+///
+/// Carried across Sign in ⇄ Create account ⇄ Reset so switching screens never
+/// costs the user their typing — the single most common complaint about
+/// splitting auth into separate routes.
+final authEmailProvider =
+    NotifierProvider<AuthEmail, String>(AuthEmail.new);
+
+class AuthEmail extends Notifier<String> {
+  @override
+  String build() => '';
+
+  void set(String value) {
+    final next = value.trim();
+    if (next != state) state = next;
+  }
+}
+
+/// Owns the submit lifecycle so the widgets only render.
 ///
 /// The contract that fixes the original bug: **a successful credential call
 /// can never be reported as a failure.** The network call sits alone in its
@@ -65,52 +102,63 @@ class AuthController extends Notifier<AuthState> {
 
   AuthRepository get _repo => ref.read(authRepositoryProvider);
 
-  void setMode(AuthMode mode) {
-    if (mode == state.mode) return;
-    // Switching modes clears stale errors — a login failure shouldn't sit
-    // under a registration form.
-    state = AuthState(mode: mode);
-  }
+  /// Called when moving between auth screens — a rejection from the previous
+  /// screen must not sit over a fresh form.
+  void reset() => state = const AuthState();
 
   /// Called as the user edits: the error they are actively fixing disappears,
-  /// and so does the form-level banner — a rejection from the previous
-  /// attempt shouldn't linger over inputs that have since changed.
+  /// and so does the form-level banner and any recovery offer — all three
+  /// describe an attempt whose inputs have since changed.
   void clearFieldError(AuthField field) {
     final hasField = state.fieldErrors.containsKey(field);
-    if (!hasField && state.banner == null && state.notice == null) return;
+    if (!hasField &&
+        state.banner == null &&
+        state.notice == null &&
+        state.recovery == AuthRecovery.none) {
+      return;
+    }
     state = state.copyWith(
       fieldErrors: hasField
           ? ({...state.fieldErrors}..remove(field))
           : state.fieldErrors,
+      recovery: AuthRecovery.none,
       clearBanner: true,
       clearNotice: true,
     );
   }
 
   void clearFeedback() {
-    if (state.banner == null && state.notice == null) return;
-    state = state.copyWith(clearBanner: true, clearNotice: true);
+    if (state.banner == null &&
+        state.notice == null &&
+        state.recovery == AuthRecovery.none) {
+      return;
+    }
+    state = state.copyWith(
+        recovery: AuthRecovery.none, clearBanner: true, clearNotice: true);
   }
 
   /// Returns true when the credentials were accepted. The router reacts to
   /// the auth stream, so there is nothing to navigate here.
-  Future<bool> submit({
-    required String name,
-    required String email,
-    required String password,
-  }) async {
+  Future<bool> signIn({required String email, required String password}) =>
+      _run(() => _repo.signIn(email, password));
+
+  Future<bool> signUp({required String email, required String password}) =>
+      _run(() => _repo.signUp(email, password));
+
+  Future<bool> _run(Future<void> Function() call) async {
     // Re-entrancy guard: an IME can deliver `onSubmitted` more than once, and
     // the button stays visually live while busy.
     if (state.busy) return false;
     state = state.copyWith(
-        busy: true, fieldErrors: const {}, clearBanner: true, clearNotice: true);
+      busy: true,
+      fieldErrors: const {},
+      recovery: AuthRecovery.none,
+      clearBanner: true,
+      clearNotice: true,
+    );
 
     try {
-      if (state.isSignUp) {
-        await _repo.signUp(name, email, password);
-      } else {
-        await _repo.signIn(email, password);
-      }
+      await call();
     } on AuthFailure catch (failure) {
       _fail(failure);
       return false;
@@ -139,11 +187,18 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
+  /// Sends a reset link and **always reports the same thing**.
+  ///
+  /// Deliberately does not distinguish "sent" from "no such account": doing
+  /// so turns this form into an oracle for which emails are registered, which
+  /// is the exact enumeration leak Firebase's own protection exists to close.
+  /// The only errors surfaced are ones the user can act on — a malformed
+  /// address, or the network being down.
   Future<bool> sendPasswordReset(String email) async {
     if (state.busy) return false;
     if (!AuthValidators.emailLooksValid(email)) {
       state = state.copyWith(
-        fieldErrors: {AuthField.email: 'Enter your email first, then tap reset.'},
+        fieldErrors: {AuthField.email: "That email doesn't look right"},
         clearBanner: true,
         clearNotice: true,
       );
@@ -155,16 +210,18 @@ class AuthController extends Notifier<AuthState> {
     try {
       await _repo.sendPasswordReset(email);
     } on AuthFailure catch (failure) {
-      _fail(failure);
-      return false;
+      // 'user-not-found' is deliberately swallowed — see the doc comment.
+      // Everything else (offline, rate limited, misconfigured) is real and
+      // the user needs to know the mail is not coming.
+      if (failure.code != 'user-not-found') {
+        _fail(failure);
+        return false;
+      }
     } catch (_) {
       _fail(const AuthFailure('Something went wrong. Please try again.'));
       return false;
     }
-    if (ref.mounted) {
-      state = state.copyWith(
-          busy: false, notice: 'Reset link sent to ${email.trim()}');
-    }
+    if (ref.mounted) state = state.copyWith(busy: false);
     return true;
   }
 
@@ -175,11 +232,19 @@ class AuthController extends Notifier<AuthState> {
     final field = failure.isConfigError ? null : fieldFor(failure.code);
     state = state.copyWith(
       busy: false,
+      recovery: recoveryFor(failure.code),
       fieldErrors: field == null ? const {} : {field: failure.message},
       banner: field == null ? failure.message : null,
       clearBanner: field != null,
     );
   }
+
+  /// Which wrong-door offer, if any, this failure justifies.
+  static AuthRecovery recoveryFor(String? code) => switch (code) {
+        'email-already-in-use' => AuthRecovery.accountExists,
+        'user-not-found' => AuthRecovery.noAccount,
+        _ => AuthRecovery.none,
+      };
 
   /// Where a server error belongs. Anything not tied to one input — no
   /// connection, rate limiting, a disabled account — stays in the banner.

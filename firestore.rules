@@ -84,11 +84,44 @@ service cloud.firestore {
             || resource.data.instructorId == uid();
       }
 
+      // The trainer is the one who is owed, so they are the only party who
+      // can say they were paid.
+      function isProvider() {
+        return resource.data.instructorId == uid();
+      }
+
+      // Money fields. A rider must never be able to write these: one who
+      // could set their own booking to `paid` could walk off the beach owing
+      // for the lesson with the app agreeing that they did not.
+      function paymentFieldsUnchanged() {
+        return !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['paymentStatus', 'paymentMethod', 'paidAt', 'refundedAt',
+                   'paymentRef', 'amountDue', 'currency', 'totalPrice']);
+      }
+
       allow read: if signedIn() && (isParty() || isStaff());
+
+      // On create the rider states what they owe, never that it is settled.
+      // A trainer creating a walk-in may record cash taken up front, so the
+      // constraint is on riders only.
       allow create: if signedIn()
         && (request.resource.data.kiterId == uid()
-            || request.resource.data.instructorId == uid());
-      allow update: if signedIn() && (isParty() || isStaff());
+            || request.resource.data.instructorId == uid())
+        && (request.resource.data.instructorId == uid()
+            || request.resource.data.paymentStatus == 'unpaid');
+
+      // Order matters here, for cost as much as clarity. `isStaff()` does a
+      // `get()` on the caller's profile — a billed read, and one of only ten
+      // a single request is allowed. The two parties account for essentially
+      // every booking update, and both are answerable from the document
+      // already loaded, so they are checked first and staff is the fallback.
+      // Evaluating isStaff() first also threw outright for any signed-in user
+      // with no profile document rather than simply denying them.
+      allow update: if signedIn()
+        && (isProvider()
+            || (isParty() && paymentFieldsUnchanged())
+            || isStaff());
+
       allow delete: if isStaff();
     }
 

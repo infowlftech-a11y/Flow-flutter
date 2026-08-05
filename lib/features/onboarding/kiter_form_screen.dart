@@ -7,9 +7,10 @@ import '../../core/constants.dart';
 import '../../core/utils/haptics.dart';
 import '../../core/widgets/buttons.dart';
 import '../../core/widgets/feedback.dart';
-import '../../core/widgets/misc.dart';
+import '../../core/widgets/picker_field.dart';
 import '../../data/firestore_paths.dart';
 import '../../providers/providers.dart';
+import 'onboarding_validators.dart';
 import 'onboarding_widgets.dart';
 
 /// Rider onboarding — one page (§3.2, §9.2). On failure the first unmet
@@ -23,15 +24,15 @@ class KiterFormScreen extends ConsumerStatefulWidget {
 
 class _KiterFormScreenState extends ConsumerState<KiterFormScreen> {
   final _name = TextEditingController();
-  final _nationality = TextEditingController();
   final _age = TextEditingController();
   final _bio = TextEditingController();
 
   XFile? _avatar;
   String _level = 'Independent';
   String? _homeSpot;
+  String? _nationality;
   List<String> _languages = [];
-  final List<String> _quiver = [];
+  List<String> _quiver = [];
 
   bool _attempted = false;
   bool _busy = false;
@@ -43,32 +44,40 @@ class _KiterFormScreenState extends ConsumerState<KiterFormScreen> {
   @override
   void initState() {
     super.initState();
-    _name.text = ref.read(sessionProvider).displayName;
+    // knownName, not displayName — an empty field is honest, "Rider" is not.
+    _name.text = ref.read(sessionProvider).knownName;
   }
 
   @override
   void dispose() {
     _name.dispose();
-    _nationality.dispose();
     _age.dispose();
     _bio.dispose();
     super.dispose();
   }
 
-  String? get _nameError =>
-      _attempted && _name.text.trim().isEmpty ? 'Your name is required' : null;
-  String? get _nationalityError => _attempted && _nationality.text.trim().isEmpty
-      ? 'Where are you from?'
-      : null;
+  // Validation lives in one place per field so the submit-time scroll target
+  // and the inline message can never disagree about what is wrong.
+  String? get _nameError {
+    if (!_attempted) return null;
+    return OnboardingValidators.name(_name.text);
+  }
+
+  String? get _nationalityError =>
+      _attempted && _nationality == null ? 'Pick your nationality' : null;
+
   String? get _ageError {
     if (!_attempted) return null;
-    final age = int.tryParse(_age.text.trim());
-    if (age == null || age < 8 || age > 99) return '8–99';
-    return null;
+    return OnboardingValidators.age(_age.text);
   }
 
   String? get _languagesError =>
       _attempted && _languages.isEmpty ? 'Pick at least one language' : null;
+
+  String? get _bioError {
+    if (!_attempted) return null;
+    return OnboardingValidators.bio(_bio.text);
+  }
 
   Future<void> _submit() async {
     setState(() => _attempted = true);
@@ -77,7 +86,7 @@ class _KiterFormScreenState extends ConsumerState<KiterFormScreen> {
         ? _nameKey
         : (_nationalityError != null || _ageError != null)
             ? _detailsKey
-            : _languagesError != null
+            : (_languagesError != null || _bioError != null)
                 ? _languagesKey
                 : null;
     if (firstProblem != null) {
@@ -106,7 +115,7 @@ class _KiterFormScreenState extends ConsumerState<KiterFormScreen> {
             uid: session.uid,
             name: _name.text.trim(),
             email: session.firebaseUser?.email ?? '',
-            nationality: _nationality.text.trim(),
+            nationality: _nationality!,
             age: int.parse(_age.text.trim()),
             level: _level,
             homeSpot: _homeSpot,
@@ -169,13 +178,15 @@ class _KiterFormScreenState extends ConsumerState<KiterFormScreen> {
                         label: 'Nationality',
                         required: true,
                         errorText: _nationalityError,
-                        child: TextField(
-                          controller: _nationality,
+                        child: FlowPickerField(
+                          values: [?_nationality],
+                          options: FlowConst.nationalities,
+                          sheetTitle: 'Nationality',
+                          hintText: 'Select',
                           enabled: !_busy,
-                          textCapitalization: TextCapitalization.words,
-                          decoration:
-                              const InputDecoration(hintText: 'e.g. German'),
-                          onChanged: (_) => setState(() {}),
+                          hasError: _nationalityError != null,
+                          onChanged: (v) =>
+                              setState(() => _nationality = v.firstOrNull),
                         ),
                       ),
                     ),
@@ -204,59 +215,70 @@ class _KiterFormScreenState extends ConsumerState<KiterFormScreen> {
               ),
               FormGroup(
                 label: 'Kite level',
-                child: ChipSelect(
+                child: FlowPickerField(
+                  values: [_level],
                   options: FlowConst.riderLevels,
-                  value: _level,
+                  sheetTitle: 'Kite level',
+                  sheetSubtitle: 'Sets what trainers see before your first session.',
+                  enabled: !_busy,
                   onChanged: (v) =>
-                      setState(() => _level = v ?? 'Independent'),
+                      setState(() => _level = v.firstOrNull ?? 'Independent'),
                 ),
               ),
               FormGroup(
                 label: 'Home spot',
-                child: ChipSelect(
+                child: FlowPickerField(
+                  values: [?_homeSpot],
                   options: FlowConst.kiteSpots,
-                  value: _homeSpot,
-                  onChanged: (v) => setState(() => _homeSpot = v),
+                  sheetTitle: 'Home spot',
+                  hintText: 'Where you ride most',
+                  enabled: !_busy,
+                  onChanged: (v) => setState(() => _homeSpot = v.firstOrNull),
                 ),
               ),
               FormGroup(
                 key: _languagesKey,
                 label: 'Languages',
                 required: true,
-                child: LanguagePicker(
-                  selected: _languages,
-                  errorText: _languagesError,
+                errorText: _languagesError,
+                child: FlowPickerField(
+                  values: _languages,
+                  options: FlowConst.languages,
+                  sheetTitle: 'Languages',
+                  sheetSubtitle: 'Search, or add one that is not listed.',
+                  hintText: 'Add the languages you speak',
+                  multiSelect: true,
+                  allowCustom: true,
+                  enabled: !_busy,
+                  hasError: _languagesError != null,
                   onChanged: (v) => setState(() => _languages = v),
                 ),
               ),
               FormGroup(
                 label: 'Your quiver',
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final q in FlowConst.quiverSuggestions)
-                      FlowChoiceChip(
-                        label: q,
-                        selected: _quiver.contains(q),
-                        onTap: () {
-                          Haptics.select();
-                          setState(() => _quiver.contains(q)
-                              ? _quiver.remove(q)
-                              : _quiver.add(q));
-                        },
-                      ),
-                  ],
+                child: FlowPickerField(
+                  values: _quiver,
+                  options: FlowConst.quiverSuggestions,
+                  sheetTitle: 'Your quiver',
+                  sheetSubtitle: 'Kites and boards you bring with you.',
+                  hintText: 'Add your gear',
+                  multiSelect: true,
+                  allowCustom: true,
+                  enabled: !_busy,
+                  onChanged: (v) => setState(() => _quiver = v),
                 ),
               ),
               FormGroup(
                 label: 'Short bio',
+                errorText: _bioError,
                 child: TextField(
                   controller: _bio,
                   enabled: !_busy,
                   maxLines: 3,
+                  maxLength: OnboardingValidators.maxBioLength,
                   decoration: const InputDecoration(
                       hintText: 'A line about you and your riding'),
+                  onChanged: (_) => setState(() {}),
                 ),
               ),
               PrimaryButton(

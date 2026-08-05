@@ -22,7 +22,7 @@ class RoleSelectScreen extends ConsumerWidget {
         automaticallyImplyLeading: false,
         actions: [
           TextButton.icon(
-            onPressed: () => ref.read(authRepositoryProvider).signOut(),
+            onPressed: () => ref.read(signOutProvider)(),
             icon: const Icon(Icons.logout_rounded,
                 size: 18, color: FlowColors.haze),
             label:
@@ -56,7 +56,10 @@ class RoleSelectScreen extends ConsumerWidget {
                   cta: 'Ride with FLOW',
                   onTap: () {
                     Haptics.select();
-                    context.go('/onboarding/rider');
+                    // push, not go: `go` replaces the location outright, so
+                    // the form had nothing to pop back to and a mistapped
+                    // role was a dead end short of signing out.
+                    context.push('/onboarding/rider');
                   },
                 ),
                 const SizedBox(height: 18),
@@ -70,7 +73,8 @@ class RoleSelectScreen extends ConsumerWidget {
                       'Trainer accounts are reviewed by our team before going live.',
                   onTap: () {
                     Haptics.select();
-                    context.go('/onboarding/trainer');
+                    // See the rider branch — pushed so Back returns here.
+                    context.push('/onboarding/trainer');
                   },
                 ),
                 const Spacer(),

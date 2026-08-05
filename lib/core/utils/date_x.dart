@@ -121,6 +121,38 @@ abstract final class BookingMath {
     return {for (final s in slots()) if (s.hour <= cutoff) s};
   }
 
+  /// Does a [durationHours] session from [start] finish by the 18:00 close?
+  ///
+  /// `DayAvailability.isFree` answers "is this hour taken", and for an hour
+  /// outside 08:00–17:00 the answer is vacuously *no* — nothing is ever
+  /// booked, blocked or past at 19:00, because all three sets are built from
+  /// [slots]. Walking a range with `isFree` alone therefore strolls straight
+  /// through closing time, and the resulting hours are held on the calendar
+  /// but never drawn by any timeline that iterates [slots].
+  static bool fitsInDay(Slot start, int durationHours) =>
+      durationHours > 0 &&
+      start.hour >= firstHour &&
+      start.hour + durationHours <= lastHour;
+
+  /// The leading back-to-back run of [sorted].
+  ///
+  /// A selection must never contain a gap (§8.4): the write derives
+  /// `endTime` from first→last, so a gapped selection books straight across
+  /// the missing hour. Tapping enforces this, but pruning an hour that was
+  /// taken mid-session can split a run, and then only the leading part is
+  /// still honest about what was reserved.
+  static List<Slot> leadingRun(Iterable<Slot> sorted) {
+    final run = <Slot>[];
+    for (final s in sorted) {
+      if (run.isEmpty || s.hour == run.last.hour + 1) {
+        run.add(s);
+      } else {
+        break;
+      }
+    }
+    return run;
+  }
+
   static BookingWindow window(Slot start, int durationHours,
       {int bufferMinutes = 60}) {
     final end = start.plusHours(durationHours);

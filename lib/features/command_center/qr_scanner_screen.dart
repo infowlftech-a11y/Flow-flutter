@@ -25,9 +25,16 @@ class QrScannerScreen extends StatefulWidget {
 }
 
 class _QrScannerScreenState extends State<QrScannerScreen> {
+  // `noDuplicates` suppresses a repeat of the same barcode for the life of
+  // the controller, which broke retrying a *rejected* ticket: after "This
+  // ticket belongs to another trainer" the trainer re-aims at the very same
+  // QR and gets nothing — no banner, no haptic — so the scanner looks dead
+  // and the only way out is backing out and reopening it. `normal` keeps
+  // emitting; the guards in _onDetect do the de-duplication we actually
+  // want, which is "one accepted scan" rather than "one scan ever".
   late final MobileScannerController _controller = MobileScannerController(
     facing: CameraFacing.back,
-    detectionSpeed: DetectionSpeed.noDuplicates,
+    detectionSpeed: DetectionSpeed.normal,
   );
 
   String? _warning;
@@ -52,6 +59,11 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
 
   void _onDetect(BarcodeCapture capture) {
     if (_captured) return;
+    // While a warning is on screen, swallow detections: `normal` speed fires
+    // many times a second, and without this the banner would re-arm its
+    // timer forever and never clear. Once it does clear, the same code is
+    // free to be scanned again — which is the whole point.
+    if (_warning != null) return;
     final raw = capture.barcodes.firstOrNull?.rawValue;
     if (raw == null) return;
 

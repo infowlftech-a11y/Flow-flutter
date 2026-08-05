@@ -4,9 +4,13 @@
 /// they appear changed (inline under the field instead of one shared banner).
 library;
 
-/// Which field an error belongs under. `null` anywhere means "not a field
-/// problem" — it belongs in the form-level banner.
-enum AuthField { name, email, password }
+/// Which field a *server* error belongs under. `null` anywhere means "not a
+/// field problem" — it belongs in the form-level banner.
+///
+/// There is no member for the confirmation field: matching is settled on the
+/// device before anything is sent, so Firebase can never have an opinion
+/// about it.
+enum AuthField { email, password }
 
 /// Deliberately pragmatic, not RFC 5322: requires a local part, a domain, and
 /// at least one dot-separated label after it. The old check was
@@ -25,9 +29,6 @@ abstract final class AuthValidators {
   static bool emailLooksValid(String raw) =>
       _emailPattern.hasMatch(raw.trim());
 
-  static String? name(String? raw) =>
-      (raw ?? '').trim().isEmpty ? 'Tell us your name' : null;
-
   static String? email(String? raw) {
     final value = (raw ?? '').trim();
     if (value.isEmpty) return 'Enter your email';
@@ -43,6 +44,24 @@ abstract final class AuthValidators {
     if (signUp && value.length < minPasswordLength) {
       return 'Use at least $minPasswordLength characters';
     }
+    return null;
+  }
+
+  /// The confirmation field on registration.
+  ///
+  /// Compares the raw strings — no trimming on either side. A password may
+  /// legitimately begin or end with a space, and quietly trimming one of the
+  /// two would either mask a real mismatch or invent one. Whatever Firebase
+  /// receives is what gets compared here.
+  ///
+  /// Stays silent while [password] is itself invalid: telling someone their
+  /// confirmation doesn't match a password that is too short is two errors for
+  /// one mistake, and they'd have to fix this field again afterwards anyway.
+  static String? confirmPassword(String? raw, String password) {
+    final value = raw ?? '';
+    if (value.isEmpty) return 'Re-enter your password';
+    if (password.length < minPasswordLength) return null;
+    if (value != password) return "Passwords don't match";
     return null;
   }
 }

@@ -420,7 +420,8 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
           ],
         ),
       ),
-    );
+      // Sheet-scoped, but still a ChangeNotifier that needs releasing.
+    ).whenComplete(details.dispose);
   }
 }
 
@@ -509,20 +510,41 @@ class _GalleryHeader extends StatelessWidget {
   }
 }
 
-class _FullScreenViewer extends StatelessWidget {
+/// Stateful purely to own the [PageController].
+///
+/// Built in `build()` it leaked one controller (with its ScrollPosition and
+/// ticker) per open, and worse: any rebuild of this route — rotation, a
+/// keyboard or inset change, a theme switch — constructed a *second*
+/// controller for the PageView to attach to, silently abandoning the first
+/// mid-gesture and losing the current page.
+class _FullScreenViewer extends StatefulWidget {
   const _FullScreenViewer({required this.images, required this.initialIndex});
 
   final List<String> images;
   final int initialIndex;
 
   @override
+  State<_FullScreenViewer> createState() => _FullScreenViewerState();
+}
+
+class _FullScreenViewerState extends State<_FullScreenViewer> {
+  late final _page = PageController(initialPage: widget.initialIndex);
+
+  @override
+  void dispose() {
+    _page.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final images = widget.images;
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
         children: [
           PageView.builder(
-            controller: PageController(initialPage: initialIndex),
+            controller: _page,
             itemCount: images.length,
             itemBuilder: (_, i) => InteractiveViewer(
               maxScale: 4,
@@ -633,12 +655,24 @@ class _ReviewsSection extends ConsumerWidget {
                             confirmLabel: 'Delete',
                             destructive: true,
                           );
-                          if (ok) {
+                          if (!ok) return;
+                          try {
                             await ref
                                 .read(reviewRepositoryProvider)
                                 .delete(r.id);
-                            onReviewed();
+                          } catch (_) {
+                            if (context.mounted) {
+                              showFlowToast(context,
+                                  "Couldn't delete your review. Try again.");
+                            }
+                            return;
                           }
+                          // Two async gaps sit between the tap and here, and
+                          // onReviewed() drives setState on the parent — a
+                          // rider who backs out to Explore while the delete
+                          // is in flight would hit "setState() called after
+                          // dispose()".
+                          if (context.mounted) onReviewed();
                         },
                       ),
                   ],

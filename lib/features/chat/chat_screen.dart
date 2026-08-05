@@ -84,6 +84,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       _scroll.jumpTo(target);
     }
     setState(() => _missedWhileAway = 0);
+    // Clearing the local counter is not the same as clearing the thread's
+    // unread count. Without this, tapping "jump to latest" scrolled you to
+    // messages you had now plainly read while the inbox kept a badge on the
+    // conversation — you had to leave and come back to shift it.
+    ref
+        .read(chatRepositoryProvider)
+        .markThreadRead(_chatId, ref.read(sessionProvider).uid);
   }
 
   void _onMessages(List<ChatMessage> messages) {

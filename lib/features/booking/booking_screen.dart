@@ -12,8 +12,10 @@ import '../../core/widgets/feedback.dart';
 import '../../core/widgets/flow_image.dart';
 import '../../core/widgets/misc.dart';
 import '../../core/widgets/sheets.dart';
+import '../../core/theme/palette.dart';
 import '../../data/models/catalogue.dart';
 import '../../data/models/schedule.dart';
+import '../../data/models/wind.dart';
 import '../../data/repositories/booking_repository.dart';
 import '../../providers/providers.dart';
 
@@ -102,13 +104,39 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   /// If a selected hour became unavailable while the screen is open, drop it
   /// on the next frame — but only once real data has arrived (§8.4).
   void _pruneSelection(DayAvailability day) {
-    final stale = [for (final s in _selection) if (!day.isFree(s)) s];
-    if (stale.isEmpty) return;
+    if ([for (final s in _selection) if (!day.isFree(s)) s].isEmpty) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      setState(() => _selection.removeAll(stale));
-      showFlowToast(context,
-          'An hour you picked was just taken and has been removed.');
+      // Re-check against the live selection: several builds can schedule this
+      // before the first callback runs, and that one may already have pruned.
+      // Without this the rider gets the same toast two or three times.
+      final stale = [for (final s in _selection) if (!day.isFree(s)) s];
+      if (stale.isEmpty) return;
+
+      var split = false;
+      setState(() {
+        _selection.removeAll(stale);
+        // Dropping a *middle* hour leaves a gap, and the write derives
+        // endTime from first→last of the span (§8.6) — so a gapped selection
+        // would book straight across an hour someone else now holds, and the
+        // trainer would see one unbroken block. Selection has to stay
+        // contiguous (§8.4): keep only the run the earliest survivor starts.
+        final remaining = _sortedSelection;
+        final run = BookingMath.leadingRun(remaining);
+        split = run.length != remaining.length;
+        _selection
+          ..clear()
+          ..addAll(run);
+      });
+
+      showFlowToast(
+        context,
+        split
+            ? 'An hour you picked was just taken, so the hours after the gap '
+                'were dropped — sessions run back-to-back.'
+            : 'An hour you picked was just taken and has been removed.',
+        icon: split ? Icons.link_off_rounded : null,
+      );
     });
   }
 
@@ -137,6 +165,10 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                   instructorId: target.providerId,
                   selected: _date,
                   onChanged: _changeDay,
+                ),
+                _WindSummary(
+                  instructorId: target.providerId,
+                  date: _date,
                 ),
                 const SizedBox(height: 24),
                 SectionHeader(
@@ -331,15 +363,16 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       Haptics.medium();
       if (sheetContext.mounted) Navigator.pop(sheetContext);
       if (mounted) _showSuccess();
-    } on SlotTakenFailure {
+    } on SlotTakenFailure catch (e) {
       if (sheetContext.mounted) Navigator.pop(sheetContext);
       if (mounted) {
         setState(() {
           _submitting = false;
           _selection.clear();
         });
-        showFlowToast(context,
-            'Those hours were just taken. Pick a different time.');
+        // The failure carries its own wording — "just taken" and "too close
+        // to now" need different advice, and both land here.
+        showFlowToast(context, e.message);
       }
     } catch (_) {
       if (sheetContext.mounted) {
@@ -520,9 +553,12 @@ class _DayStrip extends ConsumerWidget {
     // strip degrades to its old behaviour rather than lying about a day.
     final vacations =
         ref.watch(instructorVacationsProvider(instructorId)).value ?? const [];
+    // Same contract as vacations: no forecast simply means no wind row. The
+    // strip must never wait on the network to become usable.
+    final wind = ref.watch(providerWindProvider(instructorId)).value;
 
     return SizedBox(
-      height: 86,
+      height: 104,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: FlowConst.bookingDayStripLength,
@@ -532,6 +568,9 @@ class _DayStrip extends ConsumerWidget {
           final date = ymd(day);
           final active = date == selected;
           final away = vacations.any((v) => v.covers(date));
+          // Null past the forecast horizon (16 days) and whenever the fetch
+          // failed — both render as an empty slot, never as a guess.
+          final gust = wind?.forDate(date);
           // Today stops being bookable once the lead-time rule has eaten
           // every remaining hour — flag it like an away day rather than
           // letting it read as open.
@@ -551,7 +590,10 @@ class _DayStrip extends ConsumerWidget {
             label: '${weekdaysLong[day.weekday - 1]} ${day.day} '
                 '${monthsLong[day.month - 1]}'
                 '${i == 0 ? ', today' : ''}'
-                '${away ? ', trainer away' : over ? ', no hours left' : ''}',
+                '${away ? ', trainer away' : over ? ', no hours left' : ''}'
+                // Spoken in full: "18 knots, Good" reads, "18kt" does not.
+                '${gust == null ? '' : ', ${gust.displayKnots} knots, '
+                    '${gust.rating.label}'}',
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
               width: 62,
@@ -592,6 +634,24 @@ class _DayStrip extends ConsumerWidget {
                           ),
                           Text(monthsShort[day.month - 1],
                               style: inter(9.5, 640, color: subFg, spacing: .6)),
+                          // Fixed-height row whether or not there is a
+                          // forecast, so tiles inside and beyond the horizon
+                          // stay the same size and the strip does not jitter
+                          // as you scroll past day 16.
+                          SizedBox(
+                            height: 16,
+                            child: gust == null
+                                ? null
+                                : Center(
+                                    child: Text(
+                                      '${gust.displayKnots}kt',
+                                      style: interNum(11, 760,
+                                          color: active
+                                              ? Colors.white
+                                              : windColor(gust.rating)),
+                                    ),
+                                  ),
+                          ),
                         ],
                       ),
                     ),
@@ -602,6 +662,85 @@ class _DayStrip extends ConsumerWidget {
           );
         },
       ),
+    );
+  }
+}
+
+/// One colour per band, shared by the strip and the summary so a day cannot
+/// read as "good" in one place and "strong" in the other.
+///
+/// Deliberately not a gradient: the bands are decisions ("can I ride this"),
+/// and a continuous ramp would imply a precision the forecast does not have.
+Color windColor(WindRating rating) => switch (rating) {
+      WindRating.calm => FlowColors.slate,
+      WindRating.light => FlowColors.amber,
+      WindRating.good => FlowColors.emerald,
+      WindRating.strong => FlowColors.amber,
+      WindRating.extreme => FlowColors.coral,
+    };
+
+/// The forecast for the day the rider is actually looking at.
+///
+/// The strip answers "which day", this answers "what am I getting" — the
+/// numbers a rider would otherwise leave the app to find. It is advisory and
+/// says so: the trainer decides on the morning, not this row.
+class _WindSummary extends ConsumerWidget {
+  const _WindSummary({required this.instructorId, required this.date});
+
+  final String instructorId;
+  final String date;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tones = context.tones;
+    final day = ref.watch(providerWindProvider(instructorId)).value?.forDate(date);
+
+    // No forecast, or a date past the horizon — collapse entirely rather than
+    // leave an empty band where information used to be.
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      alignment: Alignment.topCenter,
+      child: day == null
+          ? const SizedBox(width: double.infinity)
+          : Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(top: 12),
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              decoration: BoxDecoration(
+                color: windColor(day.rating).withValues(alpha: .10),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                    color: windColor(day.rating).withValues(alpha: .35)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.air_rounded,
+                      size: 18, color: windColor(day.rating)),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${day.rating.label} · ${day.displayKnots}kt '
+                          '${day.compass}'
+                          '${day.hasUsefulGust ? ' · gusts '
+                              '${day.displayGustKnots}' : ''}',
+                          style: inter(13, 700,
+                              color: windColor(day.rating), height: 1.25),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          day.rating.detail,
+                          style: inter(11.5, 480, color: tones.textFaint),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
     );
   }
 }

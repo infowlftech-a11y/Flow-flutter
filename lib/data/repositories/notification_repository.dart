@@ -56,20 +56,27 @@ class NotificationRepository {
     _col.doc(id).update({'read': true}).ignore();
   }
 
-  Future<void> markAllRead(List<String> ids) async {
-    final batch = _db.batch();
-    for (final id in ids) {
-      batch.update(_col.doc(id), {'read': true});
-    }
-    await batch.commit();
-  }
+  Future<void> markAllRead(List<String> ids) => _setRead(ids, true);
 
-  Future<void> markAllUnread(List<String> ids) async {
-    final batch = _db.batch();
-    for (final id in ids) {
-      batch.update(_col.doc(id), {'read': false});
+  Future<void> markAllUnread(List<String> ids) => _setRead(ids, false);
+
+  /// Per-document rather than one batch.
+  ///
+  /// `batch.update` rejects the **whole** commit with NOT_FOUND when any
+  /// single id has gone: swipe-delete an unread notification, tap "Mark all
+  /// read" before the stream drops it, and nothing at all got marked — no
+  /// toast, no UNDO, no error. Marking read is idempotent per document, so
+  /// atomicity was never buying anything, and a row that vanished mid-flight
+  /// is exactly the case to shrug at.
+  Future<void> _setRead(List<String> ids, bool read) =>
+      Future.wait([for (final id in ids) _setReadOne(id, read)]);
+
+  Future<void> _setReadOne(String id, bool read) async {
+    try {
+      await _col.doc(id).update({'read': read});
+    } catch (_) {
+      // Deleted or denied — the remaining notifications must still update.
     }
-    await batch.commit();
   }
 
   Future<void> delete(String id) => _col.doc(id).delete();

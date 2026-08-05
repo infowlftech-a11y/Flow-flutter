@@ -12,6 +12,7 @@ import '../../core/widgets/flow_image.dart';
 import '../../core/widgets/misc.dart';
 import '../../core/widgets/sheets.dart';
 import '../../data/models/booking.dart';
+import '../../data/repositories/booking_repository.dart';
 import '../../providers/providers.dart';
 import '../../providers/settings_provider.dart';
 import '../sessions/sessions_screen.dart' show StatusPill;
@@ -64,8 +65,13 @@ class _CommandCenterScreenState extends ConsumerState<CommandCenterScreen>
             builder: (_) => QrScannerScreen(trainerId: trainerId)));
     if (bookingId == null || !mounted) return;
     try {
-      await ref.read(bookingRepositoryProvider).checkIn(bookingId);
+      await ref
+          .read(bookingRepositoryProvider)
+          .checkIn(bookingId, trainerId: trainerId);
       if (mounted) showFlowToast(context, 'Session started 🤙');
+    } on CheckInFailure catch (e) {
+      // A refused ticket is not a retry case — say which ticket it was.
+      if (mounted) showFlowToast(context, e.message);
     } catch (_) {
       if (mounted) {
         showFlowToast(context, "Couldn't start the session. Try again.");
@@ -621,8 +627,13 @@ class _ManifestCard extends ConsumerWidget {
             builder: (_) => QrScannerScreen(trainerId: trainerId)));
     if (bookingId == null) return;
     try {
-      await ref.read(bookingRepositoryProvider).checkIn(bookingId);
+      await ref
+          .read(bookingRepositoryProvider)
+          .checkIn(bookingId, trainerId: trainerId);
       if (context.mounted) showFlowToast(context, 'Session started 🤙');
+    } on CheckInFailure catch (e) {
+      // A refused ticket is not a retry case — say which ticket it was.
+      if (context.mounted) showFlowToast(context, e.message);
     } catch (_) {
       if (context.mounted) {
         showFlowToast(context, "Couldn't start the session. Try again.");
@@ -631,24 +642,101 @@ class _ManifestCard extends ConsumerWidget {
   }
 
   Future<void> _finish(BuildContext context, WidgetRef ref) async {
-    // Confirmation names the amount added to earnings (§10.4).
-    final ok = await confirmAction(
+    // Finishing and settling are one decision on the beach, so they are one
+    // sheet. Asking "finish?" and then "paid?" back to back would be two
+    // dialogs for a moment where the trainer is standing in the wind holding
+    // a kite — and the second one would get dismissed unread.
+    final paid = await _askSettlement(context, ref);
+    if (paid == null) return; // Cancelled.
+
+    Haptics.medium();
+    // Guarded like _approve/_decline above. Unhandled, a rejected write threw
+    // into the zone and the trainer saw nothing at all happen — no error, no
+    // toast, the card still offering FINISH SESSION.
+    try {
+      await ref
+          .read(bookingRepositoryProvider)
+          .setStatus(booking, BookingStatus.completed);
+    } catch (_) {
+      if (context.mounted) {
+        showFlowToast(context, "Couldn't finish the session. Try again.");
+      }
+      return;
+    }
+
+    // Settlement is a second write on purpose. If it fails the session is
+    // still finished — the trainer can settle it later from the ledger — and
+    // reporting "couldn't finish" for a session that *did* finish is the kind
+    // of lie that makes people tap the button twice.
+    if (paid) {
+      try {
+        await ref.read(bookingRepositoryProvider).markPaid(
+              booking.id,
+              trainerId: booking.instructorId,
+            );
+      } on PaymentFailure catch (e) {
+        if (context.mounted) showFlowToast(context, e.message);
+        return;
+      } catch (_) {
+        if (context.mounted) {
+          showFlowToast(context,
+              'Session finished, but the payment did not save. '
+              'Mark it paid from your earnings.');
+        }
+        return;
+      }
+    }
+
+    if (context.mounted) {
+      showFlowToast(
+          context,
+          paid
+              ? '${euro(booking.amountDue)} collected 💶'
+              : '${euro(booking.amountDue)} still owing — '
+                  'settle it from your earnings.');
+    }
+  }
+
+  /// Finish + settle in one sheet. `true` = paid, `false` = still owing,
+  /// `null` = cancelled.
+  Future<bool?> _askSettlement(BuildContext context, WidgetRef ref) {
+    final amount = euro(booking.amountDue);
+    return showFlowSheet<bool>(
       context,
       title: 'Finish this session?',
-      body:
-          "${booking.studentName}'s session will be completed and "
-          '${euro(booking.totalPrice)} added to your earnings.',
-      confirmLabel: 'Finish',
+      subtitle: "${booking.studentName} · $amount",
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Did you take the $amount?',
+              style: inter(14, 520,
+                  color: sheetContext.tones.textFaint, height: 1.4),
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: () => Navigator.pop(sheetContext, true),
+              icon: const Icon(Icons.check_circle_outline_rounded),
+              label: Text('Yes — $amount collected'),
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: () => Navigator.pop(sheetContext, false),
+              icon: const Icon(Icons.schedule_rounded),
+              label: const Text('Not yet — still owing'),
+            ),
+            const SizedBox(height: 6),
+            TextButton(
+              onPressed: () => Navigator.pop(sheetContext),
+              child: const Text('Cancel'),
+            ),
+          ],
+        ),
+      ),
     );
-    if (!ok) return;
-    Haptics.medium();
-    await ref
-        .read(bookingRepositoryProvider)
-        .setStatus(booking, BookingStatus.completed);
-    if (context.mounted) {
-      showFlowToast(context,
-          '${euro(booking.totalPrice)} added to your earnings 💶');
-    }
   }
 
   /// Read-only details + Message rider (§3.8).
@@ -782,6 +870,8 @@ void showEarningsSheet(BuildContext context, WidgetRef ref) {
         final month = sheetRef.watch(trainerMonthRevenueProvider).value ?? 0;
         final completed =
             sheetRef.watch(trainerCompletedProvider).value ?? const <Booking>[];
+        final outstanding =
+            sheetRef.watch(trainerOutstandingProvider).value ?? 0;
         final tones = sheetContext.tones;
 
         return ListView(
@@ -836,6 +926,35 @@ void showEarningsSheet(BuildContext context, WidgetRef ref) {
                 ),
               ],
             ),
+            // Only when there is something owing. A permanent "€0 owed" row
+            // would be one more number to scan past on the screen a trainer
+            // opens to see one figure.
+            if (outstanding > 0) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                decoration: BoxDecoration(
+                  color: tones.warning.withValues(alpha: .12),
+                  borderRadius: BorderRadius.circular(14),
+                  border:
+                      Border.all(color: tones.warning.withValues(alpha: .35)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.payments_outlined,
+                        size: 18, color: tones.warning),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        '${euro(outstanding)} still to collect',
+                        style: inter(13.5, 700, color: tones.warning),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 20),
             if (completed.isEmpty)
               Padding(
@@ -867,9 +986,21 @@ void showEarningsSheet(BuildContext context, WidgetRef ref) {
                           ],
                         ),
                       ),
-                      Text(euro(b.totalPrice),
+                      // One tap to settle a session that was finished
+                      // unpaid — the trainer is usually chasing this the
+                      // next morning, not at the moment it happened.
+                      if (b.payment.isOutstanding)
+                        TextButton(
+                          onPressed: () => _settle(sheetContext, sheetRef, b),
+                          child: Text('MARK PAID',
+                              style: inter(11.5, 800, color: tones.warning)),
+                        ),
+                      const SizedBox(width: 4),
+                      Text(euro(b.amountDue),
                           style: interNum(14.5, 720,
-                              color: tones.success)),
+                              color: b.payment.isOutstanding
+                                  ? tones.warning
+                                  : tones.success)),
                     ],
                   ),
                 ),
@@ -878,6 +1009,38 @@ void showEarningsSheet(BuildContext context, WidgetRef ref) {
       },
     ),
   );
+}
+
+/// Settle a session that was finished without payment.
+///
+/// Confirms first: this is the one action in the ledger that changes money,
+/// and it is a single tap away from a scrolling list.
+Future<void> _settle(
+    BuildContext context, WidgetRef ref, Booking booking) async {
+  final ok = await confirmAction(
+    context,
+    title: 'Mark as paid?',
+    body: 'Records that ${booking.studentName} paid '
+        '${euro(booking.amountDue)} for ${prettyYmd(booking.date)}.',
+    confirmLabel: 'Mark paid',
+  );
+  if (!ok) return;
+  Haptics.medium();
+  try {
+    await ref.read(bookingRepositoryProvider).markPaid(
+          booking.id,
+          trainerId: booking.instructorId,
+        );
+    if (context.mounted) {
+      showFlowToast(context, '${euro(booking.amountDue)} collected 💶');
+    }
+  } on PaymentFailure catch (e) {
+    if (context.mounted) showFlowToast(context, e.message);
+  } catch (_) {
+    if (context.mounted) {
+      showFlowToast(context, "Couldn't save that. Try again.");
+    }
+  }
 }
 
 /// The 4-step first-run tour (§3.8).

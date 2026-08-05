@@ -33,8 +33,7 @@ class RejectedScreen extends ConsumerWidget {
                 Align(
                   alignment: Alignment.topRight,
                   child: TextButton.icon(
-                    onPressed: () =>
-                        ref.read(authRepositoryProvider).signOut(),
+                    onPressed: () => ref.read(signOutProvider)(),
                     icon: const Icon(Icons.logout_rounded,
                         size: 18, color: FlowColors.haze),
                     label: Text('Sign out',
