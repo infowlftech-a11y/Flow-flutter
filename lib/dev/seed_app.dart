@@ -91,6 +91,10 @@ class _SeederScreenState extends State<SeederScreen> {
   }
 
   void _say(String message, SeedLevel level) {
+    // Also to the device log, so `flutter run` shows what happened. The
+    // on-screen list is unreadable from anywhere but the handset, which makes
+    // "it didn't work" impossible to diagnose without the phone in hand.
+    debugPrint('[seed] ${level.name.toUpperCase()} $message');
     if (!mounted) return;
     setState(() => _log.add(_LogLine(message, level)));
     // Keep the tail visible — the activity pass is long enough to scroll off.
