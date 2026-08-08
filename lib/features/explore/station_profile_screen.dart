@@ -11,6 +11,7 @@ import '../../core/widgets/feedback.dart';
 import '../../core/widgets/flow_image.dart';
 import '../../core/widgets/misc.dart';
 import '../../core/widgets/sheets.dart';
+import '../../core/widgets/surfaces.dart';
 import '../../data/models/app_user.dart';
 import '../../data/models/catalogue.dart';
 import '../../data/repositories/booking_repository.dart';
@@ -80,17 +81,11 @@ class _StationBody extends ConsumerWidget {
           SliverAppBar(
             pinned: true,
             expandedHeight: 260,
-            leading: Padding(
-              padding: const EdgeInsets.all(6),
-              child: Material(
-                color: Colors.black.withValues(alpha: .35),
-                shape: const CircleBorder(),
-                child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: () => context.pop(),
-                  child: const Icon(Icons.arrow_back_rounded,
-                      color: Colors.white, size: 21),
-                ),
+            leading: Center(
+              child: ScrimIconButton(
+                icon: Icons.arrow_back_rounded,
+                tooltip: 'Back',
+                onTap: () => context.pop(),
               ),
             ),
             flexibleSpace: FlexibleSpaceBar(
@@ -203,13 +198,8 @@ class _LessonsTab extends StatelessWidget {
       itemBuilder: (context, i) {
         final ins = instructors[i];
         final tones = context.tones;
-        return Container(
+        return FlowCard(
           padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: tones.card,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: tones.line),
-          ),
           child: Row(
             children: [
               FlowAvatar(url: ins.photoUrl, name: ins.name, size: 52),
@@ -283,13 +273,7 @@ class _ServicesTab extends StatelessWidget {
       itemBuilder: (context, i) {
         final s = services[i];
         final tones = context.tones;
-        return Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: tones.card,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: tones.line),
-          ),
+        return FlowCard(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -416,13 +400,8 @@ class _TripCardState extends ConsumerState<_TripCard> {
   Widget build(BuildContext context) {
     final trip = widget.trip;
     final tones = context.tones;
-    return Container(
+    return FlowCard(
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: tones.card,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: tones.line),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -440,13 +419,13 @@ class _TripCardState extends ConsumerState<_TripCard> {
           Row(
             children: [
               Icon(Icons.event_rounded, size: 15, color: tones.textFaint),
-              const SizedBox(width: 5),
+              const SizedBox(width: 4),
               Text('Departs ${prettyYmd(trip.startDate)}',
-                  style: inter(13, 540, color: tones.textFaint)),
+                  style: inter(14, 540, color: tones.textFaint)),
               const Spacer(),
               Text(euro(trip.price),
                   style: interNum(17, 760, color: tones.azureBrand)),
-              Text(' / seat', style: inter(12, 540, color: tones.textFaint)),
+              Text(' / seat', style: inter(12.5, 540, color: tones.textFaint)),
             ],
           ),
           if ((trip.description ?? '').isNotEmpty) ...[

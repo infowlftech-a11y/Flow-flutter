@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/theme/palette.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/theme/typography.dart';
 import '../../core/utils/haptics.dart';
 import '../../core/widgets/buttons.dart';
@@ -91,12 +91,12 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
         onPressed: auth.busy ? null : () => _switchTo('/auth/sign-up'),
         child: RichText(
           text: TextSpan(
-            style: inter(14, 460, color: FlowColors.haze),
+            style: inter(14, 460, color: context.scheme.onSurfaceVariant),
             children: [
               const TextSpan(text: 'New to FLOW?  '),
               TextSpan(
                   text: 'Create an account',
-                  style: inter(14, 700, color: FlowColors.azure)),
+                  style: inter(14, 700, color: context.scheme.primary)),
             ],
           ),
         ),
@@ -154,7 +154,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           child: TextButton(
             onPressed: auth.busy ? null : () => _switchTo('/auth/reset'),
             child: Text('Forgot password?',
-                style: inter(13.5, 600, color: FlowColors.azure)),
+                style: inter(14, 600, color: context.scheme.primary)),
           ),
         ),
         const SizedBox(height: 10),

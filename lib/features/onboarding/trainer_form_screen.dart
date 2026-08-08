@@ -6,13 +6,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/constants.dart';
+import '../../core/theme/motion.dart';
+import '../../core/theme/radii.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/typography.dart';
 import '../../core/utils/date_x.dart';
 import '../../core/utils/haptics.dart';
 import '../../core/widgets/buttons.dart';
 import '../../core/widgets/feedback.dart';
+import '../../core/widgets/media.dart';
 import '../../core/widgets/picker_field.dart';
+import '../../core/widgets/surfaces.dart';
 import '../../data/firestore_paths.dart';
 import '../../providers/providers.dart';
 import '../../services/image_service.dart';
@@ -174,11 +178,11 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
           );
       Haptics.medium();
       // Session flips to awaitingApproval; the router shows the gate.
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
         setState(() => _busy = false);
         showFlowToast(context,
-            "Couldn't submit your application. Check your connection.");
+            "Couldn't submit your application. ${ErrorView.friendly(e)}");
       }
     }
   }
@@ -205,7 +209,7 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
                   for (var i = 0; i < 4; i++) ...[
                     Expanded(
                       child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 240),
+                        duration: FlowMotion.base,
                         height: 4,
                         decoration: BoxDecoration(
                           color: i <= _step
@@ -227,7 +231,7 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
             children: [
               Expanded(
                 child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 280),
+                  duration: FlowMotion.slow,
                   switchInCurve: Curves.easeOutCubic,
                   switchOutCurve: Curves.easeInCubic,
                   transitionBuilder: (child, animation) {
@@ -326,29 +330,40 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
         FormGroup(
           label: 'Name',
           required: true,
-          errorText: attempted && _name.text.trim().length <= 2
-              ? 'At least 3 characters'
-              : null,
+          // The gate getter, not a second rule. These used to re-implement
+          // their own checks: `length <= 2` flagged a 2-character name the
+          // validator accepts (a red message over a step that advanced
+          // anyway), while an over-length name or bio failed _step1Ok and
+          // displayed nothing at all — Continue did nothing and said nothing.
+          errorText: attempted ? _nameError : null,
           child: TextField(
             controller: _name,
             enabled: !_busy,
             textCapitalization: TextCapitalization.words,
-            onChanged: (_) => setState(() {}),
+            // Only once the step has been attempted does anything on screen
+            // depend on this text — `errorText` above is the sole reader, and
+            // it is null until then. Rebuilding the whole step per keystroke
+            // before that produced a byte-identical tree. Continue is never
+            // disabled (`onPressed: _next`), so nothing else is waiting on it.
+            onChanged: attempted ? (_) => setState(() {}) : null,
           ),
         ),
         FormGroup(
           label: 'Professional bio',
           required: true,
-          errorText: attempted && _bio.text.trim().isEmpty
-              ? 'Tell riders about your experience'
-              : null,
+          errorText: attempted ? _bioError : null,
           child: TextField(
             controller: _bio,
             enabled: !_busy,
             maxLines: 4,
+            // Matches the rider form: the ceiling is visible while typing
+            // rather than discovered by a Continue that refuses.
+            maxLength: OnboardingValidators.maxBioLength,
             decoration: const InputDecoration(
                 hintText: 'Years teaching, certifications, style…'),
-            onChanged: (_) => setState(() {}),
+            // As above. The character counter under this field is drawn by
+            // TextField's own state, so it keeps updating regardless.
+            onChanged: attempted ? (_) => setState(() {}) : null,
           ),
         ),
         FormGroup(
@@ -377,32 +392,9 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
             runSpacing: 10,
             children: [
               for (var i = 0; i < _gallery.length; i++)
-                Stack(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.file(File(_gallery[i].path),
-                          width: 84, height: 84, fit: BoxFit.cover),
-                    ),
-                    Positioned(
-                      right: 2,
-                      top: 2,
-                      child: Semantics(
-                        button: true,
-                        label: 'Remove photo',
-                        child: GestureDetector(
-                          onTap: () => setState(() => _gallery.removeAt(i)),
-                          child: Container(
-                            padding: const EdgeInsets.all(5),
-                            decoration: const BoxDecoration(
-                                color: Colors.black54, shape: BoxShape.circle),
-                            child: const Icon(Icons.close_rounded,
-                                size: 14, color: Colors.white),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                ThumbTile.file(
+                  _gallery[i].path,
+                  onRemove: () => setState(() => _gallery.removeAt(i)),
                 ),
               SizedBox(
                 width: 84,
@@ -420,7 +412,7 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
                   style: OutlinedButton.styleFrom(
                       padding: EdgeInsets.zero,
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12))),
+                          borderRadius: FlowRadii.chip)),
                   child: const Icon(Icons.add_photo_alternate_outlined),
                 ),
               ),
@@ -491,36 +483,26 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
               FilteringTextInputFormatter.digitsOnly,
               LengthLimitingTextInputFormatter(3),
             ],
-            style: sora(30, 720, color: context.scheme.onSurface),
+            style: sora(32, 720, color: context.scheme.onSurface),
             decoration: InputDecoration(
               prefixText: '€ ',
-              prefixStyle: sora(30, 720, color: tones.azureBrand),
+              prefixStyle: sora(32, 720, color: tones.azureBrand),
               hintText: '80',
               helperText:
                   'Platform range: €${FlowConst.minHourlyRate}–€${FlowConst.maxHourlyRate}/h',
             ),
+            // Unguarded, unlike the other fields: the earnings notice below
+            // reads `_rate.text` live, so this one really does have to
+            // rebuild on every keystroke.
             onChanged: (_) => setState(() {}),
           ),
         ),
         if (_step3Ok)
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: tones.successTint,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.payments_outlined, color: tones.success),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'A 3-hour session earns you ${euro(int.parse(_rate.text) * 3)}.',
-                    style: inter(13.5, 580, color: tones.success),
-                  ),
-                ),
-              ],
-            ),
+          FlowNotice(
+            icon: Icons.payments_outlined,
+            title:
+                'A 3-hour session earns you ${euro(int.parse(_rate.text) * 3)}.',
+            tone: tones.success,
           ),
       ],
     );
@@ -543,7 +525,7 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
             controller: _ikoId,
             enabled: !_busy,
             decoration: const InputDecoration(hintText: 'e.g. IKO-482913'),
-            onChanged: (_) => setState(() {}),
+            onChanged: attempted ? (_) => setState(() {}) : null,
           ),
         ),
         FormGroup(
@@ -569,7 +551,7 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
               : Row(
                   children: [
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: FlowRadii.chip,
                       child: Image.file(File(_certificate!.path),
                           width: 72, height: 72, fit: BoxFit.cover),
                     ),
@@ -586,26 +568,12 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
                   ],
                 ),
         ),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: tones.azureBrand.withValues(alpha: .1),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.hourglass_top_rounded, color: tones.azureBrand),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  "After you submit, we review your application. You'll be "
-                  'live for riders the moment an admin approves it.',
-                  style: inter(13, 500,
-                      color: context.scheme.onSurfaceVariant, height: 1.5),
-                ),
-              ),
-            ],
-          ),
+        FlowNotice(
+          icon: Icons.hourglass_top_rounded,
+          title: 'Reviewed by hand',
+          body: "After you submit, we review your application. You'll be "
+              'live for riders the moment an admin approves it.',
+          tone: tones.azureBrand,
         ),
       ],
     );

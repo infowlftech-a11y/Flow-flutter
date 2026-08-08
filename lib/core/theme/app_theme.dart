@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'palette.dart';
+import 'radii.dart';
 import 'typography.dart';
 
 /// Semantic tones that fall outside Material's ColorScheme, tuned per
@@ -10,7 +11,6 @@ import 'typography.dart';
 class FlowTones extends ThemeExtension<FlowTones> {
   const FlowTones({
     required this.success,
-    required this.onSuccessTint,
     required this.successTint,
     required this.warning,
     required this.warningTint,
@@ -22,10 +22,10 @@ class FlowTones extends ThemeExtension<FlowTones> {
     required this.textFaint,
     required this.azureBrand,
     required this.heroGradient,
+    required this.brightness,
   });
 
   final Color success;
-  final Color onSuccessTint;
   final Color successTint;
   final Color warning;
   final Color warningTint;
@@ -42,15 +42,38 @@ class FlowTones extends ThemeExtension<FlowTones> {
   /// Tertiary text.
   final Color textFaint;
 
-  /// The raw logo azure — always vivid, both themes (badges, glows, accents).
+  /// The brand azure, at the depth each brightness can actually carry.
+  ///
+  /// Overwhelmingly a *foreground*: pill labels, tile icons, prices, the
+  /// "mine" chat bubble. The light theme used the raw logo azure (#1DB0FE)
+  /// here, which is a glow colour — as text on a white card it measures 2.4:1
+  /// and on its own tinted pill 2.1:1, against 7.5 and 6.0 for the same token
+  /// in dark. That gap is why light mode read as washed out next to dark.
+  /// The handful of fill usages only gain from the deeper value.
   final Color azureBrand;
 
   /// Brand gradient for hero surfaces (stat tiles, CTAs' backdrop, gates).
   final Gradient heroGradient;
 
+  /// Which brightness these tones belong to. Read by [onTint].
+  final Brightness brightness;
+
+  /// A tone deep enough to read as a *label on a tint of itself*.
+  ///
+  /// Pills and date blocks paint text in a tone over roughly 14% of the same
+  /// tone. On a dark card that lands near 6:1; on white the identical pair
+  /// measures 3.6:1, because a 14% tint barely moves white. The fill can stay
+  /// where it is — it is the text that has to go deeper, and only in light.
+  ///
+  /// Measured by test/text_contrast_test.dart against the real render, which
+  /// is how the 3.6 was found in the first place.
+  Color onTint(Color tone) => brightness == Brightness.dark
+      ? tone
+      : Color.alphaBlend(const Color(0x47000000), tone);
+
   static const dark = FlowTones(
+    brightness: Brightness.dark,
     success: FlowColors.emerald,
-    onSuccessTint: FlowColors.emerald,
     successTint: Color(0x2617CE92),
     warning: FlowColors.amber,
     warningTint: Color(0x26FFB547),
@@ -69,8 +92,8 @@ class FlowTones extends ThemeExtension<FlowTones> {
   );
 
   static const light = FlowTones(
+    brightness: Brightness.light,
     success: FlowColors.emeraldDeep,
-    onSuccessTint: FlowColors.emeraldDeep,
     successTint: Color(0x1A0B9A6C),
     warning: FlowColors.amberDeep,
     warningTint: Color(0x21FFB547),
@@ -80,7 +103,7 @@ class FlowTones extends ThemeExtension<FlowTones> {
     cardHigh: FlowColors.white,
     line: Color(0x1F0A1B36),
     textFaint: FlowColors.inkFaint,
-    azureBrand: FlowColors.azure,
+    azureBrand: FlowColors.azureDeep,
     heroGradient: LinearGradient(
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
@@ -101,7 +124,18 @@ extension FlowThemeX on BuildContext {
 }
 
 abstract final class FlowTheme {
-  static ThemeData dark() => _build(
+  // Built once each. `MaterialApp` is handed both themes on every rebuild of
+  // the app root, and each call assembled ~25 sub-themes and 15 TextStyles
+  // from scratch — then Material compared the result field-by-field against
+  // the previous one to decide whether anything had changed. Neither depends
+  // on anything but the palette, so both are constants in all but syntax.
+  static ThemeData? _darkCache;
+  static ThemeData? _lightCache;
+
+  static ThemeData dark() => _darkCache ??= _buildDark();
+  static ThemeData light() => _lightCache ??= _buildLight();
+
+  static ThemeData _buildDark() => _build(
         brightness: Brightness.dark,
         tones: FlowTones.dark,
         scheme: const ColorScheme.dark(
@@ -127,7 +161,7 @@ abstract final class FlowTheme {
         ),
       );
 
-  static ThemeData light() => _build(
+  static ThemeData _buildLight() => _build(
         brightness: Brightness.light,
         tones: FlowTones.light,
         scheme: const ColorScheme.light(
@@ -167,19 +201,20 @@ abstract final class FlowTheme {
       displayMedium: sora(32, 760, color: text, spacing: -.8, height: 1.1),
       displaySmall: sora(26, 740, color: text, spacing: -.6, height: 1.12),
       headlineMedium: sora(22, 700, color: text, spacing: -.4, height: 1.15),
-      headlineSmall: sora(19, 680, color: text, spacing: -.3, height: 1.2),
+      headlineSmall: sora(20, 680, color: text, spacing: -.3, height: 1.2),
       titleLarge: sora(17, 660, color: text, spacing: -.2, height: 1.25),
-      titleMedium: inter(15.5, 640, color: text, spacing: -.1, height: 1.3),
-      titleSmall: inter(13.5, 620, color: text, height: 1.3),
-      bodyLarge: inter(15.5, 440, color: text, height: 1.45),
+      titleMedium: inter(15, 640, color: text, spacing: -.1, height: 1.3),
+      titleSmall: inter(14, 620, color: text, height: 1.3),
+      bodyLarge: inter(15, 440, color: text, height: 1.45),
       bodyMedium: inter(14, 440, color: sub, height: 1.45),
       bodySmall: inter(12.5, 440, color: sub, height: 1.4),
-      labelLarge: inter(14.5, 640, color: text, spacing: .1),
+      labelLarge: inter(14, 640, color: text, spacing: .1),
       labelMedium: inter(12.5, 620, color: sub, spacing: .3),
       labelSmall: microLabel(sub),
     );
 
-    final radius14 = RoundedRectangleBorder(borderRadius: BorderRadius.circular(14));
+    const controlShape =
+        RoundedRectangleBorder(borderRadius: FlowRadii.control);
 
     return ThemeData(
       useMaterial3: true,
@@ -197,7 +232,7 @@ abstract final class FlowTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
-        titleTextStyle: sora(19, 700, color: text, spacing: -.3),
+        titleTextStyle: sora(20, 700, color: text, spacing: -.3),
         iconTheme: IconThemeData(color: text),
         systemOverlayStyle: dark
             ? SystemUiOverlayStyle.light.copyWith(
@@ -214,21 +249,21 @@ abstract final class FlowTheme {
         shadowColor: dark ? Colors.transparent : const Color(0x14071C3E),
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: FlowRadii.card,
           side: BorderSide(color: tones.line),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           minimumSize: const Size(64, 52),
-          shape: radius14,
-          textStyle: inter(15.5, 680, spacing: .2),
+          shape: controlShape,
+          textStyle: inter(15, 680, spacing: .2),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           minimumSize: const Size(64, 52),
-          shape: radius14,
+          shape: controlShape,
           side: BorderSide(color: scheme.outline),
           foregroundColor: text,
           textStyle: inter(15, 640),
@@ -237,8 +272,8 @@ abstract final class FlowTheme {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: scheme.primary,
-          textStyle: inter(14.5, 660, spacing: .2),
-          shape: radius14,
+          textStyle: inter(14, 660, spacing: .2),
+          shape: controlShape,
           minimumSize: const Size(48, 44),
         ),
       ),
@@ -247,27 +282,27 @@ abstract final class FlowTheme {
         fillColor: dark ? FlowColors.navy900 : FlowColors.white,
         hintStyle: inter(15, 420, color: tones.textFaint),
         labelStyle: inter(15, 460, color: sub),
-        helperStyle: inter(12, 440, color: tones.textFaint),
+        helperStyle: inter(12.5, 440, color: tones.textFaint),
         errorStyle: inter(12.5, 520, color: tones.danger),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: FlowRadii.control,
           borderSide: BorderSide(color: tones.line),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: FlowRadii.control,
           borderSide: BorderSide(color: tones.line),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: FlowRadii.control,
           borderSide: BorderSide(color: scheme.primary, width: 1.6),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: FlowRadii.control,
           borderSide: BorderSide(color: tones.danger),
         ),
         focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: FlowRadii.control,
           borderSide: BorderSide(color: tones.danger, width: 1.6),
         ),
       ),
@@ -275,8 +310,8 @@ abstract final class FlowTheme {
         backgroundColor: dark ? FlowColors.navy900 : FlowColors.white,
         selectedColor: dark ? const Color(0x331DB0FE) : FlowColors.azurePale,
         side: BorderSide(color: tones.line),
-        labelStyle: inter(13.5, 560, color: text),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        labelStyle: inter(14, 560, color: text),
+        shape: const RoundedRectangleBorder(borderRadius: FlowRadii.chip),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       ),
       dividerTheme: DividerThemeData(color: tones.line, thickness: 1, space: 1),
@@ -285,30 +320,31 @@ abstract final class FlowTheme {
         surfaceTintColor: Colors.transparent,
         modalBackgroundColor: dark ? FlowColors.navy900 : FlowColors.white,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(FlowRadius.sheet)),
         ),
         showDragHandle: false,
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: dark ? FlowColors.navy850 : FlowColors.white,
         surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        titleTextStyle: sora(19, 700, color: text, spacing: -.3),
-        contentTextStyle: inter(14.5, 440, color: sub, height: 1.5),
+        shape: const RoundedRectangleBorder(borderRadius: FlowRadii.dialog),
+        titleTextStyle: sora(20, 700, color: text, spacing: -.3),
+        contentTextStyle: inter(14, 440, color: sub, height: 1.5),
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: dark ? FlowColors.navy800 : FlowColors.ink,
         contentTextStyle: inter(14, 520, color: FlowColors.mist),
         actionTextColor: FlowColors.azure,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: RoundedRectangleBorder(borderRadius: FlowRadii.control),
         insetPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       ),
       tabBarTheme: TabBarThemeData(
         labelColor: scheme.primary,
         unselectedLabelColor: sub,
-        labelStyle: inter(13.5, 700, spacing: 1),
-        unselectedLabelStyle: inter(13.5, 600, spacing: 1),
+        labelStyle: inter(14, 700, spacing: 1),
+        unselectedLabelStyle: inter(14, 600, spacing: 1),
         indicatorSize: TabBarIndicatorSize.label,
         dividerColor: Colors.transparent,
         indicator: UnderlineTabIndicator(
@@ -352,20 +388,20 @@ abstract final class FlowTheme {
       listTileTheme: ListTileThemeData(
         iconColor: sub,
         titleTextStyle: inter(15, 560, color: text),
-        subtitleTextStyle: inter(13, 440, color: sub),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        subtitleTextStyle: inter(14, 440, color: sub),
+        shape: RoundedRectangleBorder(borderRadius: FlowRadii.control),
       ),
       tooltipTheme: TooltipThemeData(
         decoration: BoxDecoration(
           color: scheme.inverseSurface,
           borderRadius: BorderRadius.circular(8),
         ),
-        textStyle: inter(12, 520, color: scheme.onInverseSurface),
+        textStyle: inter(12.5, 520, color: scheme.onInverseSurface),
       ),
       datePickerTheme: DatePickerThemeData(
         backgroundColor: dark ? FlowColors.navy850 : FlowColors.white,
         surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        shape: const RoundedRectangleBorder(borderRadius: FlowRadii.dialog),
       ),
       pageTransitionsTheme: const PageTransitionsTheme(builders: {
         TargetPlatform.android: FadeForwardsPageTransitionsBuilder(),

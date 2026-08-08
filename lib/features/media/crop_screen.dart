@@ -5,10 +5,12 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/theme/app_theme.dart';
 import '../../core/constants.dart';
 import '../../core/theme/palette.dart';
 import '../../core/theme/typography.dart';
 import '../../core/utils/haptics.dart';
+import '../../core/widgets/feedback.dart';
 
 /// Crop shapes the app asks for.
 enum CropShape {
@@ -197,11 +199,12 @@ class _CropScreenState extends State<CropScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: FlowColors.ink,
+      backgroundColor: context.scheme.surface,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        foregroundColor: FlowColors.mist,
-        title: Text('Crop photo', style: sora(18, 700, color: FlowColors.mist)),
+        foregroundColor: context.scheme.onSurface,
+        title: Text('Crop photo',
+            style: sora(17, 700, color: context.scheme.onSurface)),
         leading: IconButton(
           icon: const Icon(Icons.close_rounded),
           tooltip: 'Cancel',
@@ -214,22 +217,26 @@ class _CropScreenState extends State<CropScreen> {
               _saving ? 'Saving…' : 'Done',
               style: inter(15, 700,
                   color: _image == null || _saving
-                      ? FlowColors.haze
-                      : FlowColors.azure),
+                      ? context.scheme.onSurfaceVariant
+                      : context.scheme.primary),
             ),
           ),
           const SizedBox(width: 6),
         ],
       ),
       body: _loadError != null
-          ? _Message(
+          // No longer `onScrim`: that variant paints light-on-dark for a
+          // camera or photo backdrop, and this screen's chrome now follows
+          // the theme like the rest of the app.
+          ? const EmptyView(
               icon: Icons.broken_image_outlined,
               title: 'Could not open that image',
-              body: 'Pick a different photo and try again.',
+              subtitle: 'Pick a different photo and try again.',
             )
           : _image == null
-              ? const Center(
-                  child: CircularProgressIndicator(color: FlowColors.azure))
+              ? Center(
+                  child:
+                      CircularProgressIndicator(color: context.scheme.primary))
               : _buildEditor(),
     );
   }
@@ -293,7 +300,7 @@ class _CropScreenState extends State<CropScreen> {
           child: Text(
             'Pinch to zoom · drag to reposition',
             textAlign: TextAlign.center,
-            style: inter(13, 500, color: FlowColors.haze),
+            style: inter(14, 500, color: context.scheme.onSurfaceVariant),
           ),
         ),
       ],
@@ -374,29 +381,3 @@ class _CropPainter extends CustomPainter {
       old.shape != shape;
 }
 
-class _Message extends StatelessWidget {
-  const _Message({required this.icon, required this.title, required this.body});
-
-  final IconData icon;
-  final String title;
-  final String body;
-
-  @override
-  Widget build(BuildContext context) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: FlowColors.haze, size: 44),
-              const SizedBox(height: 16),
-              Text(title, style: sora(19, 700, color: FlowColors.mist)),
-              const SizedBox(height: 8),
-              Text(body,
-                  textAlign: TextAlign.center,
-                  style: inter(13.5, 460, color: FlowColors.haze)),
-            ],
-          ),
-        ),
-      );
-}

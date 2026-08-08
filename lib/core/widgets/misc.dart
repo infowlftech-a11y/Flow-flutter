@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../data/models/payment.dart';
+import '../theme/motion.dart';
 import '../theme/app_theme.dart';
+import '../theme/radii.dart';
 import '../theme/typography.dart';
+import '../utils/date_x.dart';
 
 /// Uppercase section header with optional trailing action.
 class SectionHeader extends StatelessWidget {
@@ -56,30 +59,60 @@ class PaymentPill extends StatelessWidget {
   }
 }
 
-/// Small tinted tag ("Station", "Needs gear", "Walk-in"…).
+/// Small tinted tag ("Station", "Needs gear", "Walk-in", "CONFIRMED"…).
+///
+/// The one pill. There were three: this, `StatusPill` on the sessions screen
+/// (its own container at radius 7 with a heavier, tighter label) and an inline
+/// appeal-status pill on the blocked gate (radius 8, different weight again).
+/// Three renderings of "a short tinted label" is three things to keep in sync,
+/// and they had already drifted.
+///
+/// [dense] is the old `StatusPill` treatment — marginally tighter and heavier,
+/// for pills that sit in a row of metadata rather than standing alone.
 class TagPill extends StatelessWidget {
-  const TagPill(this.label, {super.key, this.color, this.icon});
+  const TagPill(
+    this.label, {
+    super.key,
+    this.color,
+    this.icon,
+    this.dense = false,
+  });
+
   final String label;
   final Color? color;
   final IconData? icon;
+  final bool dense;
 
   @override
   Widget build(BuildContext context) {
-    final c = color ?? context.tones.azureBrand;
+    final tones = context.tones;
+    final c = color ?? tones.azureBrand;
+    // Fill stays at the tone; the label goes a few steps deeper in light,
+    // where a 14% tint over white leaves the text carrying the whole ratio.
+    // These labels are 10–11.5px, so they need the full 4.5:1, not the 3:1
+    // large-text allowance.
+    final ink = tones.onTint(c);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4.5),
+      padding: dense
+          ? const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5)
+          : const EdgeInsets.symmetric(horizontal: 9, vertical: 4.5),
       decoration: BoxDecoration(
         color: c.withValues(alpha: .14),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: FlowRadii.pill,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 12, color: c),
+            Icon(icon, size: 12, color: ink),
             const SizedBox(width: 4),
           ],
-          Text(label, style: inter(11, 680, color: c, spacing: .4)),
+          Text(
+            label,
+            style: dense
+                ? inter(10, 740, color: ink, spacing: .8)
+                : inter(11.5, 680, color: ink, spacing: .4),
+          ),
         ],
       ),
     );
@@ -114,12 +147,15 @@ class FlowChoiceChip extends StatelessWidget {
     // animate. (The old AnimatedContainer sat outside them and animated
     // nothing, making selection snap.)
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 150),
-      curve: Curves.easeOut,
-      constraints: const BoxConstraints(minHeight: 40),
+      duration: FlowMotion.fast,
+      curve: FlowMotion.curve,
+      // The minimum is on the InkWell's child below, not here. A `Border`
+      // insets whatever a Container holds, so a 40 here produced a 38 tap
+      // target — the measurement the platform actually reports. Constraining
+      // the content instead makes the number that matters the one being set.
       decoration: BoxDecoration(
         color: selected ? tones.azureBrand.withValues(alpha: .16) : tones.card,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: FlowRadii.chip,
         border: Border.all(
             color: selected
                 ? tones.azureBrand.withValues(alpha: .6)
@@ -128,36 +164,51 @@ class FlowChoiceChip extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: FlowRadii.chip,
           onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AnimatedDefaultTextStyle(
-                  duration: const Duration(milliseconds: 150),
-                  style: inter(13.5, selected ? 660 : 540,
-                      color: selected ? selectedFg : scheme.onSurface),
-                  child: Text(label),
-                ),
-                if (onDeleted != null) ...[
-                  const SizedBox(width: 4),
-                  // Was a bare 15dp icon — too small to hit reliably for a
-                  // control whose whole job is removing an active filter.
-                  InkResponse(
-                    onTap: onDeleted,
-                    radius: 18,
-                    child: Padding(
-                      padding: const EdgeInsets.all(6),
-                      child: Icon(Icons.close_rounded,
-                          size: 15,
-                          color:
-                              selected ? tones.azureBrand : tones.textFaint),
-                    ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 48),
+            child: Padding(
+              padding: EdgeInsets.only(
+                  left: 14, right: onDeleted == null ? 14 : 2),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AnimatedDefaultTextStyle(
+                    curve: FlowMotion.curve,
+                    duration: FlowMotion.fast,
+                    style: inter(14, selected ? 660 : 540,
+                        color: selected ? selectedFg : scheme.onSurface),
+                    child: Text(label),
                   ),
+                  if (onDeleted != null)
+                    // A square the full height of the chip. It was 27x27 — a
+                    // 15dp glyph in 6dp of padding — for the one control that
+                    // destroys the user's selection. The glyph stays 15; the
+                    // box around it is what changed.
+                    Semantics(
+                      button: true,
+                      // Named, not just "button". A screen reader landing on
+                      // a row of these would otherwise announce four
+                      // identical unlabelled buttons and no way to tell which
+                      // filter each one drops.
+                      label: 'Remove $label',
+                      child: SizedBox(
+                        width: 48,
+                        height: 48,
+                        child: InkResponse(
+                          onTap: onDeleted,
+                          radius: 22,
+                          child: Icon(Icons.close_rounded,
+                              size: 15,
+                              color: selected
+                                  ? tones.azureBrand
+                                  : tones.textFaint),
+                        ),
+                      ),
+                    ),
                 ],
-              ],
+              ),
             ),
           ),
         ),
@@ -166,40 +217,51 @@ class FlowChoiceChip extends StatelessWidget {
   }
 }
 
-/// Info tile used on profile screens (Location, Certification…).
+/// Label-over-value on a card: profile facts (Location, Certification…) and
+/// the schedule tab's from/to date buttons, which were a private near-copy
+/// with no tap affordance at all.
 class InfoTile extends StatelessWidget {
   const InfoTile({
     super.key,
-    required this.icon,
     required this.label,
     required this.value,
+    this.icon,
     this.onTap,
+    this.trailingIcon = Icons.north_east_rounded,
   });
 
-  final IconData icon;
+  /// Omit for a tile that is only a label and a value.
+  final IconData? icon;
   final String label;
   final String value;
   final VoidCallback? onTap;
+
+  /// Shown only when [onTap] is set. Override it when the tap does something
+  /// other than navigate — opening a picker, say — and null it to show
+  /// nothing.
+  final IconData? trailingIcon;
 
   @override
   Widget build(BuildContext context) {
     final tones = context.tones;
     return Material(
       color: tones.card,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: FlowRadii.inset,
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: FlowRadii.inset,
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: FlowRadii.inset,
             border: Border.all(color: tones.line),
           ),
           child: Row(
             children: [
-              Icon(icon, size: 20, color: tones.azureBrand),
-              const SizedBox(width: 12),
+              if (icon != null) ...[
+                Icon(icon, size: 20, color: tones.azureBrand),
+                const SizedBox(width: 12),
+              ],
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -214,12 +276,59 @@ class InfoTile extends StatelessWidget {
                   ],
                 ),
               ),
-              if (onTap != null)
-                Icon(Icons.north_east_rounded,
-                    size: 16, color: tones.textFaint),
+              if (onTap != null && trailingIcon != null)
+                Icon(trailingIcon, size: 16, color: tones.textFaint),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// The month-over-day block that fronts a booking row.
+///
+/// Two copies: the rider's session cards (52 px, azure-tinted) and the
+/// trainer's compact schedule rows (44 px, bare). Both spelled out the same
+/// `date == null ? '--'` fallback, which is the part that matters — a booking
+/// whose stored date fails to parse must still render a row.
+class DateBlock extends StatelessWidget {
+  const DateBlock({super.key, required this.date, this.compact = false});
+
+  final DateTime? date;
+
+  /// The trainer's denser, untinted variant.
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final tones = context.tones;
+    final d = date;
+    return Container(
+      width: compact ? 44 : 52,
+      padding: compact
+          ? EdgeInsets.zero
+          : const EdgeInsets.symmetric(vertical: 8),
+      decoration: compact
+          ? null
+          : BoxDecoration(
+              color: tones.azureBrand.withValues(alpha: .1),
+              borderRadius: FlowRadii.chip,
+            ),
+      child: Column(
+        children: [
+          Text(d == null ? '--' : monthsShort[d.month - 1],
+              style: inter(compact ? 9.5 : 10, 720,
+                  // Tinted variant only: the month sits on 10% of this same
+                  // azure, which on white left it at 3.8:1 for a 10px label.
+                  color: compact
+                      ? tones.textFaint
+                      : tones.onTint(tones.azureBrand),
+                  spacing: .8)),
+          Text(d == null ? '--' : '${d.day}',
+              style: interNum(compact ? 16 : 20, compact ? 740 : 760,
+                  color: context.scheme.onSurface)),
+        ],
       ),
     );
   }

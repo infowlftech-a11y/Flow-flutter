@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../core/theme/palette.dart';
 import '../../core/widgets/brand.dart';
 
 /// The `/` gate — shown only while the session resolves. Always dark navy so
@@ -11,7 +10,7 @@ class SplashScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: FlowColors.ink,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: WaveBackdrop(
         child: Center(
           child: Column(
@@ -26,7 +25,7 @@ class SplashScreen extends StatelessWidget {
                 height: 26,
                 child: CircularProgressIndicator(
                   strokeWidth: 2.4,
-                  color: FlowColors.azure.withValues(alpha: .85),
+                  color: Theme.of(context).colorScheme.primary,
                 ),
               ),
             ],

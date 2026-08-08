@@ -3,11 +3,15 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants.dart';
+import '../../core/theme/motion.dart';
+import '../../core/theme/radii.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/typography.dart';
 import '../../core/utils/haptics.dart';
 import '../../core/widgets/feedback.dart';
 import '../../core/widgets/flow_image.dart';
+import '../../core/widgets/thread.dart';
+import '../../core/utils/date_x.dart';
 import '../../data/models/social.dart';
 import '../../providers/providers.dart';
 
@@ -224,13 +228,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   child: Center(
                     child: AnimatedScale(
                       scale: _missedWhileAway > 0 ? 1 : 0,
-                      duration: const Duration(milliseconds: 200),
+                      duration: FlowMotion.base,
                       child: Material(
                         color: context.tones.azureBrand,
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: FlowRadii.card,
                         elevation: 3,
                         child: InkWell(
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: FlowRadii.card,
                           onTap: _jumpToLatest,
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
@@ -257,7 +261,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ],
             ),
           ),
-          _Composer(
+          MessageComposer(
             controller: _input,
             canSend: _canSend,
             onSend: _send,
@@ -288,16 +292,6 @@ class _Bubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tones = context.tones;
-    final dark = Theme.of(context).brightness == Brightness.dark;
-
-    final radius = BorderRadius.only(
-      topLeft: Radius.circular(mine || firstOfRun ? 18 : 6),
-      topRight: Radius.circular(!mine || firstOfRun ? 18 : 6),
-      bottomLeft: Radius.circular(mine || lastOfRun ? 18 : 6),
-      bottomRight: Radius.circular(!mine || lastOfRun ? 18 : 6),
-    );
-
     return Column(
       crossAxisAlignment:
           mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
@@ -307,103 +301,30 @@ class _Bubble extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 12),
             child: Center(
               child: Text(
-                '${message.createdAt!.day} ${monthsForChat[message.createdAt!.month - 1]} · ${_clock(message.createdAt!)}',
-                style: inter(11, 600, color: tones.textFaint, spacing: .4),
+                '${message.createdAt!.day} '
+                '${monthsLong[message.createdAt!.month - 1].substring(0, 3)}'
+                ' · ${_clock(message.createdAt!)}',
+                style: inter(11.5, 600,
+                    color: context.tones.textFaint, spacing: .4),
               ),
             ),
           ),
         Padding(
           padding: EdgeInsets.only(top: firstOfRun ? 8 : 2),
-          child: GestureDetector(
+          child: ChatBubble(
+            text: message.text,
+            mine: mine,
+            firstOfRun: firstOfRun,
+            lastOfRun: lastOfRun,
             // Long-press any bubble to copy (§3.11).
             onLongPress: () {
               Haptics.light();
               Clipboard.setData(ClipboardData(text: message.text));
               showFlowToast(context, 'Copied');
             },
-            child: Container(
-              constraints: BoxConstraints(
-                  maxWidth: MediaQuery.sizeOf(context).width * .74),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: mine
-                    ? tones.azureBrand
-                    : (dark
-                        ? context.scheme.surfaceContainerHigh
-                        : Colors.white),
-                borderRadius: radius,
-                border: mine ? null : Border.all(color: tones.line),
-              ),
-              child: Text(
-                message.text,
-                style: inter(14.5, 460,
-                    color: mine ? Colors.white : context.scheme.onSurface,
-                    height: 1.4),
-              ),
-            ),
           ),
         ),
       ],
-    );
-  }
-}
-
-const monthsForChat = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-];
-
-class _Composer extends StatelessWidget {
-  const _Composer({
-    required this.controller,
-    required this.canSend,
-    required this.onSend,
-  });
-
-  final TextEditingController controller;
-  final bool canSend;
-  final VoidCallback onSend;
-
-  @override
-  Widget build(BuildContext context) {
-    final tones = context.tones;
-    return Container(
-      padding: EdgeInsets.fromLTRB(
-          14, 10, 14, 10 + MediaQuery.paddingOf(context).bottom),
-      decoration: BoxDecoration(
-        color: context.scheme.surfaceContainerLow,
-        border: Border(top: BorderSide(color: tones.line)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Expanded(
-            child: TextField(
-              controller: controller,
-              minLines: 1,
-              maxLines: 5,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(hintText: 'Message…'),
-              onSubmitted: (_) => canSend ? onSend() : null,
-            ),
-          ),
-          const SizedBox(width: 10),
-          AnimatedOpacity(
-            duration: const Duration(milliseconds: 150),
-            opacity: canSend ? 1 : .45,
-            child: SizedBox(
-              width: 48,
-              height: 48,
-              child: IconButton.filled(
-                onPressed: canSend ? onSend : null,
-                tooltip: 'Send',
-                icon: const Icon(Icons.arrow_upward_rounded, size: 22),
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/theme/motion.dart';
+import '../../core/theme/radii.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/typography.dart';
 import '../../core/utils/haptics.dart';
@@ -75,7 +77,7 @@ class _ReviewComposerCardState extends ConsumerState<ReviewComposerCard> {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: tones.azureBrand.withValues(alpha: .07),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: FlowRadii.card,
         border: Border.all(color: tones.azureBrand.withValues(alpha: .35)),
       ),
       child: Column(
@@ -94,7 +96,7 @@ class _ReviewComposerCardState extends ConsumerState<ReviewComposerCard> {
             ),
           ),
           AnimatedSize(
-            duration: const Duration(milliseconds: 220),
+            duration: FlowMotion.base,
             alignment: Alignment.topCenter,
             child: _stars == 0
                 ? const SizedBox.shrink()
@@ -121,7 +123,7 @@ class _ReviewComposerCardState extends ConsumerState<ReviewComposerCard> {
           if (_stars == 0)
             Center(
               child: Text('Tap a star to rate',
-                  style: inter(12, 500, color: tones.textFaint)),
+                  style: inter(12.5, 500, color: tones.textFaint)),
             ),
         ],
       ),

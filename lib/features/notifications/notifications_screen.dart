@@ -3,11 +3,14 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/theme/motion.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/radii.dart';
 import '../../core/theme/typography.dart';
 import '../../core/utils/date_x.dart';
 import '../../core/widgets/feedback.dart';
 import '../../core/widgets/sheets.dart';
+import '../../core/widgets/surfaces.dart';
 import '../../data/models/social.dart';
 import '../../providers/providers.dart';
 
@@ -56,15 +59,11 @@ class NotificationsScreen extends ConsumerWidget {
         skeleton: const SkeletonList(count: 6, itemHeight: 76),
         data: (list) {
           if (list.isEmpty) {
-            return ListView(children: const [
-              SizedBox(height: 60),
-              EmptyView(
-                icon: Icons.notifications_none_rounded,
-                title: 'All quiet',
-                subtitle:
-                    'Booking updates and messages will land here.',
-              ),
-            ]);
+            return const EmptyView.scrollable(
+              icon: Icons.notifications_none_rounded,
+              title: 'All quiet',
+              subtitle: 'Booking updates and messages will land here.',
+            );
           }
           return ListView.separated(
             physics: const AlwaysScrollableScrollPhysics(),
@@ -100,6 +99,16 @@ class _NotificationTile extends ConsumerWidget {
     ref.read(notificationRepositoryProvider).markRead(item.id);
     final isTrainer = ref.read(sessionProvider).isTrainer;
 
+    // `/notifications` is a modal pushed onto the root navigator, and the
+    // branches below `go()` to a destination — which replaces the location and
+    // leaves this route orphaned behind it, so Back never returned here. Pop
+    // first: same destination, honest stack. The broadcast/system branch does
+    // not pop, because a sheet keeps the reader on the list on purpose.
+    void leaveTo(String location) {
+      if (context.canPop()) context.pop();
+      context.go(location);
+    }
+
     switch (item.kind) {
       case NotificationKind.bookingRequest:
       case NotificationKind.bookingConfirmed:
@@ -107,16 +116,16 @@ class _NotificationTile extends ConsumerWidget {
       case NotificationKind.bookingCancelled:
       case NotificationKind.reminder:
         if (isTrainer) {
-          context.go('/home');
+          leaveTo('/home');
         } else {
-          context.go(item.bookingId != null
+          leaveTo(item.bookingId != null
               ? '/sessions?highlight=${item.bookingId}'
               : '/sessions');
         }
       case NotificationKind.message:
-        context.go('/inbox');
+        leaveTo('/inbox');
       case NotificationKind.review:
-        context.go('/sessions');
+        leaveTo('/sessions');
       case NotificationKind.broadcast:
       case NotificationKind.system:
         // No destination — full untruncated text in a sheet (§3.12).
@@ -161,26 +170,29 @@ class _NotificationTile extends ConsumerWidget {
           padding: const EdgeInsets.only(right: 22),
           decoration: BoxDecoration(
             color: tones.danger,
-            borderRadius: BorderRadius.circular(16),
+            // Same radius as the row it reveals, or the red corners peek out.
+            borderRadius: FlowRadii.card,
           ),
           child:
               const Icon(Icons.delete_outline_rounded, color: Colors.white),
         ),
+        // Not a FlowCard: the read/unread tint tweens (§10.9), and FlowCard
+        // paints a plain Container, which would make the transition snap.
+        // Radius matches it so this row and the inbox row agree.
         child: Material(
           color: Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-          // Unread → read tint tweens (§10.9).
+          borderRadius: FlowRadii.card,
           child: InkWell(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: FlowRadii.card,
             onTap: () => _open(context, ref),
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 220),
+              duration: FlowMotion.base,
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: item.read
                     ? tones.card
                     : tones.azureBrand.withValues(alpha: .09),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: FlowRadii.card,
                 border: Border.all(
                     color: item.read
                         ? tones.line
@@ -189,16 +201,7 @@ class _NotificationTile extends ConsumerWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: tones.azureBrand.withValues(alpha: .12),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child:
-                        Icon(_icon, size: 20, color: tones.azureBrand),
-                  ),
+                  FlowIconChip(icon: _icon),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -214,7 +217,7 @@ class _NotificationTile extends ConsumerWidget {
                                           context.scheme.onSurface)),
                             ),
                             Text(timeAgo(item.createdAt),
-                                style: inter(11, 520,
+                                style: inter(11.5, 520,
                                     color: tones.textFaint)),
                             if (!item.read) ...[
                               const SizedBox(width: 6),

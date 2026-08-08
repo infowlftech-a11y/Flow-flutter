@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/theme/palette.dart';
+import '../../core/theme/motion.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/theme/typography.dart';
 import '../../core/utils/haptics.dart';
 import '../../core/widgets/buttons.dart';
@@ -125,12 +126,12 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         onPressed: auth.busy ? null : () => _switchTo('/auth/sign-in'),
         child: RichText(
           text: TextSpan(
-            style: inter(14, 460, color: FlowColors.haze),
+            style: inter(14, 460, color: context.scheme.onSurfaceVariant),
             children: [
               const TextSpan(text: 'Already have an account?  '),
               TextSpan(
                   text: 'Sign in',
-                  style: inter(14, 700, color: FlowColors.azure)),
+                  style: inter(14, 700, color: context.scheme.primary)),
             ],
           ),
         ),
@@ -187,7 +188,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
               ),
               // Advisory only — it never blocks beyond the 6-character floor.
               AnimatedSize(
-                duration: const Duration(milliseconds: 200),
+                duration: FlowMotion.base,
                 alignment: Alignment.topCenter,
                 child: _password.text.isEmpty
                     ? const SizedBox(width: double.infinity)
@@ -216,7 +217,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
           ),
         ),
         AnimatedSize(
-          duration: const Duration(milliseconds: 200),
+          duration: FlowMotion.base,
           alignment: Alignment.topCenter,
           child: _confirmMatches && _confirmError == null
               ? const _MatchHint()
@@ -251,11 +252,11 @@ class _MatchHint extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 4),
       child: Row(
         children: [
-          const Icon(Icons.check_circle_outline_rounded,
-              size: 16, color: FlowColors.emerald),
+          Icon(Icons.check_circle_outline_rounded,
+              size: 16, color: context.tones.success),
           const SizedBox(width: 8),
           Text('Passwords match',
-              style: inter(12.5, 600, color: FlowColors.emerald)),
+              style: inter(12.5, 600, color: context.tones.success)),
         ],
       ),
     );
@@ -267,10 +268,12 @@ class _StrengthMeter extends StatelessWidget {
 
   final PasswordStrength strength;
 
-  Color get _color => switch (strength) {
-        PasswordStrength.weak => FlowColors.coral,
-        PasswordStrength.fair => FlowColors.amber,
-        PasswordStrength.strong => FlowColors.emerald,
+  /// Takes the context rather than reading a getter: these are theme tones
+  /// now, and the light theme needs deeper shades than the dark one.
+  Color _color(BuildContext context) => switch (strength) {
+        PasswordStrength.weak => context.tones.danger,
+        PasswordStrength.fair => context.tones.warning,
+        PasswordStrength.strong => context.tones.success,
       };
 
   @override
@@ -283,20 +286,20 @@ class _StrengthMeter extends StatelessWidget {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(3),
               child: TweenAnimationBuilder<double>(
-                duration: const Duration(milliseconds: 260),
+                duration: FlowMotion.base,
                 curve: Curves.easeOutCubic,
                 tween: Tween(begin: 0, end: strength.fraction),
                 builder: (_, value, _) => LinearProgressIndicator(
                   value: value,
                   minHeight: 5,
-                  backgroundColor: FlowColors.mist.withValues(alpha: .14),
-                  valueColor: AlwaysStoppedAnimation(_color),
+                  backgroundColor: context.scheme.onSurface.withValues(alpha: .14),
+                  valueColor: AlwaysStoppedAnimation(_color(context)),
                 ),
               ),
             ),
           ),
           const SizedBox(width: 12),
-          Text(strength.label, style: inter(12.5, 640, color: _color)),
+          Text(strength.label, style: inter(12.5, 640, color: _color(context))),
         ],
       ),
     );

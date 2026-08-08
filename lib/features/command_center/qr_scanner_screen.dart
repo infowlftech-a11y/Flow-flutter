@@ -4,9 +4,13 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import '../../core/theme/motion.dart';
+import '../../core/theme/radii.dart';
 import '../../core/theme/palette.dart';
 import '../../core/theme/typography.dart';
 import '../../core/utils/haptics.dart';
+import '../../core/widgets/buttons.dart';
+import '../../core/widgets/feedback.dart';
 
 /// Trainer QR check-in scanner (§3.10).
 ///
@@ -107,33 +111,17 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
             onDetect: _onDetect,
             // Denied/unavailable camera → explanation + retry, never a black
             // void (§3.10).
-            errorBuilder: (context, error) => Center(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.no_photography_outlined,
-                        color: FlowColors.haze, size: 44),
-                    const SizedBox(height: 18),
-                    Text('Camera unavailable',
-                        style: sora(20, 700, color: FlowColors.mist)),
-                    const SizedBox(height: 8),
-                    Text(
-                      'FLOW needs the camera to scan rider tickets. Check the '
-                      'camera permission in your system settings, then retry.',
-                      textAlign: TextAlign.center,
-                      style: inter(13.5, 460,
-                          color: FlowColors.haze, height: 1.5),
-                    ),
-                    const SizedBox(height: 20),
-                    FilledButton.icon(
-                      onPressed: () => _controller.start(),
-                      icon: const Icon(Icons.refresh_rounded, size: 20),
-                      label: const Text('Retry'),
-                    ),
-                  ],
-                ),
+            errorBuilder: (context, error) => EmptyView(
+              onScrim: true,
+              icon: Icons.no_photography_outlined,
+              title: 'Camera unavailable',
+              subtitle:
+                  'FLOW needs the camera to scan rider tickets. Check the '
+                  'camera permission in your system settings, then retry.',
+              action: FilledButton.icon(
+                onPressed: () => _controller.start(),
+                icon: const Icon(Icons.refresh_rounded, size: 20),
+                label: const Text('Retry'),
               ),
             ),
           ),
@@ -151,7 +139,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _RoundButton(
+                      ScrimIconButton(
                         icon: Icons.close_rounded,
                         tooltip: 'Close scanner',
                         onTap: () => Navigator.pop(context),
@@ -161,7 +149,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                         valueListenable: _controller,
                         builder: (context, state, _) {
                           final on = state.torchState == TorchState.on;
-                          return _RoundButton(
+                          return ScrimIconButton(
                             icon: on
                                 ? Icons.flash_on_rounded
                                 : Icons.flash_off_rounded,
@@ -175,28 +163,28 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                   ),
                   const Spacer(),
                   AnimatedSize(
-                    duration: const Duration(milliseconds: 200),
+                    duration: FlowMotion.base,
                     child: _warning == null
                         ? Text(
                             "Point at the rider's ticket",
-                            style: inter(14.5, 600, color: Colors.white),
+                            style: inter(14, 600, color: Colors.white),
                           )
                         : Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 12),
                             decoration: BoxDecoration(
                               color: FlowColors.coral,
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: FlowRadii.control,
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 const Icon(Icons.warning_amber_rounded,
-                                    color: Colors.white, size: 19),
-                                const SizedBox(width: 9),
+                                    color: Colors.white, size: 20),
+                                const SizedBox(width: 8),
                                 Flexible(
                                   child: Text(_warning!,
-                                      style: inter(13.5, 640,
+                                      style: inter(14, 640,
                                           color: Colors.white)),
                                 ),
                               ],
@@ -250,39 +238,3 @@ class _ScrimPainter extends CustomPainter {
       oldDelegate.success != success;
 }
 
-class _RoundButton extends StatelessWidget {
-  const _RoundButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onTap,
-    this.active = false,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onTap;
-  final bool active;
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: active
-            ? FlowColors.azure
-            : Colors.black.withValues(alpha: .4),
-        shape: const CircleBorder(),
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: onTap,
-          child: SizedBox(
-            width: 48,
-            height: 48,
-            child: Icon(icon,
-                size: 22, color: active ? FlowColors.ink : Colors.white),
-          ),
-        ),
-      ),
-    );
-  }
-}

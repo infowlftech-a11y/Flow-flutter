@@ -9,7 +9,9 @@ import '../../core/utils/haptics.dart';
 import '../../core/widgets/buttons.dart';
 import '../../core/widgets/feedback.dart';
 import '../../core/widgets/flow_image.dart';
+import '../../core/widgets/media.dart';
 import '../../core/widgets/misc.dart';
+import '../../core/widgets/surfaces.dart';
 import '../../core/widgets/sheets.dart';
 import '../../data/models/app_user.dart';
 import '../../data/models/report.dart';
@@ -89,15 +91,12 @@ class _ApprovalsTab extends ConsumerWidget {
       skeleton: const SkeletonList(count: 4, itemHeight: 132),
       data: (list) {
         if (list.isEmpty) {
-          return ListView(children: const [
-            SizedBox(height: 60),
-            EmptyView(
-              icon: Icons.verified_outlined,
-              title: 'No applications waiting',
-              subtitle:
-                  'New trainer sign-ups land here for certification review.',
-            ),
-          ]);
+          return const EmptyView.scrollable(
+            icon: Icons.verified_outlined,
+            title: 'No applications waiting',
+            subtitle:
+                'New trainer sign-ups land here for certification review.',
+          );
         }
         return ListView.separated(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -201,13 +200,8 @@ class _ApplicantCardState extends ConsumerState<_ApplicantCard> {
     final t = widget.trainer;
     final tones = context.tones;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: tones.card,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: tones.warning.withValues(alpha: .4)),
-      ),
+    return FlowCard(
+      borderColor: tones.warning.withValues(alpha: .4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -224,7 +218,7 @@ class _ApplicantCardState extends ConsumerState<_ApplicantCard> {
                     Text(t.email,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: inter(12, 480, color: tones.textFaint)),
+                        style: inter(12.5, 480, color: tones.textFaint)),
                   ],
                 ),
               ),
@@ -307,32 +301,8 @@ class _ApplicantCardState extends ConsumerState<_ApplicantCard> {
     );
   }
 
-  void _openCertificate(BuildContext context, AppUser trainer) {
-    Navigator.of(context, rootNavigator: true).push(PageRouteBuilder(
-      opaque: false,
-      barrierColor: Colors.black,
-      pageBuilder: (dialogContext, _, _) => Scaffold(
-        backgroundColor: Colors.black,
-        body: Stack(
-          children: [
-            InteractiveViewer(
-              maxScale: 5,
-              child: Center(
-                  child: FlowImage(
-                      url: trainer.certificateUrl, fit: BoxFit.contain)),
-            ),
-            SafeArea(
-              child: IconButton.filledTonal(
-                onPressed: () => Navigator.pop(dialogContext),
-                icon: const Icon(Icons.close_rounded),
-                tooltip: 'Close',
-              ),
-            ),
-          ],
-        ),
-      ),
-    ));
-  }
+  void _openCertificate(BuildContext context, AppUser trainer) =>
+      showFullScreenImages(context, [trainer.certificateUrl]);
 }
 
 // ── Reports ──────────────────────────────────────────────────────────────
@@ -354,14 +324,11 @@ class _ReportsTab extends ConsumerWidget {
       skeleton: const SkeletonList(count: 4, itemHeight: 110),
       data: (list) {
         if (list.isEmpty) {
-          return ListView(children: const [
-            SizedBox(height: 60),
-            EmptyView(
-              icon: Icons.flag_outlined,
-              title: 'No reports',
-              subtitle: 'Rider reports about trainers appear here.',
-            ),
-          ]);
+          return const EmptyView.scrollable(
+            icon: Icons.flag_outlined,
+            title: 'No reports',
+            subtitle: 'Rider reports about trainers appear here.',
+          );
         }
         return ListView.separated(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -382,16 +349,9 @@ class _ReportCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tones = context.tones;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: tones.card,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-            color: report.isOpen
-                ? tones.danger.withValues(alpha: .4)
-                : tones.line),
-      ),
+    return FlowCard(
+      borderColor:
+          report.isOpen ? tones.danger.withValues(alpha: .4) : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -408,7 +368,7 @@ class _ReportCard extends ConsumerWidget {
           const SizedBox(height: 6),
           Text(
             '${report.reporterName} → ${report.reportedUserName} · ${timeAgo(report.createdAt)}',
-            style: inter(12, 500, color: tones.textFaint),
+            style: inter(12.5, 500, color: tones.textFaint),
           ),
           if ((report.details ?? '').isNotEmpty) ...[
             const SizedBox(height: 10),
@@ -541,14 +501,11 @@ class _AppealsTab extends ConsumerWidget {
       skeleton: const SkeletonList(count: 3, itemHeight: 120),
       data: (list) {
         if (list.isEmpty) {
-          return ListView(children: const [
-            SizedBox(height: 60),
-            EmptyView(
-              icon: Icons.gavel_outlined,
-              title: 'No appeals',
-              subtitle: 'Suspended users can appeal, and it lands here.',
-            ),
-          ]);
+          return const EmptyView.scrollable(
+            icon: Icons.gavel_outlined,
+            title: 'No appeals',
+            subtitle: 'Suspended users can appeal, and it lands here.',
+          );
         }
         return ListView.separated(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -663,13 +620,7 @@ class _AppealCardState extends ConsumerState<_AppealCard> {
       _ => tones.warning,
     };
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: tones.card,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: tones.line),
-      ),
+    return FlowCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -726,7 +677,7 @@ class _AppealCardState extends ConsumerState<_AppealCard> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(m.text,
-                          style: inter(13, 460,
+                          style: inter(14, 460,
                               color: context.scheme.onSurfaceVariant,
                               height: 1.45)),
                     ),

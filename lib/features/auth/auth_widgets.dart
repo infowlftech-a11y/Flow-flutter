@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../core/theme/palette.dart';
+import '../../core/theme/motion.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/theme/radii.dart';
 import '../../core/theme/typography.dart';
 import '../../core/widgets/brand.dart';
 
@@ -29,47 +31,62 @@ class AuthScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: FlowColors.ink,
+      // Was hardcoded ink, which made all four auth routes a dark island in a
+      // light app. WaveBackdrop switches ground with the theme; the copy has
+      // to follow it or it disappears.
+      backgroundColor: scheme.surface,
       appBar: showBack
           ? AppBar(
               backgroundColor: Colors.transparent,
-              foregroundColor: FlowColors.mist,
+              foregroundColor: scheme.onSurface,
               elevation: 0,
             )
           : null,
       extendBodyBehindAppBar: true,
       body: WaveBackdrop(
         child: SafeArea(
-          child: Column(
-            children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(28, 8, 28, 24),
+          // The footer used to be pinned below a fixed-height scroll view.
+          // With the keyboard up that viewport ended mid-CTA, so the Sign in
+          // button was sliced in half with "New to FLOW?" pinned underneath
+          // it — reachable only by scrolling, and reading as broken.
+          //
+          // SliverFillRemaining gives the content at least the viewport's
+          // height and lets it grow past it. The Spacer therefore pushes the
+          // footer to the bottom when there is room to spare, and collapses
+          // to nothing when the keyboard takes that room, at which point the
+          // whole column scrolls as one piece.
+          child: CustomScrollView(
+            slivers: [
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(28, 8, 28, 14),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       const SizedBox(height: 8),
                       Text(title,
-                          style: sora(30, 780,
-                              color: FlowColors.mist,
+                          style: sora(32, 780,
+                              color: scheme.onSurface,
                               spacing: -.8,
                               height: 1.12)),
                       const SizedBox(height: 10),
                       Text(subtitle,
-                          style: inter(14.5, 460,
-                              color: FlowColors.haze, height: 1.45)),
+                          style: inter(14, 460,
+                              color: scheme.onSurfaceVariant, height: 1.45)),
                       const SizedBox(height: 28),
                       ...children,
+                      if (footer != null) ...[
+                        const SizedBox(height: 24),
+                        const Spacer(),
+                        footer!,
+                      ],
                     ],
                   ),
                 ),
               ),
-              if (footer != null)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(28, 0, 28, 14),
-                  child: footer,
-                ),
             ],
           ),
         ),
@@ -87,8 +104,10 @@ class AuthBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tones = context.tones;
+    final scheme = Theme.of(context).colorScheme;
     return AnimatedSize(
-      duration: const Duration(milliseconds: 200),
+      duration: FlowMotion.base,
       alignment: Alignment.topCenter,
       child: message == null
           ? const SizedBox(width: double.infinity)
@@ -97,21 +116,21 @@ class AuthBanner extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 18),
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
               decoration: BoxDecoration(
-                color: FlowColors.coral.withValues(alpha: .13),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                    color: FlowColors.coral.withValues(alpha: .45)),
+                color: tones.dangerTint,
+                borderRadius: FlowRadii.chip,
+                border:
+                    Border.all(color: tones.danger.withValues(alpha: .45)),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.error_outline_rounded,
-                      size: 18, color: FlowColors.coral),
+                  Icon(Icons.error_outline_rounded,
+                      size: 18, color: tones.danger),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(message!,
-                        style: inter(13.5, 500,
-                            color: FlowColors.mist, height: 1.35)),
+                        style: inter(14, 500,
+                            color: scheme.onSurface, height: 1.35)),
                   ),
                 ],
               ),
@@ -139,26 +158,27 @@ class AuthRecoveryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final accent = context.tones.azureBrand;
     return Container(
       margin: const EdgeInsets.only(bottom: 18),
       padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
       decoration: BoxDecoration(
-        color: FlowColors.azure.withValues(alpha: .12),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: FlowColors.azure.withValues(alpha: .4)),
+        color: accent.withValues(alpha: .12),
+        borderRadius: FlowRadii.chip,
+        border: Border.all(color: accent.withValues(alpha: .4)),
       ),
       child: Row(
         children: [
           Expanded(
             child: Text(message,
-                style: inter(13.5, 500,
-                    color: FlowColors.mist, height: 1.35)),
+                style: inter(14, 500,
+                    color: Theme.of(context).colorScheme.onSurface,
+                    height: 1.35)),
           ),
           const SizedBox(width: 8),
           TextButton(
             onPressed: onAction,
-            child: Text(actionLabel,
-                style: inter(13.5, 700, color: FlowColors.azure)),
+            child: Text(actionLabel, style: inter(14, 700, color: accent)),
           ),
         ],
       ),
@@ -210,12 +230,14 @@ class AuthTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label.toUpperCase(), style: microLabel(FlowColors.haze)),
+          Text(label.toUpperCase(),
+              style: microLabel(scheme.onSurfaceVariant)),
           const SizedBox(height: 8),
           TextField(
             controller: controller,
@@ -229,7 +251,7 @@ class AuthTextField extends StatelessWidget {
             autofillHints: autofillHints,
             textInputAction: textInputAction,
             textCapitalization: textCapitalization,
-            style: inter(15.5, 520, color: FlowColors.mist),
+            style: inter(15, 520, color: scheme.onSurface),
             onSubmitted: onSubmitted,
             onChanged: onChanged,
             decoration: InputDecoration(
@@ -245,7 +267,7 @@ class AuthTextField extends StatelessWidget {
                             ? Icons.visibility_outlined
                             : Icons.visibility_off_outlined,
                         size: 20,
-                        color: FlowColors.haze,
+                        color: scheme.onSurfaceVariant,
                       ),
                     ),
             ),

@@ -126,11 +126,11 @@ class _KiterFormScreenState extends ConsumerState<KiterFormScreen> {
           );
       Haptics.medium();
       // The profile stream flips the session to ready; the router takes over.
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
         setState(() => _busy = false);
         showFlowToast(
-            context, "Couldn't save your profile. Check your connection.");
+            context, "Couldn't save your profile. ${ErrorView.friendly(e)}");
       }
     }
   }
@@ -152,7 +152,7 @@ class _KiterFormScreenState extends ConsumerState<KiterFormScreen> {
                   onPicked: (f) => setState(() => _avatar = f),
                 ),
               ),
-              const SizedBox(height: 26),
+              const SizedBox(height: 24),
               FormGroup(
                 key: _nameKey,
                 label: 'Full name',
@@ -164,7 +164,13 @@ class _KiterFormScreenState extends ConsumerState<KiterFormScreen> {
                   textCapitalization: TextCapitalization.words,
                   decoration:
                       const InputDecoration(hintText: 'How riders know you'),
-                  onChanged: (_) => setState(() {}),
+                  // The error getters above are the only build-time readers of
+                  // this text and every one of them returns null while
+                  // `_attempted` is false, so a rebuild before the first
+                  // submit produced an identical tree. Submit is never
+                  // disabled — it scrolls to the first problem instead — so
+                  // nothing else depends on per-keystroke state.
+                  onChanged: _attempted ? (_) => setState(() {}) : null,
                 ),
               ),
               KeyedSubtree(
@@ -206,7 +212,7 @@ class _KiterFormScreenState extends ConsumerState<KiterFormScreen> {
                             LengthLimitingTextInputFormatter(2),
                           ],
                           decoration: const InputDecoration(hintText: '18'),
-                          onChanged: (_) => setState(() {}),
+                          onChanged: _attempted ? (_) => setState(() {}) : null,
                         ),
                       ),
                     ),
@@ -278,7 +284,7 @@ class _KiterFormScreenState extends ConsumerState<KiterFormScreen> {
                   maxLength: OnboardingValidators.maxBioLength,
                   decoration: const InputDecoration(
                       hintText: 'A line about you and your riding'),
-                  onChanged: (_) => setState(() {}),
+                  onChanged: _attempted ? (_) => setState(() {}) : null,
                 ),
               ),
               PrimaryButton(

@@ -1,15 +1,19 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../../core/theme/palette.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/theme/radii.dart';
 import '../../core/theme/typography.dart';
 import '../../core/utils/date_x.dart';
 import '../../core/utils/haptics.dart';
-import '../../core/widgets/brand.dart';
+import '../../core/widgets/gate.dart';
+import '../../core/widgets/misc.dart';
+import '../../core/widgets/media.dart';
+import '../../core/widgets/surfaces.dart';
+import '../../core/widgets/thread.dart';
 import '../../core/widgets/buttons.dart';
 import '../../core/widgets/feedback.dart';
 import '../../core/widgets/sheets.dart';
@@ -83,40 +87,24 @@ class _BlockedScreenState extends ConsumerState<BlockedScreen> {
       untilLabel = 'Duration under review.';
     }
 
-    return Scaffold(
-      backgroundColor: FlowColors.ink,
-      body: WaveBackdrop(
-        child: SafeArea(
-          child: ListView(
+    return GateScaffold(
+      onSignOut: () => ref.read(signOutProvider)(),
+      padding: EdgeInsets.zero,
+      child: ListView(
             padding: const EdgeInsets.all(28),
             children: [
-              Align(
-                alignment: Alignment.topRight,
-                child: TextButton.icon(
-                  onPressed: () => ref.read(signOutProvider)(),
-                  icon: const Icon(Icons.logout_rounded,
-                      size: 18, color: FlowColors.haze),
-                  label: Text('Sign out',
-                      style: inter(14, 600, color: FlowColors.haze)),
-                ),
-              ),
-              const SizedBox(height: 24),
               Center(
-                child: Container(
-                  width: 88,
-                  height: 88,
-                  decoration: BoxDecoration(
-                    color: FlowColors.coral.withValues(alpha: .14),
-                    borderRadius: BorderRadius.circular(28),
-                  ),
-                  child: const Icon(Icons.front_hand_rounded,
-                      color: FlowColors.coral, size: 40),
+                child: FlowIconChip(
+                  icon: Icons.front_hand_rounded,
+                  color: context.tones.danger,
+                  size: 88,
+                  tintOpacity: .14,
                 ),
               ),
               const SizedBox(height: 28),
               Center(
                 child: Text('Account suspended',
-                    style: sora(26, 760, color: FlowColors.mist, spacing: -.5)),
+                    style: sora(26, 760, color: context.scheme.onSurface, spacing: -.5)),
               ),
               const SizedBox(height: 10),
               Center(
@@ -124,11 +112,11 @@ class _BlockedScreenState extends ConsumerState<BlockedScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   decoration: BoxDecoration(
-                    color: FlowColors.navy900.withValues(alpha: .8),
-                    borderRadius: BorderRadius.circular(12),
+                    color: context.tones.card.withValues(alpha: .8),
+                    borderRadius: FlowRadii.chip,
                   ),
                   child: Text(untilLabel,
-                      style: inter(13.5, 640, color: FlowColors.amber)),
+                      style: inter(14, 640, color: context.tones.warning)),
                 ),
               ),
               const SizedBox(height: 16),
@@ -137,7 +125,7 @@ class _BlockedScreenState extends ConsumerState<BlockedScreen> {
                 'believe this is a mistake, you can appeal the decision and '
                 'talk to us directly below.',
                 textAlign: TextAlign.center,
-                style: inter(14.5, 440, color: FlowColors.haze, height: 1.55),
+                style: inter(14, 440, color: context.scheme.onSurfaceVariant, height: 1.55),
               ),
               const SizedBox(height: 28),
               switch (appeal) {
@@ -159,8 +147,6 @@ class _BlockedScreenState extends ConsumerState<BlockedScreen> {
                   ),
               },
             ],
-          ),
-        ),
       ),
     );
   }
@@ -201,12 +187,12 @@ class _BlockedScreenState extends ConsumerState<BlockedScreen> {
                     attachments: urls,
                   );
               if (sheetContext.mounted) Navigator.pop(sheetContext);
-            } catch (_) {
+            } catch (e) {
               // Keep the sheet (and the typed text) — let them retry.
               if (sheetContext.mounted) {
                 setSheet(() => busy = false);
                 showFlowToast(sheetContext,
-                    "Couldn't send your appeal. Check your connection and try again.");
+                    "Couldn't send your appeal. ${ErrorView.friendly(e)}");
               }
             }
           }
@@ -229,31 +215,12 @@ class _BlockedScreenState extends ConsumerState<BlockedScreen> {
                 runSpacing: 10,
                 children: [
                   for (var i = 0; i < evidence.length; i++)
-                    Stack(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.file(File(evidence[i].path),
-                              width: 72, height: 72, fit: BoxFit.cover),
-                        ),
-                        Positioned(
-                          right: 2,
-                          top: 2,
-                          child: GestureDetector(
-                            onTap: busy
-                                ? null
-                                : () => setSheet(() => evidence.removeAt(i)),
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: const BoxDecoration(
-                                  color: Colors.black54,
-                                  shape: BoxShape.circle),
-                              child: const Icon(Icons.close_rounded,
-                                  size: 14, color: Colors.white),
-                            ),
-                          ),
-                        ),
-                      ],
+                    ThumbTile.file(
+                      evidence[i].path,
+                      size: 72,
+                      onRemove: busy
+                          ? null
+                          : () => setSheet(() => evidence.removeAt(i)),
                     ),
                   OutlinedButton.icon(
                     onPressed: busy
@@ -328,9 +295,9 @@ class _AppealThreadState extends ConsumerState<_AppealThread> {
           );
       Haptics.light();
       _controller.clear();
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
-        showFlowToast(context, "Couldn't send. Try again.");
+        showFlowToast(context, "Couldn't send. ${ErrorView.friendly(e)}");
       }
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -341,17 +308,17 @@ class _AppealThreadState extends ConsumerState<_AppealThread> {
   Widget build(BuildContext context) {
     final a = widget.appeal;
     final statusColor = switch (a.status) {
-      'resolved' => FlowColors.emerald,
-      'reviewed' => FlowColors.azure,
-      _ => FlowColors.amber,
+      'resolved' => context.tones.success,
+      'reviewed' => context.scheme.primary,
+      _ => context.tones.warning,
     };
 
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: FlowColors.navy900.withValues(alpha: .85),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: FlowColors.navy700),
+        color: context.tones.card.withValues(alpha: .85),
+        borderRadius: FlowRadii.card,
+        border: Border.all(color: context.tones.line),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -360,54 +327,29 @@ class _AppealThreadState extends ConsumerState<_AppealThread> {
             children: [
               Expanded(
                 child: Text('YOUR APPEAL',
-                    style: microLabel(FlowColors.slate)),
+                    style: microLabel(context.tones.textFaint)),
               ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: .16),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(a.status.toUpperCase(),
-                    style: inter(10.5, 720, color: statusColor, spacing: 1)),
-              ),
+              TagPill(a.status.toUpperCase(),
+                  color: statusColor, dense: true),
             ],
           ),
           const SizedBox(height: 12),
           Text(a.reason,
-              style: inter(14.5, 460, color: FlowColors.mist, height: 1.5)),
+              style: inter(14, 460, color: context.scheme.onSurface, height: 1.5)),
           if (a.messages.isNotEmpty) ...[
             const SizedBox(height: 16),
             for (final m in a.messages) _AppealBubble(message: m),
           ],
           const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _controller,
-                  enabled: !_sending,
-                  style: inter(14.5, 460, color: FlowColors.mist),
-                  decoration: const InputDecoration(
-                    hintText: 'Reply to the team…',
-                    isDense: true,
-                  ),
-                  onSubmitted: (_) => _reply(),
-                ),
-              ),
-              const SizedBox(width: 10),
-              IconButton.filled(
-                onPressed: _sending ? null : _reply,
-                icon: _sending
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.send_rounded, size: 20),
-                tooltip: 'Send reply',
-              ),
-            ],
+          ComposerField(
+            controller: _controller,
+            busy: _sending,
+            maxLines: 4,
+            isDense: true,
+            hintText: 'Reply to the team…',
+            sendIcon: Icons.send_rounded,
+            textStyle: inter(14, 460, color: context.scheme.onSurface),
+            onSend: _reply,
           ),
         ],
       ),
@@ -424,28 +366,19 @@ class _AppealBubble extends ConsumerWidget {
     final mine = message.senderId == ref.watch(sessionProvider).uid;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: Column(
-        crossAxisAlignment:
-            mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
-            constraints: const BoxConstraints(maxWidth: 280),
-            decoration: BoxDecoration(
-              color: mine
-                  ? FlowColors.azure.withValues(alpha: .18)
-                  : FlowColors.navy800,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Text(message.text,
-                style: inter(13.5, 460, color: FlowColors.mist, height: 1.45)),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            '${mine ? 'You' : message.senderName} · ${timeAgo(message.timestamp)}',
-            style: inter(11, 520, color: FlowColors.slate),
-          ),
-        ],
+      child: ChatBubble(
+        text: message.text,
+        mine: mine,
+        // The gate screens keep the ink palette in both themes.
+        mineColor: context.scheme.primary.withValues(alpha: .18),
+        theirsColor: context.tones.cardHigh,
+        mineTextColor: context.scheme.onSurface,
+        theirsTextColor: context.scheme.onSurface,
+        bordered: false,
+        footer: Text(
+          '${mine ? 'You' : message.senderName} · ${timeAgo(message.timestamp)}',
+          style: inter(11.5, 520, color: context.tones.textFaint),
+        ),
       ),
     );
   }

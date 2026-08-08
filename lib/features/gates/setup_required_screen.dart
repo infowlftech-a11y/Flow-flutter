@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../core/theme/palette.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/theme/radii.dart';
 import '../../core/theme/typography.dart';
 import '../../core/widgets/brand.dart';
 import '../../core/firebase_config.dart';
@@ -26,7 +27,7 @@ class SetupRequiredScreen extends StatelessWidget {
     (
       '2',
       'Run flutterfire configure',
-      'flutterfire configure --project=go-kite-ccc33  regenerates '
+      'flutterfire configure --project=wlf-flow  regenerates '
           'lib/firebase_options.dart with the new appId and the real API key, '
           'and writes android/app/google-services.json for push delivery.',
     ),
@@ -43,7 +44,7 @@ class SetupRequiredScreen extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: Scaffold(
-        backgroundColor: FlowColors.ink,
+        backgroundColor: context.scheme.surface,
         body: WaveBackdrop(
           child: SafeArea(
             child: ListView(
@@ -55,20 +56,20 @@ class SetupRequiredScreen extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: FlowColors.amber.withValues(alpha: .16),
-                    borderRadius: BorderRadius.circular(8),
+                    color: context.tones.warning.withValues(alpha: .16),
+                    borderRadius: FlowRadii.pill,
                   ),
                   child: Text('SETUP REQUIRED',
                       textAlign: TextAlign.center,
-                      style: inter(11, 800,
-                          color: FlowColors.amber, spacing: 1.4)),
+                      style: inter(11.5, 800,
+                          color: context.tones.warning, spacing: 1.4)),
                 ),
                 const SizedBox(height: 18),
                 Text(
                   'Firebase is not configured',
                   textAlign: TextAlign.center,
                   style:
-                      sora(26, 760, color: FlowColors.mist, spacing: -.5),
+                      sora(26, 760, color: context.scheme.onSurface, spacing: -.5),
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -76,10 +77,10 @@ class SetupRequiredScreen extends StatelessWidget {
                   'API key, so every sign-in, registration and database read '
                   'will fail with API_KEY_INVALID.',
                   textAlign: TextAlign.center,
-                  style: inter(14.5, 440,
-                      color: FlowColors.haze, height: 1.55),
+                  style: inter(14, 440,
+                      color: context.scheme.onSurfaceVariant, height: 1.55),
                 ),
-                const SizedBox(height: 30),
+                const SizedBox(height: 28),
                 for (final (number, title, body) in _steps)
                   _Step(number: number, title: title, body: body),
                 const SizedBox(height: 12),
@@ -87,11 +88,11 @@ class SetupRequiredScreen extends StatelessWidget {
                   child: TextButton.icon(
                     onPressed: () => Clipboard.setData(const ClipboardData(
                         text:
-                            'flutterfire configure --project=go-kite-ccc33')),
-                    icon: const Icon(Icons.copy_rounded,
-                        size: 17, color: FlowColors.azure),
+                            'flutterfire configure --project=wlf-flow')),
+                    icon: Icon(Icons.copy_rounded,
+                        size: 17, color: context.scheme.primary),
                     label: Text('Copy the configure command',
-                        style: inter(13.5, 620, color: FlowColors.azure)),
+                        style: inter(14, 620, color: context.scheme.primary)),
                   ),
                 ),
               ],
@@ -126,11 +127,11 @@ class _Step extends StatelessWidget {
             height: 30,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: FlowColors.azure.withValues(alpha: .16),
+              color: context.scheme.primary.withValues(alpha: .16),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(number,
-                style: interNum(13.5, 760, color: FlowColors.azure)),
+                style: interNum(14, 760, color: context.scheme.primary)),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -138,11 +139,11 @@ class _Step extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title,
-                    style: inter(15, 660, color: FlowColors.mist)),
+                    style: inter(15, 660, color: context.scheme.onSurface)),
                 const SizedBox(height: 4),
                 Text(body,
-                    style: inter(13, 440,
-                        color: FlowColors.haze, height: 1.5)),
+                    style: inter(14, 440,
+                        color: context.scheme.onSurfaceVariant, height: 1.5)),
               ],
             ),
           ),

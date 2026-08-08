@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/theme/palette.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/theme/typography.dart';
 import '../../core/utils/haptics.dart';
 import '../../core/widgets/buttons.dart';
@@ -136,20 +136,20 @@ class _SentState extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.all(26),
             decoration: BoxDecoration(
-              color: FlowColors.azure.withValues(alpha: .12),
+              color: context.scheme.primary.withValues(alpha: .12),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.mark_email_read_outlined,
-                size: 46, color: FlowColors.azure),
+            child: Icon(Icons.mark_email_read_outlined,
+                size: 46, color: context.scheme.primary),
           ),
         ),
-        const SizedBox(height: 30),
+        const SizedBox(height: 28),
         Text(
           'The link expires after an hour. If it hasn’t arrived in a few '
           'minutes, check your spam folder — then try again.',
-          style: inter(14, 460, color: FlowColors.haze, height: 1.5),
+          style: inter(14, 460, color: context.scheme.onSurfaceVariant, height: 1.5),
         ),
-        const SizedBox(height: 26),
+        const SizedBox(height: 24),
         PrimaryButton(
           label: 'Back to sign in',
           onPressed: () {
@@ -161,7 +161,7 @@ class _SentState extends StatelessWidget {
         TextButton(
           onPressed: onResend,
           child: Text('Send it again',
-              style: inter(14, 600, color: FlowColors.azure)),
+              style: inter(14, 600, color: context.scheme.primary)),
         ),
       ],
     );

@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/constants.dart';
+import '../../core/theme/motion.dart';
+import '../../core/theme/radii.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/typography.dart';
 import '../../core/utils/date_x.dart';
@@ -13,6 +15,7 @@ import '../../core/widgets/feedback.dart';
 import '../../core/widgets/flow_image.dart';
 import '../../core/widgets/misc.dart';
 import '../../core/widgets/sheets.dart';
+import '../../core/widgets/surfaces.dart';
 import '../../data/models/app_user.dart';
 import '../../data/models/social.dart';
 import '../../providers/providers.dart';
@@ -228,28 +231,24 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                 skeleton: const _GridSkeleton(),
                 data: (list) {
                   if (list.isEmpty) {
-                    return ListView(
-                      children: [
-                        const SizedBox(height: 40),
-                        EmptyView(
-                          icon: filter.favouritesOnly
-                              ? Icons.favorite_outline_rounded
-                              : Icons.kitesurfing_rounded,
-                          title: filter.favouritesOnly
-                              ? 'No favourites yet'
-                              : 'No trainers match',
-                          subtitle: filter.favouritesOnly
-                              ? 'Tap the heart on any trainer to keep them here.'
-                              : 'Try widening your filters or clearing the search.',
-                          action: (filter.activeCount > 0 ||
-                                  filter.query.isNotEmpty)
+                    return EmptyView.scrollable(
+                      topGap: 40,
+                      icon: filter.favouritesOnly
+                          ? Icons.favorite_outline_rounded
+                          : Icons.kitesurfing_rounded,
+                      title: filter.favouritesOnly
+                          ? 'No favourites yet'
+                          : 'No trainers match',
+                      subtitle: filter.favouritesOnly
+                          ? 'Tap the heart on any trainer to keep them here.'
+                          : 'Try widening your filters or clearing the search.',
+                      action:
+                          (filter.activeCount > 0 || filter.query.isNotEmpty)
                               ? OutlinedButton(
                                   onPressed: _resetAll,
                                   child: const Text('RESET'),
                                 )
                               : null,
-                        ),
-                      ],
                     );
                   }
                   return CustomScrollView(
@@ -406,7 +405,7 @@ class _TrainerCard extends ConsumerWidget {
 
     return Material(
       color: tones.card,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: FlowRadii.card,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => context.push(trainer.isStation || trainer.isSafariOperator
@@ -489,14 +488,14 @@ class _TrainerCard extends ConsumerWidget {
                           trainer.location ?? 'Red Sea',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: inter(12, 480, color: tones.textFaint),
+                          style: inter(12.5, 480, color: tones.textFaint),
                         ),
                       ),
                       Text(euro(trainer.displayRate),
                           style: interNum(14, 760,
                               color: tones.azureBrand)),
                       Text('/h',
-                          style: inter(11, 560, color: tones.textFaint)),
+                          style: inter(11.5, 560, color: tones.textFaint)),
                     ],
                   ),
                 ],
@@ -538,7 +537,7 @@ class _FavHeart extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
               child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
+                duration: FlowMotion.base,
                 transitionBuilder: (child, anim) =>
                     ScaleTransition(scale: anim, child: child),
                 child: Icon(
@@ -563,27 +562,23 @@ class _GridSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+    return const SkeletonGrid(
+      padding: EdgeInsets.fromLTRB(20, 8, 20, 24),
+      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 260,
         mainAxisSpacing: 14,
         crossAxisSpacing: 14,
         childAspectRatio: .72,
       ),
-      itemCount: 6,
-      itemBuilder: (_, _) => Container(
-        decoration: BoxDecoration(
-          color: context.tones.card,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: context.tones.line),
-        ),
-        padding: const EdgeInsets.all(12),
+      tile: FlowCard(
+        padding: EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
-            Expanded(child: SkeletonPulse(width: double.infinity, height: 999, radius: 12)),
+          children: [
+            Expanded(
+              child: SkeletonPulse(
+                  width: double.infinity, height: 999, radius: 12),
+            ),
             SizedBox(height: 12),
             SkeletonPulse(width: 110),
             SizedBox(height: 8),

@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../../core/theme/motion.dart';
+import '../../core/theme/radii.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/typography.dart';
 import '../../core/utils/date_x.dart';
@@ -12,6 +14,7 @@ import '../../core/widgets/buttons.dart';
 import '../../core/widgets/feedback.dart';
 import '../../core/widgets/misc.dart';
 import '../../core/widgets/sheets.dart';
+import '../../core/widgets/surfaces.dart';
 import '../../data/models/booking.dart';
 import '../../providers/providers.dart';
 import 'review_composer.dart';
@@ -196,7 +199,7 @@ class _LiveDot extends StatefulWidget {
 class _LiveDotState extends State<_LiveDot>
     with SingleTickerProviderStateMixin {
   late final AnimationController _c = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 900))
+      vsync: this, duration: FlowMotion.pulse)
     ..repeat(reverse: true);
 
   @override
@@ -288,7 +291,7 @@ class SessionCard extends ConsumerWidget {
         color: highlighted
             ? tones.azureBrand.withValues(alpha: .1)
             : tones.card,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: FlowRadii.card,
         border: Border.all(
             color: highlighted
                 ? tones.azureBrand.withValues(alpha: .6)
@@ -300,24 +303,7 @@ class SessionCard extends ConsumerWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 52,
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                decoration: BoxDecoration(
-                  color: tones.azureBrand.withValues(alpha: .1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  children: [
-                    Text(day == null ? '--' : monthsShort[day.month - 1],
-                        style: inter(10, 720,
-                            color: tones.azureBrand, spacing: .8)),
-                    Text(day == null ? '--' : '${day.day}',
-                        style: interNum(20, 760,
-                            color: context.scheme.onSurface)),
-                  ],
-                ),
-              ),
+              DateBlock(date: day),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -359,7 +345,7 @@ class SessionCard extends ConsumerWidget {
               ),
               const SizedBox(width: 8),
               Text(euro(booking.totalPrice),
-                  style: interNum(16, 760, color: tones.azureBrand)),
+                  style: interNum(17, 760, color: tones.azureBrand)),
             ],
           ),
           ..._actions(context, ref),
@@ -473,6 +459,9 @@ class SessionCard extends ConsumerWidget {
   }
 }
 
+/// A booking's status as a pill. The colour mapping is the only thing this
+/// adds over [TagPill] — the drawing is shared, so a status pill and a tag can
+/// no longer drift apart.
 class StatusPill extends StatelessWidget {
   const StatusPill({super.key, required this.status});
 
@@ -481,22 +470,14 @@ class StatusPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tones = context.tones;
-    final (color, _) = switch (status) {
-      BookingStatus.pending => (tones.warning, ''),
-      BookingStatus.confirmed => (tones.success, ''),
-      BookingStatus.inProgress => (tones.azureBrand, ''),
-      BookingStatus.completed => (context.scheme.onSurfaceVariant, ''),
-      _ => (tones.danger, ''),
+    final color = switch (status) {
+      BookingStatus.pending => tones.warning,
+      BookingStatus.confirmed => tones.success,
+      BookingStatus.inProgress => tones.azureBrand,
+      BookingStatus.completed => context.scheme.onSurfaceVariant,
+      _ => tones.danger,
     };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: .14),
-        borderRadius: BorderRadius.circular(7),
-      ),
-      child: Text(status.label.toUpperCase(),
-          style: inter(10, 740, color: color, spacing: .8)),
-    );
+    return TagPill(status.label.toUpperCase(), color: color, dense: true);
   }
 }
 
@@ -550,15 +531,12 @@ class _QrTicketDialogState extends ConsumerState<_QrTicketDialog> {
                   ? Column(
                       key: const ValueKey('started'),
                       children: [
-                        Container(
-                          width: 76,
-                          height: 76,
-                          decoration: BoxDecoration(
-                            color: context.tones.successTint,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(Icons.surfing_rounded,
-                              color: context.tones.success, size: 36),
+                        FlowIconChip(
+                          icon: Icons.surfing_rounded,
+                          color: context.tones.success,
+                          size: 76,
+                          borderRadius:
+                              const BorderRadius.all(Radius.circular(38)),
                         ),
                         const SizedBox(height: 16),
                         Text('Session started',
@@ -587,7 +565,7 @@ class _QrTicketDialogState extends ConsumerState<_QrTicketDialog> {
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
                             color: Colors.white,
-                            borderRadius: BorderRadius.circular(18),
+                            borderRadius: FlowRadii.card,
                           ),
                           child: QrImageView(
                             data: payload,
@@ -607,7 +585,7 @@ class _QrTicketDialogState extends ConsumerState<_QrTicketDialog> {
                         const SizedBox(height: 14),
                         Text(
                           '${prettyYmd(widget.booking.date)} · ${widget.booking.timeRange}',
-                          style: interNum(13.5, 640,
+                          style: interNum(14, 640,
                               color: context.scheme.onSurfaceVariant),
                         ),
                       ],

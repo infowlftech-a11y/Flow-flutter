@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/constants.dart';
+import '../../core/theme/radii.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/typography.dart';
 import '../../core/utils/haptics.dart';
@@ -11,6 +12,7 @@ import '../../core/widgets/feedback.dart';
 import '../../core/widgets/flow_image.dart';
 import '../../core/widgets/misc.dart';
 import '../../core/widgets/sheets.dart';
+import '../../core/widgets/surfaces.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../providers/providers.dart';
 import '../../providers/settings_provider.dart';
@@ -147,15 +149,15 @@ class ProfileScreen extends ConsumerWidget {
                 segments: const [
                   ButtonSegment(
                       value: ThemeMode.system,
-                      icon: Icon(Icons.brightness_auto_rounded, size: 18),
+                      icon: Icon(Icons.brightness_auto_rounded, size: 17),
                       label: Text('Auto')),
                   ButtonSegment(
                       value: ThemeMode.light,
-                      icon: Icon(Icons.light_mode_rounded, size: 18),
+                      icon: Icon(Icons.light_mode_rounded, size: 17),
                       label: Text('Light')),
                   ButtonSegment(
                       value: ThemeMode.dark,
-                      icon: Icon(Icons.dark_mode_rounded, size: 18),
+                      icon: Icon(Icons.dark_mode_rounded, size: 17),
                       label: Text('Dark')),
                 ],
                 selected: {themeMode},
@@ -356,7 +358,7 @@ class _SettingsCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: context.tones.card,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: FlowRadii.card,
         border: Border.all(color: context.tones.line),
       ),
       child: Column(children: children),
@@ -382,15 +384,7 @@ class _PrivacyItem extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: context.tones.azureBrand.withValues(alpha: .12),
-              borderRadius: BorderRadius.circular(13),
-            ),
-            child: Icon(icon, size: 20, color: context.tones.azureBrand),
-          ),
+          FlowIconChip(icon: icon, size: 42),
           const SizedBox(width: 14),
           Expanded(
             child: Column(

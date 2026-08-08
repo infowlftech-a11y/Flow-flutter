@@ -19,8 +19,6 @@ class UserRepository {
         return AppUser.fromDoc(snap.id, data);
       });
 
-  Stream<AppUser?> watchProfile(String uid) => watchUser(uid);
-
   /// Explore source: every approved trainer/station (§6.2). Sorting stays
   /// client-side — a server-side orderBy would need a composite index.
   Stream<List<AppUser>> watchActiveTrainers() => _users

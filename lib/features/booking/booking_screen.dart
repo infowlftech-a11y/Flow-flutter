@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/constants.dart';
+import '../../core/theme/motion.dart';
+import '../../core/theme/radii.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/typography.dart';
 import '../../core/utils/date_x.dart';
@@ -12,6 +14,7 @@ import '../../core/widgets/feedback.dart';
 import '../../core/widgets/flow_image.dart';
 import '../../core/widgets/misc.dart';
 import '../../core/widgets/sheets.dart';
+import '../../core/widgets/surfaces.dart';
 import '../../core/theme/palette.dart';
 import '../../data/models/catalogue.dart';
 import '../../data/models/schedule.dart';
@@ -189,7 +192,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                   child: Text(
                     'Tap a start hour, then an end hour — sessions run '
                     'back-to-back.',
-                    style: inter(12, 480, color: context.tones.textFaint),
+                    style: inter(12.5, 480, color: context.tones.textFaint),
                   ),
                 ),
                 AsyncView<DayAvailability>(
@@ -206,7 +209,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                   ),
                 ),
                 AnimatedSize(
-                  duration: const Duration(milliseconds: 260),
+                  duration: FlowMotion.base,
                   curve: Curves.easeOutCubic,
                   alignment: Alignment.topCenter,
                   child: _selection.isEmpty
@@ -287,7 +290,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: sheetContext.tones.azureBrand.withValues(alpha: .08),
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: FlowRadii.inset,
                   border: Border.all(
                       color:
                           sheetContext.tones.azureBrand.withValues(alpha: .3)),
@@ -315,7 +318,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                             color: sheetContext.tones.textFaint),
                         const SizedBox(width: 6),
                         Text('Pay at the centre — nothing is charged in FLOW',
-                            style: inter(12, 540,
+                            style: inter(12.5, 540,
                                 color: sheetContext.tones.textFaint)),
                       ],
                     ),
@@ -326,7 +329,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
               Text(
                 'Your kite level is shared with the trainer so they can prep '
                 'the right session.',
-                style: inter(12, 480, color: sheetContext.tones.textFaint),
+                style: inter(12.5, 480, color: sheetContext.tones.textFaint),
               ),
               const SizedBox(height: 16),
               PrimaryButton(
@@ -374,12 +377,12 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         // to now" need different advice, and both land here.
         showFlowToast(context, e.message);
       }
-    } catch (_) {
+    } catch (e) {
       if (sheetContext.mounted) {
         setSheet(() => _submitting = false);
         setState(() {});
-        showFlowToast(
-            sheetContext, "Couldn't send your request. Try again.");
+        showFlowToast(sheetContext,
+            "Couldn't send your request. ${ErrorView.friendly(e)}");
       }
     }
   }
@@ -398,15 +401,11 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  width: 76,
-                  height: 76,
-                  decoration: BoxDecoration(
-                    color: dialogContext.tones.successTint,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(Icons.send_rounded,
-                      color: dialogContext.tones.success, size: 34),
+                FlowIconChip(
+                  icon: Icons.send_rounded,
+                  color: dialogContext.tones.success,
+                  size: 76,
+                  borderRadius: const BorderRadius.all(Radius.circular(38)),
                 ),
                 const SizedBox(height: 20),
                 Text('Request sent!',
@@ -418,7 +417,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                   textAlign: TextAlign.center,
                   style: Theme.of(dialogContext).textTheme.bodyMedium,
                 ),
-                const SizedBox(height: 22),
+                const SizedBox(height: 24),
                 PrimaryButton(
                   label: 'Done',
                   onPressed: () {
@@ -451,7 +450,7 @@ class _ReviewRow extends StatelessWidget {
           SizedBox(
             width: 92,
             child: Text(label.toUpperCase(),
-                style: microLabel(context.tones.textFaint, size: 10.5)),
+                style: microLabel(context.tones.textFaint, size: 10)),
           ),
           Expanded(
             child: Text(value,
@@ -470,13 +469,8 @@ class _ProviderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tones = context.tones;
-    return Container(
+    return FlowCard(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: tones.card,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: tones.line),
-      ),
       child: Row(
         children: [
           FlowAvatar(url: target.imageUrl, name: target.title, size: 54),
@@ -519,7 +513,7 @@ class _ProviderCard extends StatelessWidget {
               Text(euro(target.rate),
                   style: interNum(17, 760, color: tones.azureBrand)),
               Text('/ ${target.unit}',
-                  style: inter(11, 540, color: tones.textFaint)),
+                  style: inter(11.5, 540, color: tones.textFaint)),
             ],
           ),
         ],
@@ -595,18 +589,18 @@ class _DayStrip extends ConsumerWidget {
                 '${gust == null ? '' : ', ${gust.displayKnots} knots, '
                     '${gust.rating.label}'}',
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
+              duration: FlowMotion.fast,
               width: 62,
               decoration: BoxDecoration(
                 color: active ? tones.azureBrand : tones.card,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: FlowRadii.inset,
                 border:
                     Border.all(color: active ? tones.azureBrand : tones.line),
               ),
               child: Material(
                 color: Colors.transparent,
                 child: InkWell(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: FlowRadii.inset,
                   onTap: () => onChanged(date),
                   child: Opacity(
                     opacity: muted ? .45 : 1,
@@ -633,7 +627,7 @@ class _DayStrip extends ConsumerWidget {
                             ),
                           ),
                           Text(monthsShort[day.month - 1],
-                              style: inter(9.5, 640, color: subFg, spacing: .6)),
+                              style: inter(10, 640, color: subFg, spacing: .6)),
                           // Fixed-height row whether or not there is a
                           // forecast, so tiles inside and beyond the horizon
                           // stay the same size and the strip does not jitter
@@ -645,7 +639,7 @@ class _DayStrip extends ConsumerWidget {
                                 : Center(
                                     child: Text(
                                       '${gust.displayKnots}kt',
-                                      style: interNum(11, 760,
+                                      style: interNum(11.5, 760,
                                           color: active
                                               ? Colors.white
                                               : windColor(gust.rating)),
@@ -698,7 +692,7 @@ class _WindSummary extends ConsumerWidget {
     // No forecast, or a date past the horizon — collapse entirely rather than
     // leave an empty band where information used to be.
     return AnimatedSize(
-      duration: const Duration(milliseconds: 220),
+      duration: FlowMotion.base,
       curve: Curves.easeOutCubic,
       alignment: Alignment.topCenter,
       child: day == null
@@ -709,7 +703,7 @@ class _WindSummary extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
               decoration: BoxDecoration(
                 color: windColor(day.rating).withValues(alpha: .10),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: FlowRadii.chip,
                 border: Border.all(
                     color: windColor(day.rating).withValues(alpha: .35)),
               ),
@@ -727,7 +721,7 @@ class _WindSummary extends ConsumerWidget {
                           '${day.compass}'
                           '${day.hasUsefulGust ? ' · gusts '
                               '${day.displayGustKnots}' : ''}',
-                          style: inter(13, 700,
+                          style: inter(14, 700,
                               color: windColor(day.rating), height: 1.25),
                         ),
                         const SizedBox(height: 2),
@@ -760,7 +754,7 @@ class _SlotArea extends StatelessWidget {
   Widget build(BuildContext context) {
     // Whole-day time off → a single notice instead of the grid (§3.6).
     if (day.onVacation) {
-      return _Notice(
+      return const FlowNotice(
         icon: Icons.beach_access_rounded,
         title: 'Away on this date',
         body: 'The trainer is off the water this day. Try another date.',
@@ -771,7 +765,7 @@ class _SlotArea extends StatelessWidget {
       // day the lead-time rule retires every slot, which is a clock problem,
       // not a demand one — saying otherwise misreads the trainer's day.
       final over = day.past.length >= BookingMath.slots().length;
-      return _Notice(
+      return FlowNotice(
         icon: over ? Icons.bedtime_rounded : Icons.event_busy_rounded,
         title: over ? "That's a wrap for today" : 'Fully booked',
         body: over
@@ -855,10 +849,10 @@ class _SlotTile extends StatelessWidget {
       label:
           '${slot.value} to ${slot.plusHours(1).value}, $label',
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
+        duration: FlowMotion.fast,
         decoration: BoxDecoration(
           color: bg,
-          borderRadius: BorderRadius.circular(13),
+          borderRadius: FlowRadii.control,
           border: Border.all(color: border),
         ),
         // Ripple on top of the fill: a tapped hour should acknowledge the
@@ -866,16 +860,16 @@ class _SlotTile extends StatelessWidget {
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            borderRadius: BorderRadius.circular(13),
+            borderRadius: FlowRadii.control,
             onTap: onTap,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text('${slot.value}–${slot.plusHours(1).value}',
-                    style: interNum(13, 680, color: fg)),
+                    style: interNum(14, 680, color: fg)),
                 const SizedBox(height: 2),
                 Text(label,
-                    style: inter(10.5, 580,
+                    style: inter(10, 580,
                         color: state == _SlotState.selected
                             ? Colors.white.withValues(alpha: .85)
                             : state == _SlotState.free
@@ -890,59 +884,21 @@ class _SlotTile extends StatelessWidget {
   }
 }
 
-class _Notice extends StatelessWidget {
-  const _Notice({required this.icon, required this.title, required this.body});
-
-  final IconData icon;
-  final String title;
-  final String body;
-
-  @override
-  Widget build(BuildContext context) {
-    final tones = context.tones;
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: tones.warningTint,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: tones.warning, size: 28),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 3),
-                Text(body, style: Theme.of(context).textTheme.bodySmall),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _SlotGridSkeleton extends StatelessWidget {
   const _SlotGridSkeleton();
 
   @override
   Widget build(BuildContext context) {
-    return GridView.builder(
+    return const SkeletonGrid(
       shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+      count: 10,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
         mainAxisSpacing: 10,
         crossAxisSpacing: 10,
         childAspectRatio: 1.55,
       ),
-      itemCount: 10,
-      itemBuilder: (_, _) =>
-          const SkeletonPulse(height: 999, radius: 13),
+      tile: SkeletonPulse(height: 999, radius: FlowRadius.control),
     );
   }
 }
@@ -965,13 +921,7 @@ class _SummaryCard extends StatelessWidget {
     final tones = context.tones;
     final start = slots.first;
     final end = start.plusHours(slots.length);
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: tones.card,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: tones.line),
-      ),
+    return FlowCard(
       child: Row(
         children: [
           Icon(Icons.schedule_rounded, color: tones.azureBrand, size: 22),
@@ -981,7 +931,7 @@ class _SummaryCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('${start.value}–${end.value}',
-                    style: interNum(16, 720,
+                    style: interNum(17, 720,
                         color: context.scheme.onSurface)),
                 Text(
                     '${slots.length} hour${slots.length == 1 ? '' : 's'} · ${prettyYmd(date)}',
@@ -1012,13 +962,7 @@ class _StickyBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tones = context.tones;
-    return Container(
-      padding: EdgeInsets.fromLTRB(
-          20, 12, 20, 12 + MediaQuery.paddingOf(context).bottom),
-      decoration: BoxDecoration(
-        color: context.scheme.surfaceContainerLow,
-        border: Border(top: BorderSide(color: tones.line)),
-      ),
+    return StickyBar(
       child: Row(
         children: [
           Expanded(
@@ -1029,10 +973,10 @@ class _StickyBar extends StatelessWidget {
                     hours == 0
                         ? 'No hours selected'
                         : '$hours hour${hours == 1 ? '' : 's'}',
-                    style: inter(12, 580, color: tones.textFaint)),
+                    style: inter(12.5, 580, color: tones.textFaint)),
                 const SizedBox(height: 2),
                 AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 150),
+                  duration: FlowMotion.fast,
                   transitionBuilder: (child, anim) => SlideTransition(
                     position: Tween(
                             begin: const Offset(0, .5), end: Offset.zero)

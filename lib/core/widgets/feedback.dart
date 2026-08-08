@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../theme/motion.dart';
 import '../theme/app_theme.dart';
+import '../theme/palette.dart';
+import '../theme/radii.dart';
 import '../theme/typography.dart';
+import '../utils/error_copy.dart';
 import '../utils/haptics.dart';
+import 'surfaces.dart';
 
 /// The single place async state is rendered (APP_LOGIC_BLUEPRINT.md §10.1).
 ///
@@ -44,7 +49,7 @@ class AsyncView<T> extends StatelessWidget {
       child = skeleton ?? const Center(child: CircularProgressIndicator());
     }
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 200),
+      duration: FlowMotion.base,
       child: KeyedSubtree(
         key: ValueKey(value.hasValue
             ? 'data'
@@ -64,19 +69,12 @@ class ErrorView extends StatelessWidget {
   final VoidCallback onRetry;
 
   /// Firestore / generic error → human words (§10.3).
-  static String friendly(Object error) {
-    final s = error.toString().toLowerCase();
-    if (s.contains('permission-denied')) {
-      return "You don't have access to this yet.";
-    }
-    if (s.contains('unavailable') || s.contains('network')) {
-      return 'No connection. Check your internet and try again.';
-    }
-    if (s.contains('failed-precondition') && s.contains('index')) {
-      return "This view needs a database index that hasn't been created yet.";
-    }
-    return 'Something went wrong. Please try again.';
-  }
+  ///
+  /// The mapping itself lives in `core/utils/error_copy.dart` — it is a rule
+  /// about what users are told, not a presentation detail, and it should not
+  /// be editable as a side effect of restyling this widget. Kept here as a
+  /// delegating alias so existing call sites are unaffected.
+  static String friendly(Object error) => friendlyError(error);
 
   @override
   Widget build(BuildContext context) {
@@ -87,15 +85,10 @@ class ErrorView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: context.tones.dangerTint,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Icon(Icons.wifi_tethering_error_rounded,
-                  color: context.tones.danger, size: 30),
+            FlowIconChip(
+              icon: Icons.wifi_tethering_error_rounded,
+              color: context.tones.danger,
+              size: 64,
             ),
             const SizedBox(height: 20),
             Text('Hit some chop', style: theme.textTheme.headlineSmall),
@@ -126,45 +119,87 @@ class EmptyView extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.action,
-  });
+    this.onScrim = false,
+  })  : _scrollable = false,
+        topGap = 0;
+
+  /// The same view wrapped in a scrollable, for a list slot whose non-empty
+  /// branch scrolls.
+  ///
+  /// Seven call sites hand-rolled this as
+  /// `ListView(children: const [SizedBox(height: 60), EmptyView(…)])`, and
+  /// every one of them dropped the `physics: AlwaysScrollableScrollPhysics()`
+  /// its own non-empty branch sets. That is not cosmetic: an empty state is
+  /// shorter than the viewport, so `minScrollExtent == maxScrollExtent` and the
+  /// default clamping physics refuses the drag outright — the enclosing
+  /// `RefreshIndicator` never sees it. Pull-to-refresh was dead on precisely
+  /// the state where someone is most likely to pull.
+  const EmptyView.scrollable({
+    super.key,
+    required this.icon,
+    required this.title,
+    this.subtitle,
+    this.action,
+    this.topGap = 60,
+  })  : onScrim = false,
+        _scrollable = true;
 
   final IconData icon;
   final String title;
   final String? subtitle;
   final Widget? action;
 
+  /// Renders on the fixed dark palette instead of the theme's, for the
+  /// full-screen media surfaces (crop, scanner) that stay black in both
+  /// themes. Drops the tinted chip for a bare glyph — those screens are
+  /// deliberately chrome-free.
+  final bool onScrim;
+
+  final bool _scrollable;
+
+  /// Pushes the state down off the top edge. Only read by
+  /// [EmptyView.scrollable].
+  final double topGap;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(32, 40, 32, 40),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: context.tones.azureBrand.withValues(alpha: .12),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Icon(icon, color: context.tones.azureBrand, size: 30),
+    final content = Padding(
+      padding: const EdgeInsets.fromLTRB(32, 40, 32, 40),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (onScrim)
+            Icon(icon, color: FlowColors.haze, size: 44)
+          else
+            FlowIconChip(icon: icon, size: 64),
+          const SizedBox(height: 20),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: onScrim
+                ? sora(20, 700, color: FlowColors.mist)
+                : theme.textTheme.headlineSmall,
+          ),
+          if (subtitle != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              subtitle!,
+              textAlign: TextAlign.center,
+              style: onScrim
+                  ? inter(14, 460, color: FlowColors.haze, height: 1.5)
+                  : theme.textTheme.bodyMedium,
             ),
-            const SizedBox(height: 20),
-            Text(title,
-                style: theme.textTheme.headlineSmall,
-                textAlign: TextAlign.center),
-            if (subtitle != null) ...[
-              const SizedBox(height: 8),
-              Text(subtitle!,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium),
-            ],
-            if (action != null) ...[const SizedBox(height: 20), action!],
           ],
-        ),
+          if (action != null) ...[const SizedBox(height: 20), action!],
+        ],
       ),
+    );
+
+    if (!_scrollable) return Center(child: content);
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [SizedBox(height: topGap), content],
     );
   }
 }
@@ -185,7 +220,17 @@ class SkeletonPulse extends StatefulWidget {
 class _SkeletonPulseState extends State<SkeletonPulse>
     with SingleTickerProviderStateMixin {
   late final AnimationController _c = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 1100));
+      vsync: this, duration: FlowMotion.pulse);
+
+  // Built once. The previous version created a CurvedAnimation inside build(),
+  // and every one of those registers a status listener on `_c` that nothing
+  // ever removes — on a skeleton list that rebuilds while data streams in,
+  // the listener list grew without bound behind a widget that is on screen
+  // for under a second.
+  late final CurvedAnimation _curve =
+      CurvedAnimation(parent: _c, curve: Curves.easeInOut);
+  late final Animation<double> _opacity =
+      Tween(begin: .35, end: .9).animate(_curve);
 
   @override
   void didChangeDependencies() {
@@ -200,6 +245,7 @@ class _SkeletonPulseState extends State<SkeletonPulse>
 
   @override
   void dispose() {
+    _curve.dispose();
     _c.dispose();
     super.dispose();
   }
@@ -208,8 +254,7 @@ class _SkeletonPulseState extends State<SkeletonPulse>
   Widget build(BuildContext context) {
     return ExcludeSemantics(
       child: FadeTransition(
-        opacity: Tween(begin: .35, end: .9).animate(
-            CurvedAnimation(parent: _c, curve: Curves.easeInOut)),
+        opacity: _opacity,
         child: Container(
           width: widget.width,
           height: widget.height,
@@ -230,30 +275,27 @@ class SkeletonCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       height: height,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: context.tones.card,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: context.tones.line),
-      ),
-      child: Row(
-        children: [
-          const SkeletonPulse(width: 48, height: 48, radius: 14),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                SkeletonPulse(width: 140),
-                SizedBox(height: 8),
-                SkeletonPulse(width: 90, height: 10),
-              ],
+      child: FlowCard(
+        child: Row(
+          children: [
+            const SkeletonPulse(
+                width: 48, height: 48, radius: FlowRadius.control),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  SkeletonPulse(width: 140),
+                  SizedBox(height: 8),
+                  SkeletonPulse(width: 90, height: 10),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -272,6 +314,44 @@ class SkeletonList extends StatelessWidget {
       itemCount: count,
       separatorBuilder: (_, _) => const SizedBox(height: 12),
       itemBuilder: (_, _) => SkeletonCard(height: itemHeight),
+    );
+  }
+}
+
+/// A grid of identical placeholder tiles.
+///
+/// The counterpart to [SkeletonList]. Explore's trainer grid and the booking
+/// screen's slot grid each hand-rolled `GridView.builder`, and the point of
+/// centralising it is [NeverScrollableScrollPhysics]: a skeleton that scrolls
+/// on its own leaves the viewport somewhere the real list will not be, so the
+/// content jumps the moment it arrives.
+class SkeletonGrid extends StatelessWidget {
+  const SkeletonGrid({
+    super.key,
+    required this.gridDelegate,
+    required this.tile,
+    this.count = 6,
+    this.padding = EdgeInsets.zero,
+    this.shrinkWrap = false,
+  });
+
+  final SliverGridDelegate gridDelegate;
+
+  /// One tile, reused for every cell — placeholders never differ by index.
+  final Widget tile;
+  final int count;
+  final EdgeInsetsGeometry padding;
+  final bool shrinkWrap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GridView.builder(
+      padding: padding,
+      shrinkWrap: shrinkWrap,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: gridDelegate,
+      itemCount: count,
+      itemBuilder: (_, _) => tile,
     );
   }
 }
@@ -327,7 +407,7 @@ Future<T> withBusyOverlay<T>(
           padding: const EdgeInsets.fromLTRB(28, 26, 28, 24),
           decoration: BoxDecoration(
             color: Theme.of(dialogContext).dialogTheme.backgroundColor,
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: FlowRadii.dialog,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -339,7 +419,7 @@ Future<T> withBusyOverlay<T>(
               Material(
                 color: Colors.transparent,
                 child: Text(label,
-                    style: inter(14.5, 560,
+                    style: inter(14, 560,
                         color: Theme.of(dialogContext).colorScheme.onSurface)),
               ),
             ],

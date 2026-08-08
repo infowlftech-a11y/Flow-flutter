@@ -1,4 +1,3 @@
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,11 +6,11 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/constants.dart';
-import '../../core/theme/app_theme.dart';
-import '../../core/theme/typography.dart';
+import '../../core/theme/radii.dart';
 import '../../core/utils/haptics.dart';
 import '../../core/widgets/feedback.dart';
 import '../../core/widgets/flow_image.dart';
+import '../../core/widgets/media.dart';
 import '../../core/widgets/picker_field.dart';
 import '../../core/widgets/sheets.dart';
 import '../../data/firestore_paths.dart';
@@ -49,13 +48,34 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   bool _busy = false;
   bool _attempted = false;
 
+  /// Last value [_dirty] was rebuilt for — see [_onTextChanged].
+  bool _lastDirty = false;
+
   @override
   void initState() {
     super.initState();
     final user = ref.read(currentUserProvider).value;
     if (user != null) _load(user);
     for (final c in [_name, _phone, _age, _bio]) {
-      c.addListener(() => setState(() {}));
+      c.addListener(_onTextChanged);
+    }
+  }
+
+  /// Only two things on this screen react to a keystroke: whether Save is
+  /// enabled, and the inline errors once you have tried to submit. Rebuilding
+  /// unconditionally re-ran four `FormGroup`s, two picker fields and the
+  /// gallery grid on every character typed into the bio — the whole form, to
+  /// produce an identical tree, 200 characters in a row.
+  ///
+  /// It also cost a second full build on arrival: [_load] runs from `build()`
+  /// and assigns all four controllers, and each assignment re-marked the
+  /// element that was building at the time. Flutter permits that — you are in
+  /// scope of your own build target — so it never showed up as an error, only
+  /// as a frame's worth of work nobody asked for.
+  void _onTextChanged() {
+    final dirty = _dirty;
+    if (_attempted || dirty != _lastDirty) {
+      setState(() => _lastDirty = dirty);
     }
   }
 
@@ -73,10 +93,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   @override
   void dispose() {
-    _name.dispose();
-    _phone.dispose();
-    _age.dispose();
-    _bio.dispose();
+    for (final c in [_name, _phone, _age, _bio]) {
+      c.removeListener(_onTextChanged);
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -152,10 +172,14 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         showFlowToast(context, 'Profile updated');
         context.pop();
       }
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
         setState(() => _busy = false);
-        showFlowToast(context, "Couldn't save. Check your connection.");
+        // Was a flat "Check your connection", which is the one cause this
+        // almost never has: a rejected write comes back from the server, so
+        // the connection demonstrably worked. Blaming the network sent people
+        // to their wifi settings for a permissions problem.
+        showFlowToast(context, "Couldn't save. ${ErrorView.friendly(e)}");
       }
     }
   }
@@ -231,7 +255,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 onPicked: (f) => setState(() => _newAvatar = f),
               ),
             ),
-            const SizedBox(height: 26),
+            const SizedBox(height: 24),
             FormGroup(
               label: 'Full name',
               required: true,
@@ -359,7 +383,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   runSpacing: 10,
                   children: [
                     for (var i = 0; i < _existingGallery.length; i++)
-                      _GalleryThumb(
+                      ThumbTile(
                         onRemove: _busy
                             ? null
                             : () => setState(
@@ -368,21 +392,17 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                           url: _existingGallery[i],
                           width: 84,
                           height: 84,
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: FlowRadii.chip,
                         ),
                       ),
                     for (var i = 0; i < _newGallery.length; i++)
-                      _GalleryThumb(
+                      ThumbTile.file(
+                        _newGallery[i].path,
                         isNew: true,
                         onRemove: _busy
                             ? null
                             : () =>
                                 setState(() => _newGallery.removeAt(i)),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.file(File(_newGallery[i].path),
-                              width: 84, height: 84, fit: BoxFit.cover),
-                        ),
                       ),
                     SizedBox(
                       width: 84,
@@ -400,9 +420,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                               },
                         style: OutlinedButton.styleFrom(
                             padding: EdgeInsets.zero,
-                            shape: RoundedRectangleBorder(
-                                borderRadius:
-                                    BorderRadius.circular(12))),
+                            shape: const RoundedRectangleBorder(
+                                borderRadius: FlowRadii.chip)),
                         child: const Icon(
                             Icons.add_photo_alternate_outlined),
                       ),
@@ -413,61 +432,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _GalleryThumb extends StatelessWidget {
-  const _GalleryThumb({
-    required this.child,
-    required this.onRemove,
-    this.isNew = false,
-  });
-
-  final Widget child;
-  final VoidCallback? onRemove;
-  final bool isNew;
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        child,
-        if (isNew)
-          Positioned(
-            left: 4,
-            bottom: 4,
-            child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: context.tones.azureBrand,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              // "New" badge on not-yet-uploaded picks (§3.13).
-              child: Text('NEW',
-                  style: inter(8.5, 800, color: Colors.white, spacing: .8)),
-            ),
-          ),
-        Positioned(
-          right: 2,
-          top: 2,
-          child: Semantics(
-            button: true,
-            label: 'Remove photo',
-            child: GestureDetector(
-              onTap: onRemove,
-              child: Container(
-                padding: const EdgeInsets.all(5),
-                decoration: const BoxDecoration(
-                    color: Colors.black54, shape: BoxShape.circle),
-                child: const Icon(Icons.close_rounded,
-                    size: 14, color: Colors.white),
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../theme/motion.dart';
+import '../theme/palette.dart';
+
 /// Primary CTA. While busy it swaps the label for a spinner and **keeps its
 /// brand fill** — a disabled grey pill reads as dead (§10.5).
 class PrimaryButton extends StatelessWidget {
@@ -31,7 +34,7 @@ class PrimaryButton extends StatelessWidget {
       // Busy keeps the fill: onPressed stays non-null but ignores taps.
       onPressed: busy ? () {} : onPressed,
       child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 180),
+        duration: FlowMotion.fast,
         child: busy
             ? SizedBox(
                 key: const ValueKey('busy'),
@@ -56,6 +59,66 @@ class PrimaryButton extends StatelessWidget {
       ),
     );
     return expand ? SizedBox(width: double.infinity, child: button) : button;
+  }
+}
+
+/// A circular icon button on a scrim, for controls that float over media.
+///
+/// Three of these existed: `_ScrimButton` on the trainer profile (42 px,
+/// alpha .35), `_RoundButton` in the QR scanner (48 px, alpha .4, with an
+/// active state for the torch) and an inline copy on the station profile with
+/// no size box at all — so the station's back button had a smaller tap target
+/// than the identical-looking one a screen away.
+///
+/// Defaults to 48 px: these sit over photography and in screen corners, where
+/// a near-miss navigates somewhere you did not intend.
+class ScrimIconButton extends StatelessWidget {
+  const ScrimIconButton({
+    super.key,
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+    this.color,
+    this.active = false,
+    this.size = 48,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onTap;
+
+  /// Tints the glyph. Ignored while [active].
+  final Color? color;
+
+  /// Inverts the button — brand fill, ink glyph. Used for the scanner torch.
+  final bool active;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: active
+            ? FlowColors.azure
+            : Colors.black.withValues(alpha: .38),
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: SizedBox(
+            width: size,
+            height: size,
+            child: Icon(
+              icon,
+              size: size * .44,
+              color: active ? FlowColors.ink : (color ?? Colors.white),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -94,7 +157,7 @@ class MicroAction extends StatelessWidget {
     final child = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (icon != null) ...[Icon(icon, size: 16), const SizedBox(width: 6)],
+        if (icon != null) ...[Icon(icon, size: 17), const SizedBox(width: 6)],
         Text(label),
       ],
     );

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/theme/palette.dart';
+import '../../core/theme/radii.dart';
 import '../../core/theme/typography.dart';
 import '../../core/utils/haptics.dart';
 import '../../core/widgets/brand.dart';
@@ -25,8 +25,9 @@ class WelcomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: FlowColors.ink,
+      backgroundColor: scheme.surface,
       body: WaveBackdrop(
         child: SafeArea(
           child: Padding(
@@ -36,7 +37,7 @@ class WelcomeScreen extends ConsumerWidget {
               children: [
                 const Spacer(flex: 2),
                 const Center(child: FlowLogo(size: 92)),
-                const SizedBox(height: 22),
+                const SizedBox(height: 24),
                 const Center(child: FlowWordmark()),
                 const SizedBox(height: 18),
                 Text(
@@ -44,8 +45,8 @@ class WelcomeScreen extends ConsumerWidget {
                   'Find a certified trainer, book hours on the water, '
                   'check in on the beach.',
                   textAlign: TextAlign.center,
-                  style: inter(14.5, 460,
-                      color: FlowColors.haze, height: 1.55),
+                  style: inter(14, 460,
+                      color: scheme.onSurfaceVariant, height: 1.55),
                 ),
                 const Spacer(flex: 3),
                 PrimaryButton(
@@ -69,12 +70,12 @@ class WelcomeScreen extends ConsumerWidget {
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size.fromHeight(54),
                     side: BorderSide(
-                        color: FlowColors.mist.withValues(alpha: .28)),
+                        color: scheme.onSurface.withValues(alpha: .28)),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14)),
+                        borderRadius: FlowRadii.control),
                   ),
                   child: Text('I already have an account',
-                      style: inter(15, 640, color: FlowColors.mist)),
+                      style: inter(15, 640, color: scheme.onSurface)),
                 ),
                 const SizedBox(height: 18),
                 Text(
@@ -82,7 +83,7 @@ class WelcomeScreen extends ConsumerWidget {
                   'follow your trainer’s safety briefing.',
                   textAlign: TextAlign.center,
                   style: inter(11.5, 440,
-                      color: FlowColors.haze.withValues(alpha: .75),
+                      color: scheme.onSurfaceVariant.withValues(alpha: .75),
                       height: 1.45),
                 ),
               ],

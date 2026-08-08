@@ -12,8 +12,10 @@ import '../../core/utils/haptics.dart';
 import '../../core/widgets/buttons.dart';
 import '../../core/widgets/feedback.dart';
 import '../../core/widgets/flow_image.dart';
+import '../../core/widgets/media.dart';
 import '../../core/widgets/misc.dart';
 import '../../core/widgets/sheets.dart';
+import '../../core/widgets/surfaces.dart';
 import '../../data/firestore_paths.dart';
 import '../../data/models/app_user.dart';
 import '../../data/models/booking.dart';
@@ -131,14 +133,14 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
               SliverAppBar(
                 pinned: true,
                 expandedHeight: 320,
-                leading: _ScrimButton(
+                leading: ScrimIconButton(
                   icon: Icons.arrow_back_rounded,
                   tooltip: 'Back',
                   onTap: () => context.pop(),
                 ),
                 actions: [
                   if (!isSelf) ...[
-                    _ScrimButton(
+                    ScrimIconButton(
                       icon: isFav
                           ? Icons.favorite_rounded
                           : Icons.favorite_outline_rounded,
@@ -156,7 +158,7 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
                                   .ignore();
                             },
                     ),
-                    _ScrimButton(
+                    ScrimIconButton(
                       icon: Icons.flag_outlined,
                       tooltip: 'Report trainer',
                       onTap: () => _openReportSheet(context, trainer),
@@ -227,11 +229,11 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
                           Stars(value: rating.average, size: 17),
                           const SizedBox(width: 8),
                           Text(rating.display,
-                              style: interNum(14.5, 720,
+                              style: interNum(14, 720,
                                   color: context.scheme.onSurface)),
                           Text(
                             '  ·  ${rating.count} review${rating.count == 1 ? '' : 's'}',
-                            style: inter(13, 480, color: tones.textFaint),
+                            style: inter(14, 480, color: tones.textFaint),
                           ),
                         ],
                       ),
@@ -263,7 +265,7 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
                         ],
                       ),
                       if ((trainer.bio ?? '').isNotEmpty) ...[
-                        const SizedBox(height: 26),
+                        const SizedBox(height: 24),
                         const SectionHeader('About'),
                         Text(trainer.bio!,
                             style: Theme.of(context)
@@ -272,7 +274,7 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
                                 .copyWith(height: 1.55)),
                       ],
                       if (trainer.languages.isNotEmpty) ...[
-                        const SizedBox(height: 26),
+                        const SizedBox(height: 24),
                         const SectionHeader('Speaks'),
                         Wrap(
                           spacing: 8,
@@ -283,7 +285,7 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
                           ],
                         ),
                       ],
-                      const SizedBox(height: 26),
+                      const SizedBox(height: 24),
                     ],
                   ),
                 ),
@@ -312,15 +314,9 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
     );
   }
 
-  void _openViewer(BuildContext context) {
-    if (_images.isEmpty) return;
-    Navigator.of(context, rootNavigator: true).push(PageRouteBuilder(
-      opaque: false,
-      barrierColor: Colors.black,
-      pageBuilder: (_, _, _) => _FullScreenViewer(
-          images: _images, initialIndex: _pageIndex),
-    ));
-  }
+  void _openViewer(BuildContext context) =>
+      showFullScreenImages(context, _images, initialIndex: _pageIndex,
+          maxScale: 4);
 
   /// Reason (fixed list) + free-text details + optional screenshots (§3.4).
   void _openReportSheet(BuildContext context, AppUser trainer) {
@@ -371,7 +367,7 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
                         setSheet(() => shots.addAll(picked));
                       }
                     },
-              icon: const Icon(Icons.attach_file_rounded, size: 19),
+              icon: const Icon(Icons.attach_file_rounded, size: 20),
               label: Text(shots.isEmpty
                   ? 'Attach screenshots (optional)'
                   : '${shots.length} attachment${shots.length == 1 ? '' : 's'}'),
@@ -408,11 +404,11 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
                           showFlowToast(context,
                               'Report sent. Thanks for keeping FLOW safe.');
                         }
-                      } catch (_) {
+                      } catch (e) {
                         if (sheetContext.mounted) {
                           setSheet(() => busy = false);
                           showFlowToast(sheetContext,
-                              "Couldn't send the report. Try again.");
+                              "Couldn't send the report. ${ErrorView.friendly(e)}");
                         }
                       }
                     },
@@ -485,120 +481,14 @@ class _GalleryHeader extends StatelessWidget {
               bottom: 14,
               left: 0,
               right: 0,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  for (var i = 0; i < images.length; i++)
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      margin: const EdgeInsets.symmetric(horizontal: 3),
-                      width: i == pageIndex ? 18 : 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: i == pageIndex
-                            ? Colors.white
-                            : Colors.white.withValues(alpha: .5),
-                        borderRadius: BorderRadius.circular(3),
-                      ),
-                    ),
-                ],
+              child: PageDots(
+                count: images.length,
+                index: pageIndex,
+                activeColor: Colors.white,
+                inactiveColor: Colors.white.withValues(alpha: .5),
               ),
             ),
         ],
-      ),
-    );
-  }
-}
-
-/// Stateful purely to own the [PageController].
-///
-/// Built in `build()` it leaked one controller (with its ScrollPosition and
-/// ticker) per open, and worse: any rebuild of this route — rotation, a
-/// keyboard or inset change, a theme switch — constructed a *second*
-/// controller for the PageView to attach to, silently abandoning the first
-/// mid-gesture and losing the current page.
-class _FullScreenViewer extends StatefulWidget {
-  const _FullScreenViewer({required this.images, required this.initialIndex});
-
-  final List<String> images;
-  final int initialIndex;
-
-  @override
-  State<_FullScreenViewer> createState() => _FullScreenViewerState();
-}
-
-class _FullScreenViewerState extends State<_FullScreenViewer> {
-  late final _page = PageController(initialPage: widget.initialIndex);
-
-  @override
-  void dispose() {
-    _page.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final images = widget.images;
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          PageView.builder(
-            controller: _page,
-            itemCount: images.length,
-            itemBuilder: (_, i) => InteractiveViewer(
-              maxScale: 4,
-              child: Center(
-                  child: FlowImage(url: images[i], fit: BoxFit.contain)),
-            ),
-          ),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: _ScrimButton(
-                icon: Icons.close_rounded,
-                tooltip: 'Close',
-                onTap: () => Navigator.pop(context),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ScrimButton extends StatelessWidget {
-  const _ScrimButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onTap,
-    this.color,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback? onTap;
-  final Color? color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Tooltip(
-        message: tooltip,
-        child: Material(
-          color: Colors.black.withValues(alpha: .35),
-          shape: const CircleBorder(),
-          child: InkWell(
-            customBorder: const CircleBorder(),
-            onTap: onTap,
-            child: SizedBox(
-              width: 42,
-              height: 42,
-              child: Icon(icon, size: 21, color: color ?? Colors.white),
-            ),
-          ),
-        ),
       ),
     );
   }
@@ -705,20 +595,14 @@ class _ReviewTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tones = context.tones;
-    return Container(
+    return FlowCard(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: tones.card,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: tones.line),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              FlowAvatar(name: review.userName, size: 34),
+              FlowAvatar(name: review.userName, size: 32),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -766,13 +650,7 @@ class _BottomBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tones = context.tones;
-    return Container(
-      padding: EdgeInsets.fromLTRB(
-          20, 12, 20, 12 + MediaQuery.paddingOf(context).bottom),
-      decoration: BoxDecoration(
-        color: context.scheme.surfaceContainerLow,
-        border: Border(top: BorderSide(color: tones.line)),
-      ),
+    return StickyBar(
       child: isSelf
           ? PrimaryButton(
               label: 'Edit profile',
@@ -787,7 +665,7 @@ class _BottomBar extends ConsumerWidget {
                     Text(euro(trainer.displayRate),
                         style: sora(20, 760, color: tones.azureBrand)),
                     Text('per hour',
-                        style: inter(11, 540, color: tones.textFaint)),
+                        style: inter(11.5, 540, color: tones.textFaint)),
                   ],
                 ),
                 const SizedBox(width: 16),
@@ -805,7 +683,7 @@ class _BottomBar extends ConsumerWidget {
                           '/chat/${trainer.uid}?name=${Uri.encodeComponent(trainer.name)}');
                     },
                     icon: const Icon(Icons.chat_bubble_outline_rounded,
-                        size: 19),
+                        size: 20),
                     label: const Text('Message'),
                   ),
                 ),

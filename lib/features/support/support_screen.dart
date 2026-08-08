@@ -9,6 +9,8 @@ import '../../core/widgets/buttons.dart';
 import '../../core/widgets/feedback.dart';
 import '../../core/widgets/misc.dart';
 import '../../core/widgets/sheets.dart';
+import '../../core/widgets/surfaces.dart';
+import '../../core/widgets/thread.dart';
 import '../../data/models/support.dart';
 import '../../providers/providers.dart';
 
@@ -38,15 +40,12 @@ class SupportScreen extends ConsumerWidget {
         skeleton: const SkeletonList(count: 4, itemHeight: 76),
         data: (list) {
           if (list.isEmpty) {
-            return ListView(children: const [
-              SizedBox(height: 60),
-              EmptyView(
-                icon: Icons.support_agent_rounded,
-                title: 'How can we help?',
-                subtitle:
-                    'Open a ticket and our crew will get back to you here.',
-              ),
-            ]);
+            return const EmptyView.scrollable(
+              icon: Icons.support_agent_rounded,
+              title: 'How can we help?',
+              subtitle:
+                  'Open a ticket and our crew will get back to you here.',
+            );
           }
           return ListView.separated(
             physics: const AlwaysScrollableScrollPhysics(),
@@ -56,20 +55,10 @@ class SupportScreen extends ConsumerWidget {
             itemBuilder: (context, i) {
               final t = list[i];
               final tones = context.tones;
-              return Material(
-                color: tones.card,
-                borderRadius: BorderRadius.circular(16),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(16),
-                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                      builder: (_) => TicketThreadScreen(ticketId: t.id))),
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: tones.line),
-                    ),
-                    child: Row(
+              return FlowCard(
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => TicketThreadScreen(ticketId: t.id))),
+                child: Row(
                       children: [
                         Container(
                           width: 10,
@@ -93,7 +82,7 @@ class SupportScreen extends ConsumerWidget {
                                       .titleMedium),
                               Text(
                                 '${t.isOpen ? 'Open' : 'Resolved'} · ${timeAgo(t.lastMessageAt)}',
-                                style: inter(12, 520,
+                                style: inter(12.5, 520,
                                     color: tones.textFaint),
                               ),
                             ],
@@ -103,8 +92,6 @@ class SupportScreen extends ConsumerWidget {
                             color: tones.textFaint),
                       ],
                     ),
-                  ),
-                ),
               );
             },
           );
@@ -145,11 +132,11 @@ class SupportScreen extends ConsumerWidget {
                 Navigator.pop(sheetContext);
                 showFlowToast(context, "Ticket opened — we'll reply here.");
               }
-            } catch (_) {
+            } catch (e) {
               if (sheetContext.mounted) {
                 setSheet(() => busy = false);
                 showFlowToast(sheetContext,
-                    "Couldn't open the ticket. Check your connection.");
+                    "Couldn't open the ticket. ${ErrorView.friendly(e)}");
               }
             }
           }
@@ -277,91 +264,34 @@ class _TicketThreadScreenState extends ConsumerState<TicketThreadScreen> {
                 itemBuilder: (context, i) {
                   final m = list[i];
                   final mine = m.senderId == me && !m.fromStaff;
-                  return Align(
-                    alignment: mine
-                        ? Alignment.centerRight
-                        : Alignment.centerLeft,
-                    child: Container(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 10),
-                      constraints: BoxConstraints(
-                          maxWidth:
-                              MediaQuery.sizeOf(context).width * .78),
-                      decoration: BoxDecoration(
-                        color: mine
-                            ? tones.azureBrand
-                            : tones.card,
-                        borderRadius: BorderRadius.circular(16),
-                        border:
-                            mine ? null : Border.all(color: tones.line),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (m.fromStaff)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 4),
-                              child: Text('FLOW SUPPORT',
-                                  style: inter(9.5, 800,
-                                      color: tones.azureBrand,
-                                      spacing: 1)),
-                            ),
-                          Text(m.text,
-                              style: inter(14, 460,
-                                  color: mine
-                                      ? Colors.white
-                                      : context.scheme.onSurface,
-                                  height: 1.45)),
-                          const SizedBox(height: 3),
-                          Text(timeAgo(m.createdAt),
-                              style: inter(10.5, 500,
-                                  color: mine
-                                      ? Colors.white
-                                          .withValues(alpha: .7)
-                                      : tones.textFaint)),
-                        ],
-                      ),
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: ChatBubble(
+                      text: m.text,
+                      mine: mine,
+                      theirsColor: tones.card,
+                      header: m.fromStaff
+                          ? Text('FLOW SUPPORT',
+                              style: inter(10, 800,
+                                  color: tones.azureBrand, spacing: 1))
+                          : null,
+                      footer: Text(timeAgo(m.createdAt),
+                          style: inter(10, 500, color: tones.textFaint)),
                     ),
                   );
                 },
               ),
             ),
           ),
-          Container(
-            padding: EdgeInsets.fromLTRB(
-                14, 10, 14, 10 + MediaQuery.paddingOf(context).bottom),
-            decoration: BoxDecoration(
-              color: context.scheme.surfaceContainerLow,
-              border: Border(top: BorderSide(color: tones.line)),
-            ),
+          StickyBar(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             child: isOpen
-                ? Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _input,
-                          enabled: !_sending,
-                          minLines: 1,
-                          maxLines: 4,
-                          decoration: const InputDecoration(
-                              hintText: 'Reply to support…'),
-                          onSubmitted: (_) => _send(),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      SizedBox(
-                        width: 48,
-                        height: 48,
-                        child: IconButton.filled(
-                          onPressed: _sending ? null : _send,
-                          tooltip: 'Send',
-                          icon: const Icon(Icons.arrow_upward_rounded,
-                              size: 22),
-                        ),
-                      ),
-                    ],
+                ? ComposerField(
+                    controller: _input,
+                    busy: _sending,
+                    maxLines: 4,
+                    hintText: 'Reply to support…',
+                    onSend: _send,
                   )
                 : Row(
                     children: [
@@ -369,7 +299,7 @@ class _TicketThreadScreenState extends ConsumerState<TicketThreadScreen> {
                         child: Text(
                           'This ticket was resolved by support.',
                           style:
-                              inter(13, 520, color: tones.textFaint),
+                              inter(14, 520, color: tones.textFaint),
                         ),
                       ),
                       MicroAction(

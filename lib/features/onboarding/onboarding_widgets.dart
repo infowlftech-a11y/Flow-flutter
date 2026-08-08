@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/theme/motion.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/typography.dart';
 import '../../services/image_service.dart';
@@ -125,10 +126,10 @@ class FormGroup extends StatelessWidget {
               Text(' *', style: microLabel(tones.azureBrand)),
           ],
         ),
-        const SizedBox(height: 9),
+        const SizedBox(height: 8),
         child,
         AnimatedSize(
-          duration: const Duration(milliseconds: 200),
+          duration: FlowMotion.base,
           alignment: Alignment.topLeft,
           child: errorText == null
               ? const SizedBox.shrink()
@@ -138,7 +139,7 @@ class FormGroup extends StatelessWidget {
                       style: inter(12.5, 560, color: tones.danger)),
                 ),
         ),
-        const SizedBox(height: 22),
+        const SizedBox(height: 24),
       ],
     );
   }

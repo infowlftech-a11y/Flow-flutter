@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/theme/palette.dart';
+import '../../core/theme/app_theme.dart';
 import '../../core/theme/typography.dart';
 import '../../core/widgets/brand.dart';
+import '../../core/widgets/gate.dart';
 import '../../core/widgets/buttons.dart';
 import '../../providers/providers.dart';
 
@@ -22,70 +23,37 @@ class RejectedScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionProvider);
 
-    return Scaffold(
-      backgroundColor: FlowColors.ink,
-      body: WaveBackdrop(
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(28),
-            child: Column(
-              children: [
-                Align(
-                  alignment: Alignment.topRight,
-                  child: TextButton.icon(
-                    onPressed: () => ref.read(signOutProvider)(),
-                    icon: const Icon(Icons.logout_rounded,
-                        size: 18, color: FlowColors.haze),
-                    label: Text('Sign out',
-                        style: inter(14, 600, color: FlowColors.haze)),
-                  ),
-                ),
-                const Spacer(),
-                Container(
-                  width: 88,
-                  height: 88,
-                  decoration: BoxDecoration(
-                    color: FlowColors.amber.withValues(alpha: .14),
-                    borderRadius: BorderRadius.circular(28),
-                  ),
-                  child: const Icon(Icons.assignment_late_outlined,
-                      color: FlowColors.amber, size: 40),
-                ),
-                const SizedBox(height: 28),
-                Text('Application not approved',
-                    textAlign: TextAlign.center,
-                    style:
-                        sora(26, 760, color: FlowColors.mist, spacing: -.5)),
-                const SizedBox(height: 14),
-                Text(
-                  'Hi ${session.displayName.split(' ').first} — we could not '
-                  'verify your trainer application this time. This is usually '
-                  'a certification we could not confirm, and it is often '
-                  'fixable.',
-                  textAlign: TextAlign.center,
-                  style: inter(15, 440, color: FlowColors.haze, height: 1.55),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Check your notifications for the reason, then talk to us — '
-                  'we can re-open your application.',
-                  textAlign: TextAlign.center,
-                  style: inter(13.5, 440,
-                      color: FlowColors.slate, height: 1.5),
-                ),
-                const SizedBox(height: 28),
-                PrimaryButton(
-                  label: 'Contact support',
-                  icon: Icons.support_agent_rounded,
-                  onPressed: () => context.push('/support'),
-                ),
-                const Spacer(flex: 2),
-                const FlowWordmark(),
-                const SizedBox(height: 12),
-              ],
-            ),
+    return GateScaffold(
+      onSignOut: () => ref.read(signOutProvider)(),
+      child: Column(
+        children: [
+          const Spacer(),
+          GateHeadline(
+            icon: Icons.assignment_late_outlined,
+            color: context.tones.warning,
+            title: 'Application not approved',
+            body: 'Hi ${session.displayName.split(' ').first} — we could not '
+                'verify your trainer application this time. This is usually '
+                'a certification we could not confirm, and it is often '
+                'fixable.',
           ),
-        ),
+          const SizedBox(height: 12),
+          Text(
+            'Check your notifications for the reason, then talk to us — '
+            'we can re-open your application.',
+            textAlign: TextAlign.center,
+            style: inter(14, 440, color: context.scheme.onSurfaceVariant, height: 1.5),
+          ),
+          const SizedBox(height: 28),
+          PrimaryButton(
+            label: 'Contact support',
+            icon: Icons.support_agent_rounded,
+            onPressed: () => context.push('/support'),
+          ),
+          const Spacer(flex: 2),
+          const FlowWordmark(),
+          const SizedBox(height: 12),
+        ],
       ),
     );
   }

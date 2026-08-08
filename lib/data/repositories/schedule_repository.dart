@@ -22,12 +22,6 @@ class ScheduleRepository {
                 for (final d in qs.docs) Availability.fromDoc(d.id, d.data()),
               ]);
 
-  Stream<List<Availability>> watchAllBlocks(String instructorId) => _blocks
-      .where('instructorId', isEqualTo: instructorId)
-      .snapshots()
-      .map((qs) =>
-          [for (final d in qs.docs) Availability.fromDoc(d.id, d.data())]);
-
   /// Client-side sort by startDate (§6.2).
   Stream<List<Vacation>> watchVacations(String instructorId) => _vacations
       .where('instructorId', isEqualTo: instructorId)

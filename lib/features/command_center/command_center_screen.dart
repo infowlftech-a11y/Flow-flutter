@@ -2,15 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/constants.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/radii.dart';
 import '../../core/theme/typography.dart';
 import '../../core/utils/date_x.dart';
 import '../../core/utils/haptics.dart';
 import '../../core/widgets/buttons.dart';
 import '../../core/widgets/feedback.dart';
 import '../../core/widgets/flow_image.dart';
+import '../../core/widgets/media.dart';
 import '../../core/widgets/misc.dart';
 import '../../core/widgets/sheets.dart';
+import '../../core/widgets/surfaces.dart';
 import '../../data/models/booking.dart';
 import '../../data/repositories/booking_repository.dart';
 import '../../providers/providers.dart';
@@ -18,6 +22,36 @@ import '../../providers/settings_provider.dart';
 import '../sessions/sessions_screen.dart' show StatusPill;
 import 'qr_scanner_screen.dart';
 import 'schedule_tab.dart';
+
+/// Scan a rider's ticket and start the session (§3.8, §3.10).
+///
+/// The one check-in path. It was written twice — once on the screen's State for
+/// the CHECK IN action, once on `_ManifestCard` for SCAN TO START — identical
+/// but for the liveness guard each context could reach: `mounted` on the State,
+/// `context.mounted` on the widget. Two copies of a flow that starts a session
+/// and takes money is two places for the error handling to drift, so it is one
+/// function guarding on `context.mounted`, which is the stricter of the two
+/// (a State's context is unmounted exactly when its State is).
+Future<void> runCheckInScan(BuildContext context, WidgetRef ref) async {
+  final trainerId = ref.read(sessionProvider).uid;
+  final bookingId = await Navigator.of(context, rootNavigator: true)
+      .push<String>(MaterialPageRoute(
+          builder: (_) => QrScannerScreen(trainerId: trainerId)));
+  if (bookingId == null || !context.mounted) return;
+  try {
+    await ref
+        .read(bookingRepositoryProvider)
+        .checkIn(bookingId, trainerId: trainerId);
+    if (context.mounted) showFlowToast(context, 'Session started 🤙');
+  } on CheckInFailure catch (e) {
+    // A refused ticket is not a retry case — say which ticket it was.
+    if (context.mounted) showFlowToast(context, e.message);
+  } catch (_) {
+    if (context.mounted) {
+      showFlowToast(context, "Couldn't start the session. Try again.");
+    }
+  }
+}
 
 /// Trainer home: TODAY + SCHEDULE, with a persistent CHECK IN action (§3.8).
 class CommandCenterScreen extends ConsumerStatefulWidget {
@@ -56,27 +90,6 @@ class _CommandCenterScreenState extends ConsumerState<CommandCenterScreen>
     if (!mounted) return;
     await showTrainerTour(context);
     await flags.setTrainerTourDone(uid);
-  }
-
-  Future<void> _openScanner() async {
-    final trainerId = ref.read(sessionProvider).uid;
-    final bookingId = await Navigator.of(context, rootNavigator: true)
-        .push<String>(MaterialPageRoute(
-            builder: (_) => QrScannerScreen(trainerId: trainerId)));
-    if (bookingId == null || !mounted) return;
-    try {
-      await ref
-          .read(bookingRepositoryProvider)
-          .checkIn(bookingId, trainerId: trainerId);
-      if (mounted) showFlowToast(context, 'Session started 🤙');
-    } on CheckInFailure catch (e) {
-      // A refused ticket is not a retry case — say which ticket it was.
-      if (mounted) showFlowToast(context, e.message);
-    } catch (_) {
-      if (mounted) {
-        showFlowToast(context, "Couldn't start the session. Try again.");
-      }
-    }
   }
 
   void _scrollToRequests() {
@@ -123,7 +136,7 @@ class _CommandCenterScreenState extends ConsumerState<CommandCenterScreen>
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openScanner,
+        onPressed: () => runCheckInScan(context, ref),
         icon: const Icon(Icons.qr_code_scanner_rounded),
         label: const Text('CHECK IN'),
       ),
@@ -178,7 +191,7 @@ class _TodayTab extends ConsumerWidget {
         final comingUp = [
           for (final b in upcoming)
             if (b.date != todayYmd()) b,
-        ].take(10).toList();
+        ].take(FlowConst.comingUpLimit).toList();
 
         return ListView(
           controller: scrollController,
@@ -256,16 +269,16 @@ class _StatTile extends StatelessWidget {
     return Expanded(
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: FlowRadii.card,
         child: InkWell(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: FlowRadii.card,
           onTap: onTap,
           child: Container(
             padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
             decoration: BoxDecoration(
               gradient: emphasized ? tones.heroGradient : null,
               color: emphasized ? null : tones.card,
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: FlowRadii.card,
               border: Border.all(
                   color: emphasized
                       ? tones.azureBrand.withValues(alpha: .5)
@@ -283,7 +296,7 @@ class _StatTile extends StatelessWidget {
                 FittedBox(
                   fit: BoxFit.scaleDown,
                   child: Text(value,
-                      style: sora(21, 760,
+                      style: sora(22, 760,
                           color: emphasized
                               ? Colors.white
                               : context.scheme.onSurface,
@@ -297,7 +310,7 @@ class _StatTile extends StatelessWidget {
                         emphasized
                             ? Colors.white.withValues(alpha: .75)
                             : tones.textFaint,
-                        size: 9.5)),
+                        size: 10)),
               ],
             ),
           ),
@@ -313,16 +326,11 @@ class _EmptyToday extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tones = context.tones;
-    return Container(
+    return FlowCard(
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: tones.card,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: tones.line),
-      ),
       child: Row(
         children: [
-          Icon(Icons.air_rounded, color: tones.azureBrand, size: 30),
+          Icon(Icons.air_rounded, color: tones.azureBrand, size: 32),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -434,14 +442,9 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
   Widget build(BuildContext context) {
     final b = widget.booking;
     final tones = context.tones;
-    return Container(
+    return FlowCard(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: tones.card,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: tones.warning.withValues(alpha: .45)),
-      ),
+      borderColor: tones.warning.withValues(alpha: .45),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -466,7 +469,7 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
                 ),
               ),
               Text(euro(b.totalPrice),
-                  style: interNum(16, 760, color: tones.azureBrand)),
+                  style: interNum(17, 760, color: tones.azureBrand)),
             ],
           ),
           if ((b.message ?? '').isNotEmpty) ...[
@@ -477,7 +480,7 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
               decoration: BoxDecoration(
                 color: context.scheme.surfaceContainerHighest
                     .withValues(alpha: .5),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: FlowRadii.chip,
               ),
               child: Text('"${b.message}"',
                   style: Theme.of(context)
@@ -527,25 +530,13 @@ class _ManifestCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final b = booking;
     final tones = context.tones;
-    return Container(
+    return FlowCard(
       margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: tones.card,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-            color: b.status == BookingStatus.inProgress
-                ? tones.success.withValues(alpha: .5)
-                : tones.line),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(20),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: () => _openDetails(context, ref),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
+      borderColor: b.status == BookingStatus.inProgress
+          ? tones.success.withValues(alpha: .5)
+          : null,
+      onTap: () => _openDetails(context, ref),
+      child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
@@ -572,7 +563,7 @@ class _ManifestCard extends ConsumerWidget {
                           Row(
                             children: [
                               Text(b.timeRange,
-                                  style: inter(12, 500,
+                                  style: inter(12.5, 500,
                                       color: tones.textFaint)),
                               if (b.isManual) ...[
                                 const SizedBox(width: 8),
@@ -599,7 +590,7 @@ class _ManifestCard extends ConsumerWidget {
                     child: MicroAction(
                       label: 'SCAN TO START',
                       icon: Icons.qr_code_scanner_rounded,
-                      onPressed: () => _scanToStart(context, ref),
+                      onPressed: () => runCheckInScan(context, ref),
                     ),
                   )
                 else if (b.status == BookingStatus.inProgress)
@@ -614,31 +605,7 @@ class _ManifestCard extends ConsumerWidget {
                   ),
               ],
             ),
-          ),
-        ),
-      ),
     );
-  }
-
-  Future<void> _scanToStart(BuildContext context, WidgetRef ref) async {
-    final trainerId = ref.read(sessionProvider).uid;
-    final bookingId = await Navigator.of(context, rootNavigator: true)
-        .push<String>(MaterialPageRoute(
-            builder: (_) => QrScannerScreen(trainerId: trainerId)));
-    if (bookingId == null) return;
-    try {
-      await ref
-          .read(bookingRepositoryProvider)
-          .checkIn(bookingId, trainerId: trainerId);
-      if (context.mounted) showFlowToast(context, 'Session started 🤙');
-    } on CheckInFailure catch (e) {
-      // A refused ticket is not a retry case — say which ticket it was.
-      if (context.mounted) showFlowToast(context, e.message);
-    } catch (_) {
-      if (context.mounted) {
-        showFlowToast(context, "Couldn't start the session. Try again.");
-      }
-    }
   }
 
   Future<void> _finish(BuildContext context, WidgetRef ref) async {
@@ -811,29 +778,14 @@ class _ComingUpRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final tones = context.tones;
     final day = parseYmd(booking.date);
-    return Container(
+    return FlowCard(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: tones.card,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: tones.line),
-      ),
+      // Control radius, not card: this is a dense schedule row, not content.
+      borderRadius: FlowRadii.control,
       child: Row(
         children: [
-          SizedBox(
-            width: 44,
-            child: Column(
-              children: [
-                Text(day == null ? '--' : monthsShort[day.month - 1],
-                    style: inter(9.5, 720,
-                        color: tones.textFaint, spacing: .8)),
-                Text(day == null ? '--' : '${day.day}',
-                    style: interNum(16, 740,
-                        color: context.scheme.onSurface)),
-              ],
-            ),
-          ),
+          DateBlock(date: day, compact: true),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -885,7 +837,7 @@ void showEarningsSheet(BuildContext context, WidgetRef ref) {
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       gradient: tones.heroGradient,
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: FlowRadii.inset,
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -903,13 +855,7 @@ void showEarningsSheet(BuildContext context, WidgetRef ref) {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: tones.card,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: tones.line),
-                    ),
+                  child: FlowCard(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -931,28 +877,10 @@ void showEarningsSheet(BuildContext context, WidgetRef ref) {
             // opens to see one figure.
             if (outstanding > 0) ...[
               const SizedBox(height: 12),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-                decoration: BoxDecoration(
-                  color: tones.warning.withValues(alpha: .12),
-                  borderRadius: BorderRadius.circular(14),
-                  border:
-                      Border.all(color: tones.warning.withValues(alpha: .35)),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.payments_outlined,
-                        size: 18, color: tones.warning),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        '${euro(outstanding)} still to collect',
-                        style: inter(13.5, 700, color: tones.warning),
-                      ),
-                    ),
-                  ],
-                ),
+              FlowNotice(
+                icon: Icons.payments_outlined,
+                title: '${euro(outstanding)} still to collect',
+                bordered: true,
               ),
             ],
             const SizedBox(height: 20),
@@ -997,7 +925,7 @@ void showEarningsSheet(BuildContext context, WidgetRef ref) {
                         ),
                       const SizedBox(width: 4),
                       Text(euro(b.amountDue),
-                          style: interNum(14.5, 720,
+                          style: interNum(14, 720,
                               color: b.payment.isOutstanding
                                   ? tones.warning
                                   : tones.success)),
@@ -1036,9 +964,9 @@ Future<void> _settle(
     }
   } on PaymentFailure catch (e) {
     if (context.mounted) showFlowToast(context, e.message);
-  } catch (_) {
+  } catch (e) {
     if (context.mounted) {
-      showFlowToast(context, "Couldn't save that. Try again.");
+      showFlowToast(context, "Couldn't save that. ${ErrorView.friendly(e)}");
     }
   }
 }
@@ -1081,17 +1009,7 @@ Future<void> showTrainerTour(BuildContext context) {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  width: 72,
-                  height: 72,
-                  decoration: BoxDecoration(
-                    color: dialogContext.tones.azureBrand
-                        .withValues(alpha: .12),
-                    borderRadius: BorderRadius.circular(22),
-                  ),
-                  child: Icon(icon,
-                      color: dialogContext.tones.azureBrand, size: 34),
-                ),
+                FlowIconChip(icon: icon, size: 72),
                 const SizedBox(height: 18),
                 Text(title,
                     style: Theme.of(dialogContext).textTheme.headlineSmall,
@@ -1101,24 +1019,7 @@ Future<void> showTrainerTour(BuildContext context) {
                     textAlign: TextAlign.center,
                     style: Theme.of(dialogContext).textTheme.bodyMedium),
                 const SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    for (var i = 0; i < steps.length; i++)
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        margin: const EdgeInsets.symmetric(horizontal: 3),
-                        width: i == step ? 18 : 6,
-                        height: 6,
-                        decoration: BoxDecoration(
-                          color: i == step
-                              ? dialogContext.tones.azureBrand
-                              : dialogContext.tones.line,
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                      ),
-                  ],
-                ),
+                PageDots(count: steps.length, index: step),
                 const SizedBox(height: 16),
                 PrimaryButton(
                   label: step < steps.length - 1 ? 'Next' : "Let's go",

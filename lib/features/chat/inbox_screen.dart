@@ -7,6 +7,7 @@ import '../../core/theme/typography.dart';
 import '../../core/utils/date_x.dart';
 import '../../core/widgets/feedback.dart';
 import '../../core/widgets/flow_image.dart';
+import '../../core/widgets/surfaces.dart';
 import '../../data/models/social.dart';
 import '../../providers/providers.dart';
 
@@ -59,15 +60,12 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                       t,
                 ];
                 if (visible.isEmpty) {
-                  return ListView(children: const [
-                    SizedBox(height: 60),
-                    EmptyView(
-                      icon: Icons.forum_outlined,
-                      title: 'No conversations',
-                      subtitle:
-                          'Message a trainer from their profile to start one.',
-                    ),
-                  ]);
+                  return const EmptyView.scrollable(
+                    icon: Icons.forum_outlined,
+                    title: 'No conversations',
+                    subtitle:
+                        'Message a trainer from their profile to start one.',
+                  );
                 }
                 return ListView.separated(
                   physics: const AlwaysScrollableScrollPhysics(),
@@ -104,25 +102,14 @@ class _ThreadRow extends ConsumerWidget {
           ? '$partnerName, $unread unread message${unread == 1 ? '' : 's'}'
           : partnerName,
       button: true,
-      child: Material(
-        color: unread > 0
-            ? tones.azureBrand.withValues(alpha: .08)
-            : tones.card,
-        borderRadius: BorderRadius.circular(18),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(18),
-          onTap: () => context.push(
-              '/chat/$partnerId?name=${Uri.encodeComponent(partnerName)}'),
-          child: Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                  color: unread > 0
-                      ? tones.azureBrand.withValues(alpha: .35)
-                      : tones.line),
-            ),
-            child: Row(
+      child: FlowCard(
+        padding: const EdgeInsets.all(14),
+        color: unread > 0 ? tones.azureBrand.withValues(alpha: .08) : null,
+        borderColor:
+            unread > 0 ? tones.azureBrand.withValues(alpha: .35) : null,
+        onTap: () => context.push(
+            '/chat/$partnerId?name=${Uri.encodeComponent(partnerName)}'),
+        child: Row(
               children: [
                 FlowAvatar(name: partnerName, size: 48),
                 const SizedBox(width: 12),
@@ -154,7 +141,7 @@ class _ThreadRow extends ConsumerWidget {
                               thread.lastMessage ?? 'Say hi 👋',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: inter(13, unread > 0 ? 600 : 440,
+                              style: inter(14, unread > 0 ? 600 : 440,
                                   color: unread > 0
                                       ? context.scheme.onSurface
                                       : tones.textFaint),
@@ -170,7 +157,7 @@ class _ThreadRow extends ConsumerWidget {
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Text('$unread',
-                                  style: interNum(11, 760,
+                                  style: interNum(11.5, 760,
                                       color: Colors.white)),
                             ),
                           ],
@@ -181,8 +168,6 @@ class _ThreadRow extends ConsumerWidget {
                 ),
               ],
             ),
-          ),
-        ),
       ),
     );
   }

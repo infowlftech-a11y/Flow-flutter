@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/motion.dart';
+import '../theme/radii.dart';
 import '../theme/app_theme.dart';
 import '../theme/typography.dart';
 import '../utils/haptics.dart';
@@ -68,12 +70,13 @@ class FlowPickerField extends StatelessWidget {
       label: '$sheetTitle. ${empty ? 'None selected' : values.join(', ')}',
       child: InkWell(
         onTap: enabled ? () => _open(context) : null,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: FlowRadii.control,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
+          curve: FlowMotion.curve,
+          duration: FlowMotion.fast,
           padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: FlowRadii.control,
             border: Border.all(color: borderColor, width: 1.2),
             color: tones.card,
           ),
@@ -131,14 +134,14 @@ class _Tags extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(v, style: inter(13.5, 600, color: tones.azureBrand)),
+                Text(v, style: inter(14, 600, color: tones.azureBrand)),
                 const SizedBox(width: 3),
                 InkWell(
                   onTap: onRemove == null ? null : () {
                     Haptics.select();
                     onRemove!(v);
                   },
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: FlowRadii.card,
                   child: Padding(
                     padding: const EdgeInsets.all(2),
                     child: Icon(Icons.close_rounded,
@@ -286,7 +289,7 @@ class _PickerBodyState extends State<_PickerBody> {
               suffixIcon: _query.isEmpty
                   ? null
                   : IconButton(
-                      icon: const Icon(Icons.close_rounded, size: 18),
+                      icon: const Icon(Icons.close_rounded, size: 17),
                       onPressed: () => setState(_search.clear),
                     ),
             ),
@@ -378,7 +381,7 @@ class _Row extends StatelessWidget {
             )
           : (multiSelect
               ? Icon(Icons.check_box_outline_blank_rounded,
-                  color: tones.line, size: 21)
+                  color: tones.line, size: 22)
               : null),
     );
   }

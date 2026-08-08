@@ -27,18 +27,24 @@ abstract final class FlowColors {
   // Text on dark.
   static const mist = Color(0xFFEFF5FF);
   static const haze = Color(0xFFA6BAD8);
-  static const slate = Color(0xFF647CA5);
+  static const slate = Color(0xFF6B84AE);
 
   // Text on light.
   static const inkText = Color(0xFF0A1B36);
   static const inkSub = Color(0xFF48597B);
-  static const inkFaint = Color(0xFF8393B0);
+  static const inkFaint = Color(0xFF64748F);
 
   // Functional accents (tuned per brightness in FlowTones).
+  //
+  // The `Deep` shades are the light-theme foregrounds. They sit on a tint of
+  // themselves over white, which lands a hair under white — so they have to
+  // carry nearly the whole contrast ratio themselves, and the first pass at
+  // them did not: success measured 3.2:1 and warning 3.4:1 where the dark
+  // theme's equivalents were 6.8 and 7.9. See test/theme_contrast_test.dart.
   static const emerald = Color(0xFF17CE92);
-  static const emeraldDeep = Color(0xFF0B9A6C);
+  static const emeraldDeep = Color(0xFF07714F);
   static const amber = Color(0xFFFFB547);
-  static const amberDeep = Color(0xFFB97710);
+  static const amberDeep = Color(0xFF8F5C0C);
   static const coral = Color(0xFFFF5D72);
-  static const coralDeep = Color(0xFFD23B50);
+  static const coralDeep = Color(0xFFC22C42);
 }

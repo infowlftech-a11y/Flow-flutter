@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/radii.dart';
 import '../../core/theme/typography.dart';
 import '../../core/utils/date_x.dart';
 import '../../core/utils/haptics.dart';
@@ -11,6 +12,7 @@ import '../../core/widgets/buttons.dart';
 import '../../core/widgets/feedback.dart';
 import '../../core/widgets/misc.dart';
 import '../../core/widgets/sheets.dart';
+import '../../core/widgets/surfaces.dart';
 import '../../data/models/booking.dart';
 import '../../data/models/schedule.dart';
 import '../../data/repositories/booking_repository.dart';
@@ -113,7 +115,7 @@ class _ScheduleTabState extends ConsumerState<ScheduleTab> {
                   label: 'Change date, currently ${longYmd(_date)}',
                   child: InkWell(
                     onTap: _pickDate,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: FlowRadii.chip,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 10),
                       child: Column(
@@ -162,27 +164,15 @@ class _ScheduleTabState extends ConsumerState<ScheduleTab> {
               ),
             ],
           ),
-          const SizedBox(height: 22),
+          const SizedBox(height: 24),
           if (vacationForDay != null)
-            Container(
-              margin: const EdgeInsets.only(bottom: 14),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: tones.warningTint,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.beach_access_rounded, color: tones.warning),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      '${vacationForDay.label ?? 'Time off'} — you are away '
-                      'this whole day. Riders see nothing bookable.',
-                      style: inter(13, 560, color: context.scheme.onSurface),
-                    ),
-                  ),
-                ],
+            Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: FlowNotice(
+                icon: Icons.beach_access_rounded,
+                title: vacationForDay.label ?? 'Time off',
+                body: 'You are away this whole day. '
+                    'Riders see nothing bookable.',
               ),
             ),
           SectionHeader(
@@ -487,16 +477,18 @@ class _ScheduleTabState extends ConsumerState<ScheduleTab> {
               Row(
                 children: [
                   Expanded(
-                    child: _DateButton(
+                    child: InfoTile(
                         label: 'FROM',
-                        date: ymd(from),
+                        value: prettyYmd(ymd(from)),
+                        trailingIcon: Icons.edit_calendar_outlined,
                         onTap: busy ? null : () => pick(true)),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: _DateButton(
+                    child: InfoTile(
                         label: 'TO',
-                        date: ymd(to),
+                        value: prettyYmd(ymd(to)),
+                        trailingIcon: Icons.edit_calendar_outlined,
                         onTap: busy ? null : () => pick(false)),
                   ),
                 ],
@@ -509,47 +501,6 @@ class _ScheduleTabState extends ConsumerState<ScheduleTab> {
         },
       ),
     ).whenComplete(reason.dispose);
-  }
-}
-
-class _DateButton extends StatelessWidget {
-  const _DateButton({
-    required this.label,
-    required this.date,
-    required this.onTap,
-  });
-
-  final String label;
-  final String date;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final tones = context.tones;
-    return Material(
-      color: tones.card,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: tones.line),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: microLabel(tones.textFaint, size: 10)),
-              const SizedBox(height: 4),
-              Text(prettyYmd(date),
-                  style: Theme.of(context).textTheme.titleSmall),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }
 
@@ -630,7 +581,7 @@ class _Timeline extends ConsumerWidget {
                         : isBlocked
                             ? tones.warningTint
                             : tones.card,
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: FlowRadii.control,
                     border: Border.all(
                         color: booking != null
                             ? tones.azureBrand.withValues(alpha: .4)
@@ -641,7 +592,7 @@ class _Timeline extends ConsumerWidget {
                       SizedBox(
                         width: 52,
                         child: Text(slot.value,
-                            style: interNum(13.5, 680,
+                            style: interNum(14, 680,
                                 color: isPast
                                     ? tones.textFaint
                                     : context.scheme.onSurface)),
@@ -709,14 +660,11 @@ class _VacationList extends ConsumerWidget {
       children: [
         const SectionHeader('Scheduled time off'),
         for (final v in list)
-          Container(
+          FlowCard(
             margin: const EdgeInsets.only(bottom: 8),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: tones.card,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: tones.line),
-            ),
+            // Control radius: a dense row of scheduled days, not a card.
+            borderRadius: FlowRadii.control,
             child: Row(
               children: [
                 Icon(Icons.beach_access_rounded,
@@ -732,7 +680,7 @@ class _VacationList extends ConsumerWidget {
                         v.startDate == v.endDate
                             ? prettyYmd(v.startDate)
                             : '${prettyYmd(v.startDate)} → ${prettyYmd(v.endDate)}',
-                        style: inter(12, 500, color: tones.textFaint),
+                        style: inter(12.5, 500, color: tones.textFaint),
                       ),
                     ],
                   ),

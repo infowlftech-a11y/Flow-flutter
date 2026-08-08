@@ -53,7 +53,7 @@ TextStyle interNum(double size, double weight,
         features: const [FontFeature.tabularFigures()]);
 
 /// Uppercase micro-label (section headers, pills, tab labels).
-TextStyle microLabel(Color color, {double size = 11}) =>
+TextStyle microLabel(Color color, {double size = 11.5}) =>
     inter(size, 700, color: color, spacing: 1.1);
 
 FontWeight _nearest(double w) => switch (w) {

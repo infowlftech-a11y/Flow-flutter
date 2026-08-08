@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/theme/palette.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/theme/radii.dart';
 import '../../core/theme/typography.dart';
 import '../../core/utils/haptics.dart';
-import '../../core/widgets/brand.dart';
+import '../../core/widgets/gate.dart';
 import '../../providers/providers.dart';
 
 /// "I'm a Kiter" / "I'm a Trainer". Sign-out lives in the app-bar *trailing*
@@ -15,39 +16,21 @@ class RoleSelectScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Scaffold(
-      backgroundColor: FlowColors.ink,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        automaticallyImplyLeading: false,
-        actions: [
-          TextButton.icon(
-            onPressed: () => ref.read(signOutProvider)(),
-            icon: const Icon(Icons.logout_rounded,
-                size: 18, color: FlowColors.haze),
-            label:
-                Text('Sign out', style: inter(14, 600, color: FlowColors.haze)),
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: WaveBackdrop(
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(28),
-            child: Column(
+    return GateScaffold(
+      onSignOut: () => ref.read(signOutProvider)(),
+      child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 12),
                 Text('Who are you\non the beach?',
                     style:
-                        sora(34, 780, color: FlowColors.mist, spacing: -1, height: 1.1)),
+                        sora(32, 780, color: context.scheme.onSurface, spacing: -1, height: 1.1)),
                 const SizedBox(height: 12),
                 Text(
                   'This decides what FLOW looks like for you. You only pick once.',
-                  style: inter(15, 440, color: FlowColors.haze, height: 1.5),
+                  style: inter(15, 440, color: context.scheme.onSurfaceVariant, height: 1.5),
                 ),
-                const SizedBox(height: 36),
+                const SizedBox(height: 32),
                 _RoleCard(
                   icon: Icons.kitesurfing_rounded,
                   title: "I'm a Kiter",
@@ -80,9 +63,6 @@ class RoleSelectScreen extends ConsumerWidget {
                 const Spacer(),
               ],
             ),
-          ),
-        ),
-      ),
     );
   }
 }
@@ -107,16 +87,16 @@ class _RoleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: FlowColors.navy900,
-      borderRadius: BorderRadius.circular(24),
+      color: context.tones.card,
+      borderRadius: FlowRadii.dialog,
       child: InkWell(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: FlowRadii.dialog,
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.all(22),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: FlowColors.navy700),
+            borderRadius: FlowRadii.dialog,
+            border: Border.all(color: context.tones.line),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -127,42 +107,42 @@ class _RoleCard extends StatelessWidget {
                     width: 52,
                     height: 52,
                     decoration: BoxDecoration(
-                      color: FlowColors.azure.withValues(alpha: .15),
-                      borderRadius: BorderRadius.circular(16),
+                      color: context.scheme.primary.withValues(alpha: .15),
+                      borderRadius: FlowRadii.inset,
                     ),
-                    child: Icon(icon, color: FlowColors.azure, size: 26),
+                    child: Icon(icon, color: context.scheme.primary, size: 26),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Text(title,
                         style: sora(20, 720,
-                            color: FlowColors.mist, spacing: -.3)),
+                            color: context.scheme.onSurface, spacing: -.3)),
                   ),
-                  const Icon(Icons.arrow_forward_rounded,
-                      color: FlowColors.azure),
+                  Icon(Icons.arrow_forward_rounded,
+                      color: context.scheme.primary),
                 ],
               ),
               const SizedBox(height: 14),
               Text(body,
                   style:
-                      inter(14, 440, color: FlowColors.haze, height: 1.5)),
+                      inter(14, 440, color: context.scheme.onSurfaceVariant, height: 1.5)),
               if (footnote != null) ...[
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    const Icon(Icons.verified_user_outlined,
-                        size: 15, color: FlowColors.slate),
-                    const SizedBox(width: 7),
+                    Icon(Icons.verified_user_outlined,
+                        size: 15, color: context.tones.textFaint),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(footnote!,
-                          style: inter(12, 500, color: FlowColors.slate)),
+                          style: inter(12.5, 500, color: context.tones.textFaint)),
                     ),
                   ],
                 ),
               ],
               const SizedBox(height: 6),
               Text(cta.toUpperCase(),
-                  style: inter(12, 760, color: FlowColors.azure, spacing: 1.4)),
+                  style: inter(12.5, 760, color: context.scheme.primary, spacing: 1.4)),
             ],
           ),
         ),
