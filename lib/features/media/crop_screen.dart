@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/theme/app_theme.dart';
@@ -24,7 +25,7 @@ enum CropShape {
 /// A self-contained cropper.
 ///
 /// Written rather than pulled in as a package so the crop step looks like the
-/// rest of FLOW (ink navy, azure rim, Sora labels) instead of dropping the
+/// rest of FLOW (ink navy, azure rim, Space Grotesk labels) instead of dropping the
 /// user into a third-party activity mid-onboarding — and so the Android build
 /// needs no extra native activity registered.
 ///
@@ -204,9 +205,9 @@ class _CropScreenState extends State<CropScreen> {
         backgroundColor: Colors.transparent,
         foregroundColor: context.scheme.onSurface,
         title: Text('Crop photo',
-            style: sora(17, 700, color: context.scheme.onSurface)),
+            style: display(17, 700, color: context.scheme.onSurface)),
         leading: IconButton(
-          icon: const Icon(Icons.close_rounded),
+          icon: const Icon(Symbols.close_rounded),
           tooltip: 'Cancel',
           onPressed: _saving ? null : () => Navigator.pop(context),
         ),
@@ -229,7 +230,7 @@ class _CropScreenState extends State<CropScreen> {
           // camera or photo backdrop, and this screen's chrome now follows
           // the theme like the rest of the app.
           ? const EmptyView(
-              icon: Icons.broken_image_outlined,
+              icon: Symbols.broken_image_rounded,
               title: 'Could not open that image',
               subtitle: 'Pick a different photo and try again.',
             )

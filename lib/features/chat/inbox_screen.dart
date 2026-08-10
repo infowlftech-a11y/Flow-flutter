@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -38,7 +39,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
               onChanged: (q) => setState(() => _query = q),
               decoration: const InputDecoration(
                 hintText: 'Search conversations…',
-                prefixIcon: Icon(Icons.search_rounded, size: 22),
+                prefixIcon: Icon(Symbols.search_rounded, size: 22),
               ),
             ),
           ),
@@ -61,7 +62,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
                 ];
                 if (visible.isEmpty) {
                   return const EmptyView.scrollable(
-                    icon: Icons.forum_outlined,
+                    icon: Symbols.forum_rounded,
                     title: 'No conversations',
                     subtitle:
                         'Message a trainer from their profile to start one.',

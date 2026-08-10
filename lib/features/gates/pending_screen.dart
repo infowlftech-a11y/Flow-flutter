@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_theme.dart';
@@ -22,7 +23,7 @@ class PendingScreen extends ConsumerWidget {
         children: [
           const Spacer(),
           GateHeadline(
-            icon: Icons.hourglass_top_rounded,
+            icon: Symbols.hourglass_top_rounded,
             color: context.scheme.primary,
             title: 'Under review',
             body: 'Thanks ${session.displayName} — your trainer profile is '

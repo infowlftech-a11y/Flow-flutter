@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../theme/motion.dart';
 import '../theme/app_theme.dart';
@@ -157,7 +158,7 @@ class ComposerField extends StatelessWidget {
     this.busy = false,
     this.hintText = 'Message…',
     this.maxLines = 5,
-    this.sendIcon = Icons.arrow_upward_rounded,
+    this.sendIcon = Symbols.arrow_upward_rounded,
     this.textStyle,
     this.isDense = false,
   });

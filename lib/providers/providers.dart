@@ -420,6 +420,76 @@ final trainerOutstandingProvider = Provider<AsyncValue<double>>((ref) => ref
     .watch(trainerUnpaidProvider)
     .whenData((list) => list.fold<double>(0, (acc, b) => acc + b.amountDue)));
 
+/// A week of earnings, Monday-first, plus how it compares with the week before.
+///
+/// Monday-first because that is what a working week means to a centre taking
+/// bookings, not because of any locale setting — the seven buckets have to
+/// line up with the seven labels under the chart, and a shifting first day
+/// would silently re-label every bar.
+typedef EarningsWeek = ({
+  /// Seven totals, `[Mon … Sun]`. Days with no completed session are 0.
+  List<double> byWeekday,
+  double total,
+
+  /// Fractional change against the previous seven days: `.18` is +18%.
+  ///
+  /// **Null when the previous week earned nothing.** A percentage change from
+  /// zero is not infinity and it is not 100% — it is undefined, and printing
+  /// "+100%" for a first week of trading is a flattering lie. The UI shows
+  /// nothing rather than inventing a comparison.
+  double? deltaVsPrevious,
+
+  /// Index into [byWeekday] for today, or null when today is outside the
+  /// window. Drives which bar is highlighted.
+  int? todayIndex,
+});
+
+/// Monday 00:00 of the week containing [from].
+DateTime _weekStart(DateTime from) {
+  final d = DateTime(from.year, from.month, from.day);
+  return d.subtract(Duration(days: d.weekday - DateTime.monday));
+}
+
+final trainerEarningsWeekProvider = Provider<AsyncValue<EarningsWeek>>((ref) {
+  final now = DateTime.now();
+  final start = _weekStart(now);
+  final previousStart = start.subtract(const Duration(days: 7));
+
+  return ref.watch(trainerCompletedProvider).whenData((list) {
+    final week = List<double>.filled(7, 0);
+    var previous = 0.0;
+
+    for (final b in list) {
+      final day = parseYmd(b.date);
+      // A booking whose stored date will not parse is skipped rather than
+      // bucketed into Monday — the same tolerance every other reader applies
+      // (§10.7), and a silent misattribution here would be money in the
+      // wrong column.
+      if (day == null) continue;
+      final amount = b.totalPrice ?? 0;
+
+      if (!day.isBefore(start)) {
+        final index = day.difference(start).inDays;
+        if (index >= 0 && index < 7) week[index] += amount;
+      } else if (!day.isBefore(previousStart)) {
+        previous += amount;
+      }
+    }
+
+    final total = week.fold<double>(0, (a, b) => a + b);
+    final todayOffset = DateTime(now.year, now.month, now.day)
+        .difference(start)
+        .inDays;
+
+    return (
+      byWeekday: week,
+      total: total,
+      deltaVsPrevious: previous > 0 ? (total - previous) / previous : null,
+      todayIndex: todayOffset >= 0 && todayOffset < 7 ? todayOffset : null,
+    );
+  });
+});
+
 // ── Availability (§7.5) ──────────────────────────────────────────────────
 
 typedef DayKey = ({String instructorId, String date});

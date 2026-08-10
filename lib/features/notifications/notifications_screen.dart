@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -60,7 +61,7 @@ class NotificationsScreen extends ConsumerWidget {
         data: (list) {
           if (list.isEmpty) {
             return const EmptyView.scrollable(
-              icon: Icons.notifications_none_rounded,
+              icon: Symbols.notifications_none_rounded,
               title: 'All quiet',
               subtitle: 'Booking updates and messages will land here.',
             );
@@ -84,14 +85,14 @@ class _NotificationTile extends ConsumerWidget {
   final AppNotification item;
 
   IconData get _icon => switch (item.kind) {
-        NotificationKind.bookingRequest => Icons.pending_actions_rounded,
-        NotificationKind.bookingConfirmed => Icons.event_available_rounded,
-        NotificationKind.bookingRejected => Icons.event_busy_rounded,
-        NotificationKind.bookingCancelled => Icons.cancel_outlined,
-        NotificationKind.reminder => Icons.alarm_rounded,
-        NotificationKind.review => Icons.star_rounded,
-        NotificationKind.message => Icons.chat_bubble_rounded,
-        _ => Icons.campaign_rounded,
+        NotificationKind.bookingRequest => Symbols.pending_actions_rounded,
+        NotificationKind.bookingConfirmed => Symbols.event_available_rounded,
+        NotificationKind.bookingRejected => Symbols.event_busy_rounded,
+        NotificationKind.bookingCancelled => Symbols.cancel_rounded,
+        NotificationKind.reminder => Symbols.alarm_rounded,
+        NotificationKind.review => Symbols.star_rounded,
+        NotificationKind.message => Symbols.chat_bubble_rounded,
+        _ => Symbols.campaign_rounded,
       };
 
   void _open(BuildContext context, WidgetRef ref) {
@@ -174,7 +175,7 @@ class _NotificationTile extends ConsumerWidget {
             borderRadius: FlowRadii.card,
           ),
           child:
-              const Icon(Icons.delete_outline_rounded, color: Colors.white),
+              const Icon(Symbols.delete_outline_rounded, color: Colors.white),
         ),
         // Not a FlowCard: the read/unread tint tweens (§10.9), and FlowCard
         // paints a plain Container, which would make the transition snap.
@@ -187,6 +188,7 @@ class _NotificationTile extends ConsumerWidget {
             onTap: () => _open(context, ref),
             child: AnimatedContainer(
               duration: FlowMotion.base,
+              curve: FlowMotion.curve,
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: item.read

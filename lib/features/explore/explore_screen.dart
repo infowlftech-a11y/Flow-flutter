@@ -1,19 +1,18 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/constants.dart';
-import '../../core/theme/motion.dart';
-import '../../core/theme/radii.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/typography.dart';
 import '../../core/utils/date_x.dart';
 import '../../core/utils/haptics.dart';
 import '../../core/widgets/feedback.dart';
-import '../../core/widgets/flow_image.dart';
 import '../../core/widgets/misc.dart';
+import '../../core/widgets/provider_card.dart';
 import '../../core/widgets/sheets.dart';
 import '../../core/widgets/surfaces.dart';
 import '../../data/models/app_user.dart';
@@ -92,6 +91,28 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                       ],
                     ),
                   ),
+                  // Messages. Inbox stopped being a tab in the redesign, so
+                  // this is now its only entry point — it is a header action
+                  // rather than a destination because a rider messages a
+                  // trainer far less often than they browse or check a
+                  // booking, and it was taking a quarter of the bar.
+                  Consumer(builder: (context, ref, _) {
+                    final unreadChats = ref.watch(unreadChatCountProvider);
+                    return Semantics(
+                      button: true,
+                      child: IconButton.outlined(
+                        onPressed: () => context.push('/inbox'),
+                        tooltip: 'Messages',
+                        icon: BadgedIcon(
+                          count: unreadChats,
+                          icon: Symbols.forum_rounded,
+                          semanticLabelBuilder: (n) =>
+                              '$n unread message${n == 1 ? '' : 's'}',
+                        ),
+                      ),
+                    );
+                  }),
+                  const SizedBox(width: 8),
                   Semantics(
                     label: unread > 0
                         ? '$unread unread notification${unread == 1 ? '' : 's'}'
@@ -103,7 +124,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                       icon: Badge.count(
                         count: unread,
                         isLabelVisible: unread > 0,
-                        child: const Icon(Icons.notifications_outlined),
+                        child: const Icon(Symbols.notifications_rounded),
                       ),
                     ),
                   ),
@@ -129,14 +150,14 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                         decoration: InputDecoration(
                           hintText: 'Search trainers, spots…',
                           prefixIcon:
-                              const Icon(Icons.search_rounded, size: 22),
+                              const Icon(Symbols.search_rounded, size: 22),
                           suffixIcon: value.text.isEmpty
                               ? null
                               : IconButton(
                                   tooltip: 'Clear search',
                                   onPressed: _clearQuery,
                                   icon:
-                                      const Icon(Icons.close_rounded, size: 20),
+                                      const Icon(Symbols.close_rounded, size: 20),
                                 ),
                         ),
                       ),
@@ -157,7 +178,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                         icon: Badge.count(
                           count: filter.activeCount,
                           isLabelVisible: filter.activeCount > 0,
-                          child: const Icon(Icons.tune_rounded),
+                          child: const Icon(Symbols.tune_rounded),
                         ),
                       ),
                     ),
@@ -234,8 +255,8 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                     return EmptyView.scrollable(
                       topGap: 40,
                       icon: filter.favouritesOnly
-                          ? Icons.favorite_outline_rounded
-                          : Icons.kitesurfing_rounded,
+                          ? Symbols.favorite_rounded
+                          : Symbols.kitesurfing_rounded,
                       title: filter.favouritesOnly
                           ? 'No favourites yet'
                           : 'No trainers match',
@@ -274,24 +295,40 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                           ),
                         ),
                       ),
+                      // A list, not a grid. The four facts a rider compares —
+                      // rating, spot, price, and the face — read faster
+                      // stacked against a fixed photo than tiled, and a grid
+                      // tile forces every name longer than two words to
+                      // ellipse. `Konstantinos Papadopoulos` is a real seeded
+                      // trainer and was unreadable at 260px.
                       SliverPadding(
                         padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-                        sliver: SliverGrid(
-                          gridDelegate:
-                              const SliverGridDelegateWithMaxCrossAxisExtent(
-                            maxCrossAxisExtent: 260,
-                            mainAxisSpacing: 14,
-                            crossAxisSpacing: 14,
-                            childAspectRatio: .72,
-                          ),
-                          delegate: SliverChildBuilderDelegate(
-                            (context, i) => _TrainerCard(
-                              trainer: list[i],
-                              rating: ratings[list[i].uid] ??
-                                  RatingSummary.none,
-                            ),
-                            childCount: list.length,
-                          ),
+                        sliver: SliverList.separated(
+                          itemCount: list.length,
+                          separatorBuilder: (_, _) =>
+                              const SizedBox(height: 10),
+                          itemBuilder: (context, i) {
+                            final t = list[i];
+                            final r =
+                                ratings[t.uid] ?? RatingSummary.none;
+                            return ProviderCard(
+                              name: t.name,
+                              photoUrl: t.photoUrl,
+                              rating: r.count > 0 ? r.average : null,
+                              reviewCount: r.count > 0 ? r.count : null,
+                              location: t.location ?? t.homeSpot,
+                              priceLabel: t.hourlyRate == null
+                                  ? null
+                                  : euro(t.hourlyRate!),
+                              badge: t.isStation || t.isSafariOperator
+                                  ? const _KindBadge(icon: Symbols.storefront_rounded)
+                                  : null,
+                              onTap: () => context.push(
+                                  t.isStation || t.isSafariOperator
+                                      ? '/station/${t.uid}'
+                                      : '/trainer/${t.uid}'),
+                            );
+                          },
                         ),
                       ),
                     ],
@@ -391,172 +428,6 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
   }
 }
 
-class _TrainerCard extends ConsumerWidget {
-  const _TrainerCard({required this.trainer, required this.rating});
-
-  final AppUser trainer;
-  final RatingSummary rating;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final tones = context.tones;
-    final me = ref.watch(currentUserProvider).value;
-    final isFav = me?.favorites.contains(trainer.uid) ?? false;
-
-    return Material(
-      color: tones.card,
-      borderRadius: FlowRadii.card,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => context.push(trainer.isStation || trainer.isSafariOperator
-            ? '/station/${trainer.uid}'
-            : '/trainer/${trainer.uid}'),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  FlowImage(url: trainer.photoUrl),
-                  Positioned(
-                    // 3 + the 5dp of transparent padding inside the 48dp hit
-                    // box = the puck still sits 8dp off the corner.
-                    top: 3,
-                    right: 3,
-                    child: _FavHeart(
-                      isFav: isFav,
-                      onTap: me == null
-                          ? null
-                          : () {
-                              Haptics.light();
-                              // Optimistic — Firestore latency compensation
-                              // flips the stream instantly.
-                              ref
-                                  .read(userRepositoryProvider)
-                                  .setFavorite(me.uid, trainer.uid, !isFav)
-                                  .ignore();
-                            },
-                    ),
-                  ),
-                  if (trainer.isStation)
-                    const Positioned(
-                        left: 8,
-                        top: 8,
-                        child: TagPill('STATION',
-                            icon: Icons.storefront_rounded)),
-                  if (trainer.isSafariOperator)
-                    const Positioned(
-                        left: 8,
-                        top: 8,
-                        child:
-                            TagPill('SAFARI', icon: Icons.sailing_rounded)),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          trainer.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                      ),
-                      Icon(Icons.star_rounded,
-                          size: 15, color: tones.warning),
-                      const SizedBox(width: 2),
-                      Text(rating.display,
-                          style: interNum(12.5, 700,
-                              color: context.scheme.onSurface)),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(Icons.place_outlined,
-                          size: 13, color: tones.textFaint),
-                      const SizedBox(width: 3),
-                      Expanded(
-                        child: Text(
-                          trainer.location ?? 'Red Sea',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: inter(12.5, 480, color: tones.textFaint),
-                        ),
-                      ),
-                      Text(euro(trainer.displayRate),
-                          style: interNum(14, 760,
-                              color: tones.azureBrand)),
-                      Text('/h',
-                          style: inter(11.5, 560, color: tones.textFaint)),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _FavHeart extends StatelessWidget {
-  const _FavHeart({required this.isFav, required this.onTap});
-
-  final bool isFav;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: isFav ? 'Remove from favourites' : 'Add to favourites',
-      // The visible puck stays 38dp so it doesn't crowd the photo, but the
-      // hit area is padded out to the 48dp minimum — this sits in a card
-      // corner, where a near-miss navigates to the profile instead.
-      child: InkResponse(
-        onTap: onTap,
-        radius: 26,
-        child: SizedBox(
-          width: 48,
-          height: 48,
-          child: Center(
-            child: Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: .35),
-                shape: BoxShape.circle,
-              ),
-              child: AnimatedSwitcher(
-                duration: FlowMotion.base,
-                transitionBuilder: (child, anim) =>
-                    ScaleTransition(scale: anim, child: child),
-                child: Icon(
-                  isFav
-                      ? Icons.favorite_rounded
-                      : Icons.favorite_outline_rounded,
-                  key: ValueKey(isFav),
-                  size: 20,
-                  color: isFav ? const Color(0xFFFF5D72) : Colors.white,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _GridSkeleton extends StatelessWidget {
   const _GridSkeleton();
 
@@ -586,6 +457,30 @@ class _GridSkeleton extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Marks a listing that is a centre or a safari operator rather than a person.
+///
+/// Sits over the photo because that is where the eye already is, and because
+/// the alternative — a pill in the text column — competes with the name for
+/// the one line that matters most.
+class _KindBadge extends StatelessWidget {
+  const _KindBadge({required this.icon});
+
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(5),
+      decoration: BoxDecoration(
+        // Fixed dark: this sits on a photograph in both themes.
+        color: const Color(0xCC04121F),
+        shape: BoxShape.circle,
+      ),
+      child: Icon(icon, size: 13, color: Colors.white),
     );
   }
 }

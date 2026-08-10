@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/theme/motion.dart';
@@ -78,7 +79,7 @@ class AvatarPicker extends StatelessWidget {
                       color: Theme.of(context).scaffoldBackgroundColor,
                       width: 2),
                 ),
-                child: const Icon(Icons.photo_camera_rounded,
+                child: const Icon(Symbols.photo_camera_rounded,
                     size: 15, color: Colors.white),
               ),
             ),
@@ -92,7 +93,7 @@ class AvatarPicker extends StatelessWidget {
         width: size,
         height: size,
         color: (tones.azureBrand as Color).withValues(alpha: .12),
-        child: Icon(Icons.add_a_photo_outlined,
+        child: Icon(Symbols.add_a_photo_rounded,
             color: tones.azureBrand as Color, size: size * .3),
       );
 }
@@ -130,6 +131,7 @@ class FormGroup extends StatelessWidget {
         child,
         AnimatedSize(
           duration: FlowMotion.base,
+          curve: FlowMotion.curve,
           alignment: Alignment.topLeft,
           child: errorText == null
               ? const SizedBox.shrink()

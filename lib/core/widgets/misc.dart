@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../../data/models/payment.dart';
 import '../theme/motion.dart';
@@ -47,12 +48,12 @@ class PaymentPill extends StatelessWidget {
     final tones = context.tones;
 
     final (color, icon) = switch (payment.status) {
-      PaymentStatus.paid => (tones.success, Icons.check_circle_rounded),
-      PaymentStatus.unpaid => (tones.warning, Icons.payments_outlined),
-      PaymentStatus.processing => (tones.azureBrand, Icons.sync_rounded),
-      PaymentStatus.failed => (tones.danger, Icons.error_outline_rounded),
-      PaymentStatus.refunded => (tones.textFaint, Icons.undo_rounded),
-      PaymentStatus.unknown => (tones.textFaint, Icons.help_outline_rounded),
+      PaymentStatus.paid => (tones.success, Symbols.check_circle_rounded),
+      PaymentStatus.unpaid => (tones.warning, Symbols.payments_rounded),
+      PaymentStatus.processing => (tones.azureBrand, Symbols.sync_rounded),
+      PaymentStatus.failed => (tones.danger, Symbols.error_outline_rounded),
+      PaymentStatus.refunded => (tones.textFaint, Symbols.undo_rounded),
+      PaymentStatus.unknown => (tones.textFaint, Symbols.help_outline_rounded),
     };
 
     return TagPill(payment.status.label, color: color, icon: icon);
@@ -76,12 +77,17 @@ class TagPill extends StatelessWidget {
     this.color,
     this.icon,
     this.dense = false,
+    this.iconFill = 0,
   });
 
   final String label;
   final Color? color;
   final IconData? icon;
   final bool dense;
+
+  /// Material Symbols fill axis. 1 for glyphs that only read solid — the
+  /// LIVE dot is a disc, not a ring.
+  final double iconFill;
 
   @override
   Widget build(BuildContext context) {
@@ -104,7 +110,7 @@ class TagPill extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 12, color: ink),
+            Icon(icon, size: 12, fill: iconFill, color: ink),
             const SizedBox(width: 4),
           ],
           Text(
@@ -199,7 +205,7 @@ class FlowChoiceChip extends StatelessWidget {
                         child: InkResponse(
                           onTap: onDeleted,
                           radius: 22,
-                          child: Icon(Icons.close_rounded,
+                          child: Icon(Symbols.close_rounded,
                               size: 15,
                               color: selected
                                   ? tones.azureBrand
@@ -227,7 +233,7 @@ class InfoTile extends StatelessWidget {
     required this.value,
     this.icon,
     this.onTap,
-    this.trailingIcon = Icons.north_east_rounded,
+    this.trailingIcon = Symbols.north_east_rounded,
   });
 
   /// Omit for a tile that is only a label and a value.
@@ -355,12 +361,11 @@ class Stars extends StatelessWidget {
       children: List.generate(5, (i) {
         final filled = value >= i + .75;
         final half = !filled && value >= i + .25;
+        // Fill is the axis now: a solid star is star + fill, an empty star
+        // is the same glyph at fill 0 — only the half state is its own glyph.
         final star = Icon(
-          filled
-              ? Icons.star_rounded
-              : half
-                  ? Icons.star_half_rounded
-                  : Icons.star_outline_rounded,
+          half ? Symbols.star_half_rounded : Symbols.star_rounded,
+          fill: filled ? 1 : 0,
           size: onChanged == null ? size : 34,
           color: filled || half ? tones.warning : tones.textFaint,
         );
@@ -375,6 +380,38 @@ class Stars extends StatelessWidget {
           ),
         );
       }),
+    );
+  }
+}
+
+/// An icon carrying an unread count.
+///
+/// Lived privately in the tab shell. It moved here when Inbox stopped being a
+/// tab: the badge is now a header action on Discover, and a second copy of
+/// "icon plus a spoken count" is exactly the kind of near-duplicate the
+/// refactor spent its time removing.
+class BadgedIcon extends StatelessWidget {
+  const BadgedIcon({
+    super.key,
+    required this.count,
+    required this.icon,
+    required this.semanticLabelBuilder,
+  });
+
+  final int count;
+  final IconData icon;
+
+  /// Badge counts surface as spoken sentences, not bare digits — a screen
+  /// reader announcing "3" beside an icon tells nobody what three of.
+  final String Function(int) semanticLabelBuilder;
+
+  @override
+  Widget build(BuildContext context) {
+    final base = Icon(icon);
+    if (count <= 0) return base;
+    return Semantics(
+      label: semanticLabelBuilder(count),
+      child: Badge.count(count: count, child: base),
     );
   }
 }

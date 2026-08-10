@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -24,8 +25,11 @@ import 'features/onboarding/kiter_form_screen.dart';
 import 'features/onboarding/role_select_screen.dart';
 import 'features/onboarding/trainer_form_screen.dart';
 import 'features/profile/edit_profile_screen.dart';
+import 'features/command_center/calendar_screen.dart';
+import 'features/command_center/earnings_screen.dart';
 import 'features/profile/profile_screen.dart';
 import 'features/sessions/sessions_screen.dart';
+import 'features/sessions/ticket_screen.dart';
 import 'features/shell/app_shell.dart';
 import 'features/splash/splash_screen.dart';
 import 'features/support/support_screen.dart';
@@ -157,7 +161,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           // Explore ⇄ Command Center without a restart (§4.3).
           StatefulShellBranch(routes: [
             GoRoute(
-              path: '/home',
+              path: ShellBranch.paths[ShellBranch.home],
               builder: (context, state) => Consumer(
                 builder: (context, ref, _) =>
                     ref.watch(sessionProvider).isTrainer
@@ -168,20 +172,41 @@ final routerProvider = Provider<GoRouter>((ref) {
           ]),
           StatefulShellBranch(routes: [
             GoRoute(
-              path: '/sessions',
+              path: ShellBranch.paths[ShellBranch.sessions],
               builder: (context, state) => SessionsScreen(
                   highlightBookingId: state.uri.queryParameters['highlight']),
             ),
           ]),
+          // Branch 2 — the rider's check-in credential, promoted from a
+          // dialog to a destination (§3.6). Trainers never see this tab; the
+          // scanner is their side of the same transaction.
           StatefulShellBranch(routes: [
             GoRoute(
-              path: '/inbox',
-              builder: (context, state) => const InboxScreen(),
+              path: ShellBranch.paths[ShellBranch.ticket],
+              builder: (context, state) => const TicketScreen(),
+            ),
+          ]),
+          // Branch 3 — the trainer's calendar, which used to be a tab *inside*
+          // the Command Center. Lifting it to the bar makes the two things a
+          // trainer does all day reachable in one tap each rather than one
+          // plus a tab.
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: ShellBranch.paths[ShellBranch.calendar],
+              builder: (context, state) => const CalendarScreen(),
+            ),
+          ]),
+          // Branch 4 — earnings, likewise promoted from a sheet behind a stat
+          // tile.
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: ShellBranch.paths[ShellBranch.earnings],
+              builder: (context, state) => const EarningsScreen(),
             ),
           ]),
           StatefulShellBranch(routes: [
             GoRoute(
-              path: '/profile',
+              path: ShellBranch.paths[ShellBranch.profile],
               builder: (context, state) => const ProfileScreen(),
             ),
           ]),
@@ -212,6 +237,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) =>
             BookingScreen(target: state.extra as BookingTarget),
+      ),
+      // Inbox is no longer a tab — it is reached from the Discover header, so
+      // it is a pushed route with its own back affordance rather than a shell
+      // branch that nothing selects.
+      GoRoute(
+        path: '/inbox',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const InboxScreen(),
       ),
       GoRoute(
         path: '/notifications',
@@ -245,7 +278,7 @@ class _NotFoundScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: EmptyView(
-        icon: Icons.explore_off_rounded,
+        icon: Symbols.explore_off_rounded,
         title: 'That page drifted offshore.',
         subtitle: "The route you followed doesn't exist anymore.",
         action: FilledButton(

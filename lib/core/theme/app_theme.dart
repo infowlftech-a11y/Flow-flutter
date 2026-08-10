@@ -114,8 +114,32 @@ class FlowTones extends ThemeExtension<FlowTones> {
   @override
   FlowTones copyWith({Color? success}) => this;
 
+  /// A real interpolation, not a step.
+  ///
+  /// The first version returned `t < .5 ? this : other`, which meant that in
+  /// any animated theme change Material's ColorScheme cross-faded continuously
+  /// while every card, border, tint and pill painted from these tones jumped
+  /// at the halfway point — the whole app appeared to pop mid-fade.
   @override
-  FlowTones lerp(FlowTones? other, double t) => t < .5 ? this : (other ?? this);
+  FlowTones lerp(FlowTones? other, double t) {
+    if (other == null) return this;
+    return FlowTones(
+      // Discrete — flips with the half of the fade it belongs to.
+      brightness: t < .5 ? brightness : other.brightness,
+      success: Color.lerp(success, other.success, t)!,
+      successTint: Color.lerp(successTint, other.successTint, t)!,
+      warning: Color.lerp(warning, other.warning, t)!,
+      warningTint: Color.lerp(warningTint, other.warningTint, t)!,
+      danger: Color.lerp(danger, other.danger, t)!,
+      dangerTint: Color.lerp(dangerTint, other.dangerTint, t)!,
+      card: Color.lerp(card, other.card, t)!,
+      cardHigh: Color.lerp(cardHigh, other.cardHigh, t)!,
+      line: Color.lerp(line, other.line, t)!,
+      textFaint: Color.lerp(textFaint, other.textFaint, t)!,
+      azureBrand: Color.lerp(azureBrand, other.azureBrand, t)!,
+      heroGradient: Gradient.lerp(heroGradient, other.heroGradient, t)!,
+    );
+  }
 }
 
 extension FlowThemeX on BuildContext {
@@ -197,12 +221,12 @@ abstract final class FlowTheme {
     final sub = scheme.onSurfaceVariant;
 
     final textTheme = TextTheme(
-      displayLarge: sora(40, 780, color: text, spacing: -1.2, height: 1.05),
-      displayMedium: sora(32, 760, color: text, spacing: -.8, height: 1.1),
-      displaySmall: sora(26, 740, color: text, spacing: -.6, height: 1.12),
-      headlineMedium: sora(22, 700, color: text, spacing: -.4, height: 1.15),
-      headlineSmall: sora(20, 680, color: text, spacing: -.3, height: 1.2),
-      titleLarge: sora(17, 660, color: text, spacing: -.2, height: 1.25),
+      displayLarge: display(40, 780, color: text, spacing: -1.2, height: 1.05),
+      displayMedium: display(32, 760, color: text, spacing: -.8, height: 1.1),
+      displaySmall: display(26, 740, color: text, spacing: -.6, height: 1.12),
+      headlineMedium: display(22, 700, color: text, spacing: -.4, height: 1.15),
+      headlineSmall: display(20, 680, color: text, spacing: -.3, height: 1.2),
+      titleLarge: display(17, 660, color: text, spacing: -.2, height: 1.25),
       titleMedium: inter(15, 640, color: text, spacing: -.1, height: 1.3),
       titleSmall: inter(14, 620, color: text, height: 1.3),
       bodyLarge: inter(15, 440, color: text, height: 1.45),
@@ -232,7 +256,7 @@ abstract final class FlowTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
-        titleTextStyle: sora(20, 700, color: text, spacing: -.3),
+        titleTextStyle: display(20, 700, color: text, spacing: -.3),
         iconTheme: IconThemeData(color: text),
         systemOverlayStyle: dark
             ? SystemUiOverlayStyle.light.copyWith(
@@ -329,7 +353,7 @@ abstract final class FlowTheme {
         backgroundColor: dark ? FlowColors.navy850 : FlowColors.white,
         surfaceTintColor: Colors.transparent,
         shape: const RoundedRectangleBorder(borderRadius: FlowRadii.dialog),
-        titleTextStyle: sora(20, 700, color: text, spacing: -.3),
+        titleTextStyle: display(20, 700, color: text, spacing: -.3),
         contentTextStyle: inter(14, 440, color: sub, height: 1.5),
       ),
       snackBarTheme: SnackBarThemeData(

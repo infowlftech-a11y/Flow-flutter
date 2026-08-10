@@ -11,12 +11,19 @@ abstract final class FlowColors {
   static const white = Color(0xFFFFFFFF);
 
   // Navy ramp (dark theme surfaces, light theme text).
-  static const navy950 = Color(0xFF020A1E);
-  static const navy900 = Color(0xFF041530);
-  static const navy850 = Color(0xFF071C3E);
-  static const navy800 = Color(0xFF0B2449);
-  static const navy700 = Color(0xFF143158);
-  static const navy600 = Color(0xFF1F4270);
+  //
+  // Retuned to the redesign reference, which sits a few steps lighter and
+  // markedly cooler than the original ramp. The old values ran from #020A1E
+  // to #1F4270 — close enough to black that a card never read as a distinct
+  // surface, only as a slightly different black, and the whole dark theme
+  // flattened into one plane. These keep the same six steps and the same
+  // hue family, but start where a surface is legible as a surface.
+  static const navy950 = Color(0xFF07121E); // page
+  static const navy900 = Color(0xFF0E1E2E); // resting card
+  static const navy850 = Color(0xFF14263A); // elevated card
+  static const navy800 = Color(0xFF1B3048);
+  static const navy700 = Color(0xFF23405C);
+  static const navy600 = Color(0xFF2E5379);
 
   // Azure ramp.
   static const azureDeep = Color(0xFF0077C9); // light-theme primary (AA on white)
@@ -27,12 +34,18 @@ abstract final class FlowColors {
   // Text on dark.
   static const mist = Color(0xFFEFF5FF);
   static const haze = Color(0xFFA6BAD8);
-  static const slate = Color(0xFF6B84AE);
+  // Tertiary text on dark. Rises with the card ramp: against the old near-black
+  // card this measured comfortably, but on the retuned #0E1E2E surface it fell
+  // to 4.45:1 — under AA by a hair, and only measurement caught it.
+  static const slate = Color(0xFF7590B8);
 
   // Text on light.
   static const inkText = Color(0xFF0A1B36);
   static const inkSub = Color(0xFF48597B);
-  static const inkFaint = Color(0xFF64748F);
+  // Tertiary text on light. Cleared AA on a white *card* but measured 4.37:1
+  // on the page tint behind it, which is where the booking legend sits — the
+  // token was only ever checked against the surface that flattered it.
+  static const inkFaint = Color(0xFF5F6E88);
 
   // Functional accents (tuned per brightness in FlowTones).
   //

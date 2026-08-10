@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../theme/typography.dart';
 import 'brand.dart';
@@ -47,7 +48,7 @@ class GateScaffold extends StatelessWidget {
         actions: [
           TextButton.icon(
             onPressed: onSignOut,
-            icon: Icon(Icons.logout_rounded, size: 18, color: subdued),
+            icon: Icon(Symbols.logout_rounded, size: 18, color: subdued),
             label: Text('Sign out', style: inter(14, 600, color: subdued)),
           ),
           const SizedBox(width: 8),
@@ -90,7 +91,7 @@ class GateHeadline extends StatelessWidget {
         const SizedBox(height: 28),
         Text(title,
             textAlign: TextAlign.center,
-            style: sora(26, 760, color: scheme.onSurface, spacing: -.5)),
+            style: display(26, 760, color: scheme.onSurface, spacing: -.5)),
         const SizedBox(height: 14),
         Text(body,
             textAlign: TextAlign.center,

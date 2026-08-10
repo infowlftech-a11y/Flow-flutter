@@ -29,11 +29,22 @@ dependencies:
   mobile_scanner: ^7.4.0
   qr_flutter: ^4.1.0
   url_launcher: ^6.3.2
+  material_symbols_icons: ^4.2960.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  # Drives the real app on a real device. The widget suite renders components
+  # in isolation and cannot answer "does this screen look right against live
+  # Firestore data" — which is where every defect in the redesign was found.
+  integration_test:
+    sdk: flutter
+  # Only for the driver's TimelineSummary — turns a --profile walkthrough into
+  # frame build/raster percentiles instead of an impression.
+  flutter_driver:
+    sdk: flutter
   flutter_lints: ^6.0.0
+  fake_cloud_firestore: ^4.2.0
 
 flutter:
   uses-material-design: true
@@ -44,9 +55,9 @@ flutter:
   # Variable fonts — weight is selected with FontVariation('wght', …) in the
   # theme (see lib/core/theme/typography.dart), so one file covers all weights.
   fonts:
-    - family: Sora
+    - family: SpaceGrotesk
       fonts:
-        - asset: assets/fonts/Sora.ttf
+        - asset: assets/fonts/SpaceGrotesk.ttf
     - family: Inter
       fonts:
         - asset: assets/fonts/Inter.ttf

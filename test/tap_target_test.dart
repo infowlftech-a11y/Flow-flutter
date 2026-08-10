@@ -16,7 +16,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:flow/core/theme/app_theme.dart';
+import 'package:flow/core/widgets/booking_grid.dart';
 import 'package:flow/core/widgets/buttons.dart';
+import 'package:flow/core/widgets/dashboard.dart';
+import 'package:flow/core/widgets/provider_card.dart';
 import 'package:flow/core/widgets/media.dart';
 import 'package:flow/core/widgets/misc.dart';
 import 'package:flow/core/widgets/picker_field.dart';
@@ -28,6 +31,33 @@ void _noop() {}
 /// Every interactive shared component, in the tightest realistic container.
 final _cases = <String, Widget Function()>{
   'PrimaryButton': () => PrimaryButton(label: 'Book', onPressed: _noop),
+  // A bookable hour is the smallest thing a rider taps in the whole flow, and
+  // it sits in a 3-across grid where the temptation is always to shrink it.
+  'SlotTile.free': () =>
+      SlotTile(range: '09:00 – 10:00', state: SlotState.free, onTap: _noop),
+  'SlotTile.selected': () => SlotTile(
+      range: '09:00 – 10:00', state: SlotState.selected, onTap: _noop),
+  'WeekStrip': () => WeekStrip(
+        days: [for (var i = 0; i < 7; i++) DateTime(2026, 5, 13 + i)],
+        selected: DateTime(2026, 5, 13),
+        onSelect: (_) {},
+      ),
+  'RequestRow': () => RequestRow(
+      when: 'Tomorrow, 09:00 - 10:00',
+      name: 'Nicolas P.',
+      onApprove: _noop,
+      onDecline: _noop),
+  'AgendaRow': () =>
+      AgendaRow(time: '10:00', name: 'Julie M.', live: true, onTap: _noop),
+  'ProviderCard': () => ProviderCard(
+        name: 'Marco B.',
+        photoUrl: null,
+        rating: 4.9,
+        reviewCount: 128,
+        location: 'El Gouna',
+        priceLabel: '€65',
+        onTap: _noop,
+      ),
   'MicroAction.filled': () => MicroAction(label: 'APPROVE', onPressed: _noop),
   'MicroAction.outlined': () =>
       MicroAction(label: 'DECLINE', onPressed: _noop, filled: false),

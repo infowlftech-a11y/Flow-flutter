@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/theme/app_theme.dart';
@@ -69,7 +70,7 @@ class SetupRequiredScreen extends StatelessWidget {
                   'Firebase is not configured',
                   textAlign: TextAlign.center,
                   style:
-                      sora(26, 760, color: context.scheme.onSurface, spacing: -.5),
+                      display(26, 760, color: context.scheme.onSurface, spacing: -.5),
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -89,7 +90,7 @@ class SetupRequiredScreen extends StatelessWidget {
                     onPressed: () => Clipboard.setData(const ClipboardData(
                         text:
                             'flutterfire configure --project=wlf-flow')),
-                    icon: Icon(Icons.copy_rounded,
+                    icon: Icon(Symbols.content_copy_rounded,
                         size: 17, color: context.scheme.primary),
                     label: Text('Copy the configure command',
                         style: inter(14, 620, color: context.scheme.primary)),

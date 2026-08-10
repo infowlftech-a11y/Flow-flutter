@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../theme/motion.dart';
@@ -50,6 +51,8 @@ class AsyncView<T> extends StatelessWidget {
     }
     return AnimatedSwitcher(
       duration: FlowMotion.base,
+      switchInCurve: FlowMotion.curve,
+      switchOutCurve: FlowMotion.curve,
       child: KeyedSubtree(
         key: ValueKey(value.hasValue
             ? 'data'
@@ -86,7 +89,7 @@ class ErrorView extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             FlowIconChip(
-              icon: Icons.wifi_tethering_error_rounded,
+              icon: Symbols.wifi_tethering_error_rounded,
               color: context.tones.danger,
               size: 64,
             ),
@@ -101,7 +104,7 @@ class ErrorView extends StatelessWidget {
             const SizedBox(height: 24),
             FilledButton.icon(
               onPressed: onRetry,
-              icon: const Icon(Icons.refresh_rounded, size: 20),
+              icon: const Icon(Symbols.refresh_rounded, size: 20),
               label: const Text('Try again'),
             ),
           ],
@@ -178,7 +181,7 @@ class EmptyView extends StatelessWidget {
             title,
             textAlign: TextAlign.center,
             style: onScrim
-                ? sora(20, 700, color: FlowColors.mist)
+                ? display(20, 700, color: FlowColors.mist)
                 : theme.textTheme.headlineSmall,
           ),
           if (subtitle != null) ...[

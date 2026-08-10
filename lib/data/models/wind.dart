@@ -49,6 +49,8 @@ class WindDay {
     required this.knots,
     required this.gustKnots,
     required this.directionDegrees,
+    this.airC,
+    this.waterC,
   });
 
   /// Local `YYYY-MM-DD`, matching how bookings store dates.
@@ -61,6 +63,33 @@ class WindDay {
   final double gustKnots;
 
   final int directionDegrees;
+
+  /// Daily maximum air temperature, °C. Null when the forecast came back
+  /// without it — the strip then shows wind alone rather than a placeholder.
+  final double? airC;
+
+  /// Daily maximum sea-surface temperature, °C.
+  ///
+  /// Comes from a *different* Open-Meteo endpoint (Marine) than every other
+  /// field here, and is the one most likely to be missing: marine coverage is
+  /// gridded to the sea, so a spot whose coordinates sit slightly inland
+  /// returns nothing at all. Null is the normal case, not an error.
+  final double? waterC;
+
+  int? get displayAirC => airC?.round();
+
+  int? get displayWaterC => waterC?.round();
+
+  /// A copy carrying sea temperature, used to fold the marine response into a
+  /// forecast that has already been parsed.
+  WindDay withWater(double? water) => WindDay(
+        date: date,
+        knots: knots,
+        gustKnots: gustKnots,
+        directionDegrees: directionDegrees,
+        airC: airC,
+        waterC: water ?? waterC,
+      );
 
   WindRating get rating => WindRating.fromKnots(knots);
 
@@ -118,6 +147,7 @@ class WindForecast {
     final speeds = _numList(daily['wind_speed_10m_max']);
     final gusts = _numList(daily['wind_gusts_10m_max']);
     final directions = _numList(daily['wind_direction_10m_dominant']);
+    final airs = _numList(daily['temperature_2m_max']);
 
     final days = <String, WindDay>{};
     for (var i = 0; i < dates.length; i++) {
@@ -129,9 +159,31 @@ class WindForecast {
         gustKnots: (i < gusts.length ? gusts[i] : null) ?? speed,
         directionDegrees: ((i < directions.length ? directions[i] : null) ?? 0)
             .round(),
+        airC: i < airs.length ? airs[i] : null,
       );
     }
     return WindForecast(spot: spot, days: days);
+  }
+
+  /// Folds an Open-Meteo **Marine** `daily` block into this forecast.
+  ///
+  /// Separate from [fromOpenMeteo] because it is a separate request that is
+  /// allowed to fail on its own: a forecast with wind and air but no sea
+  /// temperature is a perfectly good forecast, so a marine failure must not
+  /// discard the wind that already arrived.
+  WindForecast withMarine(Map<String, dynamic> json) {
+    final daily = json.nested('daily');
+    final dates = daily.strList('time');
+    final seas = _numList(daily['sea_surface_temperature_max']);
+    if (dates.isEmpty || seas.isEmpty) return this;
+
+    final merged = {...days};
+    for (var i = 0; i < dates.length && i < seas.length; i++) {
+      final existing = merged[dates[i]];
+      if (existing == null) continue;
+      merged[dates[i]] = existing.withWater(seas[i]);
+    }
+    return WindForecast(spot: spot, days: merged);
   }
 
   static List<double?> _numList(dynamic raw) {

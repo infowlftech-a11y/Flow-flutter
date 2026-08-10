@@ -55,7 +55,7 @@ class WindService {
       'latitude': coordinates.$1.toStringAsFixed(4),
       'longitude': coordinates.$2.toStringAsFixed(4),
       'daily': 'wind_speed_10m_max,wind_gusts_10m_max,'
-          'wind_direction_10m_dominant',
+          'wind_direction_10m_dominant,temperature_2m_max',
       // Knots directly, so nothing downstream has to convert — and nothing
       // downstream can convert *twice*, which is the classic version of this
       // bug.
@@ -79,11 +79,60 @@ class WindService {
       if (decoded is! Map<String, dynamic>) return _fallback(spot, cached);
 
       final forecast = WindForecast.fromOpenMeteo(spot, decoded);
-      _cache[spot] = _CacheEntry(forecast);
-      return forecast;
+      // Sea temperature is a second request to a second host, and it is the
+      // one most likely to come back empty — the marine grid only covers
+      // water, so a spot pinned slightly inland has none. It is folded in if
+      // it arrives and ignored entirely if it does not, so the wind that
+      // already succeeded is never thrown away for the sake of one more
+      // number.
+      final withSea = await _mergeSeaTemperature(forecast, coordinates);
+      _cache[spot] = _CacheEntry(withSea);
+      return withSea;
     } catch (_) {
       // Offline, DNS failure, timeout, garbage body — all the same outcome.
       return _fallback(spot, cached);
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  /// Adds sea-surface temperature to [forecast], or returns it untouched.
+  ///
+  /// Never throws and never returns null: every failure mode — no marine
+  /// coverage at these coordinates, a timeout, a rate limit, a body that is
+  /// not the shape expected — leaves the caller with exactly the forecast it
+  /// already had. This is the wind service's own contract (§12) applied one
+  /// level down, because a second network call is a second thing that can go
+  /// wrong and it must not become the first thing that breaks booking.
+  Future<WindForecast> _mergeSeaTemperature(
+    WindForecast forecast,
+    (double, double) coordinates,
+  ) async {
+    if (forecast.isEmpty) return forecast;
+
+    final uri = Uri.https('marine-api.open-meteo.com', '/v1/marine', {
+      'latitude': coordinates.$1.toStringAsFixed(4),
+      'longitude': coordinates.$2.toStringAsFixed(4),
+      'daily': 'sea_surface_temperature_max',
+      'timezone': 'Africa/Cairo',
+      'forecast_days': '${FlowConst.windForecastDays}',
+    });
+
+    final client = _clientFactory();
+    try {
+      client.connectionTimeout = _timeout;
+      final request = await client.getUrl(uri).timeout(_timeout);
+      final response = await request.close().timeout(_timeout);
+      if (response.statusCode != 200) return forecast;
+
+      final body =
+          await response.transform(utf8.decoder).join().timeout(_timeout);
+      final decoded = json.decode(body);
+      if (decoded is! Map<String, dynamic>) return forecast;
+
+      return forecast.withMarine(decoded);
+    } catch (_) {
+      return forecast;
     } finally {
       client.close(force: true);
     }

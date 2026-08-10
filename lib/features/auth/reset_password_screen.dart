@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -139,7 +140,7 @@ class _SentState extends StatelessWidget {
               color: context.scheme.primary.withValues(alpha: .12),
               shape: BoxShape.circle,
             ),
-            child: Icon(Icons.mark_email_read_outlined,
+            child: Icon(Symbols.mark_email_read_rounded,
                 size: 46, color: context.scheme.primary),
           ),
         ),

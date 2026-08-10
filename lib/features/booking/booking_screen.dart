@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -9,6 +10,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/theme/typography.dart';
 import '../../core/utils/date_x.dart';
 import '../../core/utils/haptics.dart';
+import '../../core/widgets/booking_grid.dart';
 import '../../core/widgets/buttons.dart';
 import '../../core/widgets/feedback.dart';
 import '../../core/widgets/flow_image.dart';
@@ -99,7 +101,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         context,
         "Those hours aren't back-to-back — starting again from "
         '${slot.value}.',
-        icon: Icons.link_off_rounded,
+        icon: Symbols.link_off_rounded,
       );
     }
   }
@@ -138,7 +140,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
             ? 'An hour you picked was just taken, so the hours after the gap '
                 'were dropped — sessions run back-to-back.'
             : 'An hour you picked was just taken and has been removed.',
-        icon: split ? Icons.link_off_rounded : null,
+        icon: split ? Symbols.link_off_rounded : null,
       );
     });
   }
@@ -210,7 +212,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                 ),
                 AnimatedSize(
                   duration: FlowMotion.base,
-                  curve: Curves.easeOutCubic,
+                  curve: FlowMotion.curve,
                   alignment: Alignment.topCenter,
                   child: _selection.isEmpty
                       ? const SizedBox.shrink()
@@ -306,14 +308,14 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                                 color:
                                     sheetContext.scheme.onSurfaceVariant)),
                         Text(euro(_total),
-                            style: sora(22, 760,
+                            style: display(22, 760,
                                 color: sheetContext.tones.azureBrand)),
                       ],
                     ),
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        Icon(Icons.storefront_outlined,
+                        Icon(Symbols.storefront_rounded,
                             size: 15,
                             color: sheetContext.tones.textFaint),
                         const SizedBox(width: 6),
@@ -402,7 +404,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 FlowIconChip(
-                  icon: Icons.send_rounded,
+                  icon: Symbols.send_rounded,
                   color: dialogContext.tones.success,
                   size: 76,
                   borderRadius: const BorderRadius.all(Radius.circular(38)),
@@ -491,7 +493,7 @@ class _ProviderCard extends StatelessWidget {
                   const SizedBox(height: 3),
                   Row(
                     children: [
-                      Icon(Icons.place_outlined,
+                      Icon(Symbols.place_rounded,
                           size: 13, color: tones.textFaint),
                       const SizedBox(width: 3),
                       Flexible(
@@ -590,6 +592,7 @@ class _DayStrip extends ConsumerWidget {
                     '${gust.rating.label}'}',
             child: AnimatedContainer(
               duration: FlowMotion.fast,
+              curve: FlowMotion.curve,
               width: 62,
               decoration: BoxDecoration(
                 color: active ? tones.azureBrand : tones.card,
@@ -693,7 +696,7 @@ class _WindSummary extends ConsumerWidget {
     // leave an empty band where information used to be.
     return AnimatedSize(
       duration: FlowMotion.base,
-      curve: Curves.easeOutCubic,
+      curve: FlowMotion.curve,
       alignment: Alignment.topCenter,
       child: day == null
           ? const SizedBox(width: double.infinity)
@@ -709,7 +712,7 @@ class _WindSummary extends ConsumerWidget {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.air_rounded,
+                  Icon(Symbols.air_rounded,
                       size: 18, color: windColor(day.rating)),
                   const SizedBox(width: 10),
                   Expanded(
@@ -755,7 +758,7 @@ class _SlotArea extends StatelessWidget {
     // Whole-day time off → a single notice instead of the grid (§3.6).
     if (day.onVacation) {
       return const FlowNotice(
-        icon: Icons.beach_access_rounded,
+        icon: Symbols.beach_access_rounded,
         title: 'Away on this date',
         body: 'The trainer is off the water this day. Try another date.',
       );
@@ -766,7 +769,7 @@ class _SlotArea extends StatelessWidget {
       // not a demand one — saying otherwise misreads the trainer's day.
       final over = day.past.length >= BookingMath.slots().length;
       return FlowNotice(
-        icon: over ? Icons.bedtime_rounded : Icons.event_busy_rounded,
+        icon: over ? Symbols.bedtime_rounded : Symbols.event_busy_rounded,
         title: over ? "That's a wrap for today" : 'Fully booked',
         body: over
             ? 'Sessions need an hour of notice, so today is done. Pick a '
@@ -774,112 +777,50 @@ class _SlotArea extends StatelessWidget {
             : 'Every hour is taken. Another day might be wide open.',
       );
     }
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        mainAxisSpacing: 10,
-        crossAxisSpacing: 10,
-        childAspectRatio: 1.55,
-      ),
-      itemCount: BookingMath.slots().length,
-      itemBuilder: (context, i) {
-        final slot = BookingMath.slots()[i];
-        final free = day.isFree(slot);
-        final selected = selection.contains(slot);
-        final reason = day.blockedReason(slot);
-        return _SlotTile(
-          slot: slot,
-          state: selected
-              ? _SlotState.selected
-              : free
-                  ? _SlotState.free
-                  : _SlotState.blocked,
-          reason: reason,
-          onTap: free || selected ? () => onTap(slot) : null,
-        );
-      },
-    );
-  }
-}
+    final slots = BookingMath.slots();
+    final states = [
+      for (final s in slots)
+        selection.contains(s)
+            ? SlotState.selected
+            : slotStateForReason(day.blockedReason(s)),
+    ];
 
-enum _SlotState { free, selected, blocked }
-
-class _SlotTile extends StatelessWidget {
-  const _SlotTile({
-    required this.slot,
-    required this.state,
-    required this.reason,
-    required this.onTap,
-  });
-
-  final Slot slot;
-  final _SlotState state;
-  final String? reason;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final tones = context.tones;
-    final scheme = context.scheme;
-
-    final (bg, border, fg) = switch (state) {
-      _SlotState.selected => (
-          tones.azureBrand,
-          tones.azureBrand,
-          Colors.white
-        ),
-      _SlotState.free => (tones.card, tones.line, scheme.onSurface),
-      _SlotState.blocked => (
-          Colors.transparent,
-          tones.line.withValues(alpha: .5),
-          tones.textFaint.withValues(alpha: .8)
-        ),
-    };
-
-    final label = switch (state) {
-      _SlotState.selected => 'Selected',
-      _SlotState.free => 'Free',
-      _SlotState.blocked => reason ?? 'Unavailable',
-    };
-
-    return Semantics(
-      button: onTap != null,
-      label:
-          '${slot.value} to ${slot.plusHours(1).value}, $label',
-      child: AnimatedContainer(
-        duration: FlowMotion.fast,
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: FlowRadii.control,
-          border: Border.all(color: border),
-        ),
-        // Ripple on top of the fill: a tapped hour should acknowledge the
-        // touch on contact, not only once setState lands.
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: FlowRadii.control,
-            onTap: onTap,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text('${slot.value}–${slot.plusHours(1).value}',
-                    style: interNum(14, 680, color: fg)),
-                const SizedBox(height: 2),
-                Text(label,
-                    style: inter(10, 580,
-                        color: state == _SlotState.selected
-                            ? Colors.white.withValues(alpha: .85)
-                            : state == _SlotState.free
-                                ? tones.success
-                                : fg)),
-              ],
-            ),
+    return Column(
+      children: [
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            // A fixed height, not an aspect ratio. The ratio made the tile as
+            // tall as the phone was wide divided by three — on a small handset
+            // that resolved to 64px, and the 48px tap target inside it was
+            // silently clamped to 46 by the padding and the border.
+            mainAxisExtent: 68,
+          ),
+          itemCount: slots.length,
+          itemBuilder: (context, i) => SlotTile(
+            range: '${slots[i].value}–${slots[i].plusHours(1).value}',
+            state: states[i],
+            onTap: () => onTap(slots[i]),
           ),
         ),
-      ),
+        const SizedBox(height: 14),
+        // Only the states this day actually contains. A fixed five-item key
+        // under a day where everything is free is five facts to read and four
+        // of them irrelevant.
+        Align(
+          alignment: Alignment.centerLeft,
+          child: SlotLegend(
+            states: [
+              for (final s in SlotState.values)
+                if (states.contains(s)) s,
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -896,9 +837,11 @@ class _SlotGridSkeleton extends StatelessWidget {
         crossAxisCount: 3,
         mainAxisSpacing: 10,
         crossAxisSpacing: 10,
-        childAspectRatio: 1.55,
+        // Must track the real grid's delegate exactly, or the hours jump the
+        // moment they arrive.
+        mainAxisExtent: 68,
       ),
-      tile: SkeletonPulse(height: 999, radius: FlowRadius.control),
+      tile: SkeletonPulse(height: 999, radius: FlowRadius.chip),
     );
   }
 }
@@ -924,7 +867,7 @@ class _SummaryCard extends StatelessWidget {
     return FlowCard(
       child: Row(
         children: [
-          Icon(Icons.schedule_rounded, color: tones.azureBrand, size: 22),
+          Icon(Symbols.schedule_rounded, color: tones.azureBrand, size: 22),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -939,7 +882,7 @@ class _SummaryCard extends StatelessWidget {
               ],
             ),
           ),
-          Text(euro(total), style: sora(20, 760, color: tones.azureBrand)),
+          Text(euro(total), style: display(20, 760, color: tones.azureBrand)),
         ],
       ),
     );
@@ -977,6 +920,8 @@ class _StickyBar extends StatelessWidget {
                 const SizedBox(height: 2),
                 AnimatedSwitcher(
                   duration: FlowMotion.fast,
+                  switchInCurve: FlowMotion.curve,
+                  switchOutCurve: FlowMotion.curve,
                   transitionBuilder: (child, anim) => SlideTransition(
                     position: Tween(
                             begin: const Offset(0, .5), end: Offset.zero)
@@ -986,7 +931,7 @@ class _StickyBar extends StatelessWidget {
                   child: Text(
                     total == null ? '—' : euro(total),
                     key: ValueKey(total),
-                    style: sora(22, 780, color: context.scheme.onSurface),
+                    style: display(22, 780, color: context.scheme.onSurface),
                   ),
                 ),
               ],

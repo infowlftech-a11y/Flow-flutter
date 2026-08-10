@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../theme/motion.dart';
 import '../theme/app_theme.dart';
@@ -146,7 +147,7 @@ class ThumbTile extends StatelessWidget {
                       padding: const EdgeInsets.all(5),
                       decoration: const BoxDecoration(
                           color: Colors.black54, shape: BoxShape.circle),
-                      child: const Icon(Icons.close_rounded,
+                      child: const Icon(Symbols.close_rounded,
                           size: 14, color: Colors.white),
                     ),
                   ),
@@ -217,7 +218,7 @@ class _FullScreenImageViewerState extends State<FullScreenImageViewer> {
             child: Padding(
               padding: const EdgeInsets.all(12),
               child: ScrimIconButton(
-                icon: Icons.close_rounded,
+                icon: Symbols.close_rounded,
                 tooltip: 'Close',
                 onTap: () => Navigator.pop(context),
               ),

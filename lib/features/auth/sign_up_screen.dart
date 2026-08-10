@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -189,6 +190,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
               // Advisory only — it never blocks beyond the 6-character floor.
               AnimatedSize(
                 duration: FlowMotion.base,
+                curve: FlowMotion.curve,
                 alignment: Alignment.topCenter,
                 child: _password.text.isEmpty
                     ? const SizedBox(width: double.infinity)
@@ -218,6 +220,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
         ),
         AnimatedSize(
           duration: FlowMotion.base,
+          curve: FlowMotion.curve,
           alignment: Alignment.topCenter,
           child: _confirmMatches && _confirmError == null
               ? const _MatchHint()
@@ -252,7 +255,7 @@ class _MatchHint extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 4),
       child: Row(
         children: [
-          Icon(Icons.check_circle_outline_rounded,
+          Icon(Symbols.check_circle_outline_rounded,
               size: 16, color: context.tones.success),
           const SizedBox(width: 8),
           Text('Passwords match',
@@ -287,7 +290,7 @@ class _StrengthMeter extends StatelessWidget {
               borderRadius: BorderRadius.circular(3),
               child: TweenAnimationBuilder<double>(
                 duration: FlowMotion.base,
-                curve: Curves.easeOutCubic,
+                curve: FlowMotion.curve,
                 tween: Tween(begin: 0, end: strength.fraction),
                 builder: (_, value, _) => LinearProgressIndicator(
                   value: value,

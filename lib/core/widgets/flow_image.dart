@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../theme/motion.dart';
 import '../theme/app_theme.dart';
@@ -46,7 +47,7 @@ class FlowImage extends StatelessWidget {
     this.width,
     this.height,
     this.borderRadius,
-    this.placeholderIcon = Icons.kitesurfing_rounded,
+    this.placeholderIcon = Symbols.kitesurfing_rounded,
   });
 
   final String? url;
@@ -100,6 +101,8 @@ class FlowImage extends StatelessWidget {
             // say it did not animate at all.
             return AnimatedSwitcher(
               duration: FlowMotion.base,
+              switchInCurve: FlowMotion.curve,
+              switchOutCurve: FlowMotion.curve,
               child: frame == null ? fallback : image,
             );
           },

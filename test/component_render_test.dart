@@ -13,8 +13,16 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:flow/core/theme/app_theme.dart';
 import 'package:flow/core/theme/palette.dart';
+import 'package:flow/core/widgets/booking_grid.dart';
 import 'package:flow/core/widgets/buttons.dart';
+import 'package:flow/core/widgets/charts.dart';
+import 'package:flow/core/widgets/dashboard.dart';
+import 'package:flow/core/widgets/conditions.dart';
 import 'package:flow/core/widgets/feedback.dart';
+import 'package:flow/core/widgets/provider_card.dart';
+import 'package:flow/core/widgets/session_card.dart';
+import 'package:flow/core/widgets/ticket.dart';
+import 'package:flow/data/models/wind.dart';
 import 'package:flow/core/widgets/gate.dart';
 import 'package:flow/core/widgets/media.dart';
 import 'package:flow/core/widgets/misc.dart';
@@ -29,6 +37,114 @@ const _long =
 final _cases = <String, Widget Function()>{
   'FlowCard': () => const FlowCard(child: Text(_long)),
   'FlowCard.onTap': () => FlowCard(onTap: () {}, child: const Text(_long)),
+  // Three metrics on a 320px phone at 1.3x is the case this component is most
+  // likely to fail: each is an icon plus a stacked label and value, and they
+  // share the width equally.
+  'ConditionsStrip': () => const ConditionsStrip(
+        day: WindDay(
+          date: '2026-05-13',
+          knots: 18,
+          gustKnots: 24,
+          directionDegrees: 315,
+          airC: 28,
+          waterC: 26,
+        ),
+      ),
+  // Wind only — the shape when the marine grid has no coverage.
+  'ConditionsStrip.windOnly': () => const ConditionsStrip(
+        day: WindDay(
+          date: '2026-05-13',
+          knots: 18,
+          gustKnots: 24,
+          directionDegrees: 315,
+        ),
+      ),
+  'ProviderCard': () => ProviderCard(
+        name: 'Konstantinos Papadopoulos',
+        photoUrl: null,
+        rating: 4.9,
+        reviewCount: 128,
+        location: 'El Gouna, Red Sea',
+        priceLabel: '€65',
+        onTap: () {},
+      ),
+  'ProviderCard.bare': () =>
+      ProviderCard(name: 'Marco B.', photoUrl: null, onTap: () {}),
+  // Three across a 320 phone is the narrowest each tile ever gets, and the
+  // longest state word ("Unavailable") is the one that has to survive it.
+  'SlotTile.grid': () => GridView.count(
+        crossAxisCount: 3,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        childAspectRatio: 1.55,
+        mainAxisSpacing: 8,
+        crossAxisSpacing: 8,
+        children: [
+          for (final s in SlotState.values)
+            SlotTile(range: '09:00 – 10:00', state: s, onTap: () {}),
+        ],
+      ),
+  'SlotLegend': () => const SlotLegend(),
+  'WeekBars': () => WeekBars(bars: [
+        for (final d in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'])
+          WeekBar(
+              label: d,
+              value: d == 'Wed' ? 320 : 90,
+              semanticValue: d == 'Wed' ? '€320' : '€90',
+              highlighted: d == 'Wed'),
+      ]),
+  // A week of zeroes is a real state, not an error — it must not render as
+  // seven flat stubs.
+  'WeekBars.empty': () => const WeekBars(bars: [
+        WeekBar(label: 'Mon', value: 0, semanticValue: '€0'),
+        WeekBar(label: 'Tue', value: 0, semanticValue: '€0'),
+        WeekBar(label: 'Wed', value: 0, semanticValue: '€0'),
+      ]),
+  'AgendaRow.live': () => AgendaRow(
+      time: '10:00', name: 'Annelies van der Berg-Hoekstra', live: true, onTap: () {}),
+  'AgendaRow': () => AgendaRow(
+      time: '12:00', name: 'Ahmed K.', statusLabel: 'Upcoming', onTap: () {}),
+  'RequestRow': () => RequestRow(
+      when: 'Tomorrow, 09:00 - 10:00',
+      name: 'Nicolas P.',
+      location: 'El Gouna',
+      onApprove: () {},
+      onDecline: () {}),
+  'TicketCard': () => const TicketCard(
+        payload: '{"bookingId":"seed-lina-omar-next","trainerId":"omar"}',
+        qrSize: 140,
+        ticketId: 'FLW-13MAY-10AM-7X8K',
+        rows: [
+          ('SESSION', '13 May 2026 · 10:00 – 11:00'),
+          ('INSTRUCTOR', 'Konstantinos Papadopoulos'),
+          ('SPOT', 'El Gouna, Red Sea'),
+        ],
+      ),
+  'LiveSessionCard': () => LiveSessionCard(
+        title: 'Today, 13 May · 10:00 – 11:00',
+        subtitle: 'with Konstantinos Papadopoulos · El Gouna, Red Sea',
+        badgeLabel: 'LIVE NOW',
+        countdownTo: DateTime.now().add(const Duration(minutes: 32)),
+        onTap: () {},
+      ),
+  'LiveSessionCard.bare': () => LiveSessionCard(
+        title: 'Wed, 14 May · 09:00 – 11:00',
+        subtitle: 'with Nadia Cherif',
+        onTap: () {},
+      ),
+  'SessionRow': () => SessionRow(
+        when: 'Tue, 13 May · 12:00 – 13:00',
+        who: 'Konstantinos Papadopoulos',
+        location: 'El Gouna',
+        priceLabel: '€65',
+        statusLabel: 'UPCOMING',
+        onTap: () {},
+      ),
+  'WeekStrip': () => WeekStrip(
+        days: [for (var i = 0; i < 21; i++) DateTime(2026, 5, 13 + i)],
+        selected: DateTime(2026, 5, 13),
+        onSelect: (_) {},
+      ),
   'FlowIconChip': () => const FlowIconChip(icon: Icons.air_rounded, size: 88),
   'FlowNotice': () =>
       const FlowNotice(icon: Icons.warning_amber_rounded, title: 'Away', body: _long),

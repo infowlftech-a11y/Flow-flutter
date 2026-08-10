@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -107,7 +108,7 @@ class _ScheduleTabState extends ConsumerState<ScheduleTab> {
               IconButton.outlined(
                 onPressed: () => _shiftDay(-1),
                 tooltip: 'Previous day',
-                icon: const Icon(Icons.chevron_left_rounded),
+                icon: const Icon(Symbols.chevron_left_rounded),
               ),
               Expanded(
                 child: Semantics(
@@ -139,7 +140,7 @@ class _ScheduleTabState extends ConsumerState<ScheduleTab> {
               IconButton.outlined(
                 onPressed: () => _shiftDay(1),
                 tooltip: 'Next day',
-                icon: const Icon(Icons.chevron_right_rounded),
+                icon: const Icon(Symbols.chevron_right_rounded),
               ),
             ],
           ),
@@ -149,7 +150,7 @@ class _ScheduleTabState extends ConsumerState<ScheduleTab> {
               Expanded(
                 child: MicroAction(
                   label: 'WALK-IN',
-                  icon: Icons.person_add_alt_rounded,
+                  icon: Symbols.person_add_alt_rounded,
                   onPressed: () => _openWalkInSheet(context),
                 ),
               ),
@@ -157,7 +158,7 @@ class _ScheduleTabState extends ConsumerState<ScheduleTab> {
               Expanded(
                 child: MicroAction(
                   label: 'TIME OFF',
-                  icon: Icons.beach_access_rounded,
+                  icon: Symbols.beach_access_rounded,
                   filled: false,
                   onPressed: () => _openTimeOffSheet(context),
                 ),
@@ -169,7 +170,7 @@ class _ScheduleTabState extends ConsumerState<ScheduleTab> {
             Padding(
               padding: const EdgeInsets.only(bottom: 14),
               child: FlowNotice(
-                icon: Icons.beach_access_rounded,
+                icon: Symbols.beach_access_rounded,
                 title: vacationForDay.label ?? 'Time off',
                 body: 'You are away this whole day. '
                     'Riders see nothing bookable.',
@@ -480,7 +481,7 @@ class _ScheduleTabState extends ConsumerState<ScheduleTab> {
                     child: InfoTile(
                         label: 'FROM',
                         value: prettyYmd(ymd(from)),
-                        trailingIcon: Icons.edit_calendar_outlined,
+                        trailingIcon: Symbols.edit_calendar_rounded,
                         onTap: busy ? null : () => pick(true)),
                   ),
                   const SizedBox(width: 12),
@@ -488,7 +489,7 @@ class _ScheduleTabState extends ConsumerState<ScheduleTab> {
                     child: InfoTile(
                         label: 'TO',
                         value: prettyYmd(ymd(to)),
-                        trailingIcon: Icons.edit_calendar_outlined,
+                        trailingIcon: Symbols.edit_calendar_rounded,
                         onTap: busy ? null : () => pick(false)),
                   ),
                 ],
@@ -627,8 +628,8 @@ class _Timeline extends ConsumerWidget {
                       if (tappable)
                         Icon(
                           isBlocked
-                              ? Icons.lock_open_rounded
-                              : Icons.block_rounded,
+                              ? Symbols.lock_open_rounded
+                              : Symbols.block_rounded,
                           size: 17,
                           color: tones.textFaint,
                         ),
@@ -667,7 +668,7 @@ class _VacationList extends ConsumerWidget {
             borderRadius: FlowRadii.control,
             child: Row(
               children: [
-                Icon(Icons.beach_access_rounded,
+                Icon(Symbols.beach_access_rounded,
                     size: 19, color: tones.warning),
                 const SizedBox(width: 12),
                 Expanded(
@@ -710,7 +711,7 @@ class _VacationList extends ConsumerWidget {
                       );
                     }
                   },
-                  icon: const Icon(Icons.delete_outline_rounded, size: 20),
+                  icon: const Icon(Symbols.delete_outline_rounded, size: 20),
                 ),
               ],
             ),

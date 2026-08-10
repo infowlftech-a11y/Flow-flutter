@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../theme/app_theme.dart';
@@ -108,12 +109,12 @@ Future<ImageSource?> showImageSourceSheet(BuildContext context) {
         mainAxisSize: MainAxisSize.min,
         children: [
           ListTile(
-            leading: const Icon(Icons.photo_camera_rounded),
+            leading: const Icon(Symbols.photo_camera_rounded),
             title: const Text('Take a photo'),
             onTap: () => Navigator.pop(sheetContext, ImageSource.camera),
           ),
           ListTile(
-            leading: const Icon(Icons.photo_library_rounded),
+            leading: const Icon(Symbols.photo_library_rounded),
             title: const Text('Choose from gallery'),
             onTap: () => Navigator.pop(sheetContext, ImageSource.gallery),
           ),

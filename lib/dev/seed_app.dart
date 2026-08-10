@@ -84,6 +84,30 @@ class _SeederScreenState extends State<SeederScreen> {
   /// every screen in its empty state.
   bool _withActivity = true;
 
+  /// Run both passes on launch, without waiting for a tap.
+  ///
+  /// Off by default — this writes ~30 accounts, which is not something a
+  /// launch should do by accident. Turned on explicitly:
+  ///
+  ///   flutter run -t lib/dev/seed_app.dart --dart-define=SEED_AUTORUN=true
+  ///
+  /// It exists because the on-screen log is only readable with the handset in
+  /// hand, and "did it run at all?" is the first thing you need to know when
+  /// the data does not appear. With this and the debugPrint in [_say], the
+  /// whole run lands in the terminal that launched it.
+  static const _autoRun = bool.fromEnvironment('SEED_AUTORUN');
+
+  @override
+  void initState() {
+    super.initState();
+    if (_autoRun) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        await _seed();
+        await _approveAll();
+      });
+    }
+  }
+
   @override
   void dispose() {
     _scroll.dispose();

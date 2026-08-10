@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -29,7 +30,7 @@ class RejectedScreen extends ConsumerWidget {
         children: [
           const Spacer(),
           GateHeadline(
-            icon: Icons.assignment_late_outlined,
+            icon: Symbols.assignment_late_rounded,
             color: context.tones.warning,
             title: 'Application not approved',
             body: 'Hi ${session.displayName.split(' ').first} — we could not '
@@ -47,7 +48,7 @@ class RejectedScreen extends ConsumerWidget {
           const SizedBox(height: 28),
           PrimaryButton(
             label: 'Contact support',
-            icon: Icons.support_agent_rounded,
+            icon: Symbols.support_agent_rounded,
             onPressed: () => context.push('/support'),
           ),
           const Spacer(flex: 2),

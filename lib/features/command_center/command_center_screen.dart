@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -9,6 +10,7 @@ import '../../core/theme/typography.dart';
 import '../../core/utils/date_x.dart';
 import '../../core/utils/haptics.dart';
 import '../../core/widgets/buttons.dart';
+import '../../core/widgets/dashboard.dart';
 import '../../core/widgets/feedback.dart';
 import '../../core/widgets/flow_image.dart';
 import '../../core/widgets/media.dart';
@@ -21,7 +23,6 @@ import '../../providers/providers.dart';
 import '../../providers/settings_provider.dart';
 import '../sessions/sessions_screen.dart' show StatusPill;
 import 'qr_scanner_screen.dart';
-import 'schedule_tab.dart';
 
 /// Scan a rider's ticket and start the session (§3.8, §3.10).
 ///
@@ -53,6 +54,38 @@ Future<void> runCheckInScan(BuildContext context, WidgetRef ref) async {
   }
 }
 
+/// The one session on today's manifest that earns a card instead of a row.
+///
+/// A session already running wins outright — it is the only thing happening on
+/// the beach. Otherwise it is the next one still ahead, which is the session
+/// whose SCAN TO START button the trainer is about to need. When the day is
+/// over there is no focus at all and today reads as a list of rows, which is
+/// exactly what it then is.
+///
+/// Pure and public because the ordering is the whole point and it is invisible
+/// on screen: a manifest that promoted a finished 09:00 over a live 14:00 puts
+/// the wrong button under the trainer's thumb, and nothing about the layout
+/// would look wrong.
+Booking? todayFocus(List<Booking> today, {DateTime? now}) {
+  final clock = now ?? DateTime.now();
+
+  for (final b in today) {
+    if (b.status == BookingStatus.inProgress) return b;
+  }
+
+  Booking? next;
+  for (final b in today) {
+    if (b.status != BookingStatus.confirmed) continue;
+    final ends = b.endsAt;
+    if (ends != null && clock.isAfter(ends)) continue;
+    final start = b.startsAt ?? DateTime(2100);
+    if (next == null || start.isBefore(next.startsAt ?? DateTime(2100))) {
+      next = b;
+    }
+  }
+  return next;
+}
+
 /// Trainer home: TODAY + SCHEDULE, with a persistent CHECK IN action (§3.8).
 class CommandCenterScreen extends ConsumerStatefulWidget {
   const CommandCenterScreen({super.key});
@@ -62,9 +95,7 @@ class CommandCenterScreen extends ConsumerStatefulWidget {
       _CommandCenterScreenState();
 }
 
-class _CommandCenterScreenState extends ConsumerState<CommandCenterScreen>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabs = TabController(length: 2, vsync: this);
+class _CommandCenterScreenState extends ConsumerState<CommandCenterScreen> {
   final _requestsKey = GlobalKey();
   final _todayScroll = ScrollController();
 
@@ -76,7 +107,6 @@ class _CommandCenterScreenState extends ConsumerState<CommandCenterScreen>
 
   @override
   void dispose() {
-    _tabs.dispose();
     _todayScroll.dispose();
     super.dispose();
   }
@@ -93,7 +123,8 @@ class _CommandCenterScreenState extends ConsumerState<CommandCenterScreen>
   }
 
   void _scrollToRequests() {
-    _tabs.animateTo(0);
+    // No tab to switch to any more — the requests are on this screen, so this
+    // is now purely a scroll.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final ctx = _requestsKey.currentContext;
       if (ctx != null && ctx.mounted) {
@@ -124,32 +155,27 @@ class _CommandCenterScreenState extends ConsumerState<CommandCenterScreen>
               icon: Badge.count(
                 count: unread,
                 isLabelVisible: unread > 0,
-                child: const Icon(Icons.notifications_outlined),
+                child: const Icon(Symbols.notifications_rounded),
               ),
             ),
           ),
           const SizedBox(width: 8),
         ],
-        bottom: TabBar(
-          controller: _tabs,
-          tabs: const [Tab(text: 'TODAY'), Tab(text: 'SCHEDULE')],
-        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => runCheckInScan(context, ref),
-        icon: const Icon(Icons.qr_code_scanner_rounded),
+        icon: const Icon(Symbols.qr_code_scanner_rounded),
         label: const Text('CHECK IN'),
       ),
-      body: TabBarView(
-        controller: _tabs,
-        children: [
-          _TodayTab(
-            requestsKey: _requestsKey,
-            scrollController: _todayScroll,
-            onRequestsTap: _scrollToRequests,
-          ),
-          const ScheduleTab(),
-        ],
+      // No tabs. The redesign lifted the schedule to its own destination in
+      // the navigation bar, and leaving the SCHEDULE tab here as well gave a
+      // trainer the same screen in two places — one of them reachable only by
+      // remembering it was behind a tab on a different screen. The dashboard
+      // is now what its name says: today.
+      body: _TodayTab(
+        requestsKey: _requestsKey,
+        scrollController: _todayScroll,
+        onRequestsTap: _scrollToRequests,
       ),
     );
   }
@@ -192,6 +218,7 @@ class _TodayTab extends ConsumerWidget {
           for (final b in upcoming)
             if (b.date != todayYmd()) b,
         ].take(FlowConst.comingUpLimit).toList();
+        final focus = todayFocus(today);
 
         return ListView(
           controller: scrollController,
@@ -202,7 +229,7 @@ class _TodayTab extends ConsumerWidget {
                 _StatTile(
                   label: 'Requests',
                   value: '${pending.length}',
-                  icon: Icons.pending_actions_rounded,
+                  icon: Symbols.pending_actions_rounded,
                   emphasized: pending.isNotEmpty,
                   onTap: onRequestsTap,
                 ),
@@ -210,14 +237,17 @@ class _TodayTab extends ConsumerWidget {
                 _StatTile(
                   label: 'Upcoming',
                   value: '${upcoming.length}',
-                  icon: Icons.event_rounded,
+                  icon: Symbols.event_rounded,
                 ),
                 const SizedBox(width: 10),
                 _StatTile(
                   label: 'Total earned',
                   value: euro(revenue.value ?? 0),
-                  icon: Icons.payments_rounded,
-                  onTap: () => showEarningsSheet(context, ref),
+                  icon: Symbols.payments_rounded,
+                  // The ledger is a tab now. It was a sheet behind this tile,
+                  // which made "how am I doing" a thing you had to already
+                  // know where to find.
+                  onTap: () => context.go('/earnings'),
                 ),
               ],
             ),
@@ -235,7 +265,28 @@ class _TodayTab extends ConsumerWidget {
             if (today.isEmpty)
               const _EmptyToday()
             else
-              for (final b in today) _ManifestCard(booking: b),
+              // One card, the rest rows. Six sessions used to mean six tall
+              // cards each offering SCAN TO START, and only one of them was
+              // ever the next thing to do — so the button that matters was
+              // indistinguishable from five that did not.
+              for (final b in today)
+                if (b.id == focus?.id)
+                  _ManifestCard(booking: b)
+                else
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: AgendaRow(
+                      time: b.startTime ?? '--:--',
+                      name: b.studentName,
+                      live: b.status == BookingStatus.inProgress,
+                      statusLabel: switch (b.status) {
+                        BookingStatus.completed => 'Done',
+                        BookingStatus.pending => 'Pending',
+                        _ => null,
+                      },
+                      onTap: () => openManifestDetails(context, ref, b),
+                    ),
+                  ),
             if (comingUp.isNotEmpty) ...[
               const SizedBox(height: 28),
               const SectionHeader('Coming up'),
@@ -296,7 +347,7 @@ class _StatTile extends StatelessWidget {
                 FittedBox(
                   fit: BoxFit.scaleDown,
                   child: Text(value,
-                      style: sora(22, 760,
+                      style: display(22, 760,
                           color: emphasized
                               ? Colors.white
                               : context.scheme.onSurface,
@@ -330,7 +381,7 @@ class _EmptyToday extends StatelessWidget {
       padding: const EdgeInsets.all(24),
       child: Row(
         children: [
-          Icon(Icons.air_rounded, color: tones.azureBrand, size: 32),
+          Icon(Symbols.air_rounded, color: tones.azureBrand, size: 32),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -442,6 +493,29 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
   Widget build(BuildContext context) {
     final b = widget.booking;
     final tones = context.tones;
+
+    // Nothing extra to say means nothing extra to draw. A request with no
+    // message and no gear need is fully described by who, when and how much,
+    // and a trainer with eight of those should not scroll eight cards to
+    // answer them. The ones that carry a message keep the card, because the
+    // message is the part of the decision a row cannot hold.
+    if ((b.message ?? '').isEmpty && !b.gearNeeded) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: RequestRow(
+          when: '${prettyYmd(b.date)} · ${b.timeRange}',
+          name: b.studentName,
+          location: [
+            if (b.studentLevel != null) b.studentLevel!,
+            euro(b.totalPrice),
+          ].join(' · '),
+          busy: _busy,
+          onApprove: _approve,
+          onDecline: _decline,
+        ),
+      );
+    }
+
     return FlowCard(
       margin: const EdgeInsets.only(bottom: 12),
       borderColor: tones.warning.withValues(alpha: .45),
@@ -491,7 +565,7 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
           ],
           if (b.gearNeeded) ...[
             const SizedBox(height: 10),
-            const TagPill('NEEDS GEAR', icon: Icons.settings_input_component_rounded),
+            const TagPill('NEEDS GEAR', icon: Symbols.settings_input_component_rounded),
           ],
           const SizedBox(height: 14),
           Row(
@@ -509,7 +583,7 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
                 flex: 2,
                 child: MicroAction(
                   label: _busy ? '…' : 'APPROVE',
-                  icon: Icons.check_rounded,
+                  icon: Symbols.check_rounded,
                   onPressed: _busy ? null : _approve,
                 ),
               ),
@@ -589,7 +663,7 @@ class _ManifestCard extends ConsumerWidget {
                     width: double.infinity,
                     child: MicroAction(
                       label: 'SCAN TO START',
-                      icon: Icons.qr_code_scanner_rounded,
+                      icon: Symbols.qr_code_scanner_rounded,
                       onPressed: () => runCheckInScan(context, ref),
                     ),
                   )
@@ -598,7 +672,7 @@ class _ManifestCard extends ConsumerWidget {
                     width: double.infinity,
                     child: MicroAction(
                       label: 'FINISH SESSION',
-                      icon: Icons.flag_rounded,
+                      icon: Symbols.flag_rounded,
                       color: tones.success,
                       onPressed: () => _finish(context, ref),
                     ),
@@ -686,13 +760,13 @@ class _ManifestCard extends ConsumerWidget {
             const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: () => Navigator.pop(sheetContext, true),
-              icon: const Icon(Icons.check_circle_outline_rounded),
+              icon: const Icon(Symbols.check_circle_outline_rounded),
               label: Text('Yes — $amount collected'),
             ),
             const SizedBox(height: 10),
             OutlinedButton.icon(
               onPressed: () => Navigator.pop(sheetContext, false),
-              icon: const Icon(Icons.schedule_rounded),
+              icon: const Icon(Symbols.schedule_rounded),
               label: const Text('Not yet — still owing'),
             ),
             const SizedBox(height: 6),
@@ -706,9 +780,16 @@ class _ManifestCard extends ConsumerWidget {
     );
   }
 
-  /// Read-only details + Message rider (§3.8).
-  void _openDetails(BuildContext context, WidgetRef ref) {
-    final b = booking;
+  void _openDetails(BuildContext context, WidgetRef ref) =>
+      openManifestDetails(context, ref, booking);
+}
+
+/// Read-only details + Message rider (§3.8).
+///
+/// Top-level since the manifest stopped being cards all the way down: an
+/// [AgendaRow] has no card of its own to hang this off, and both need to open
+/// the same sheet.
+void openManifestDetails(BuildContext context, WidgetRef ref, Booking b) {
     showFlowSheet<void>(
       context,
       title: b.studentName,
@@ -749,7 +830,7 @@ class _ManifestCard extends ConsumerWidget {
             if (!b.isManual && b.kiterId.isNotEmpty)
               PrimaryButton(
                 label: 'Message rider',
-                icon: Icons.chat_bubble_outline_rounded,
+                icon: Symbols.chat_bubble_outline_rounded,
                 onPressed: () {
                   final session = ref.read(sessionProvider);
                   ref.read(chatRepositoryProvider).openThread(
@@ -767,7 +848,6 @@ class _ManifestCard extends ConsumerWidget {
         ),
       ),
     );
-  }
 }
 
 class _ComingUpRow extends StatelessWidget {
@@ -810,188 +890,27 @@ class _ComingUpRow extends StatelessWidget {
   }
 }
 
-/// Earnings ledger — all-time + month-to-date + every completed session
-/// (§3.8).
-void showEarningsSheet(BuildContext context, WidgetRef ref) {
-  showFlowSheet<void>(
-    context,
-    title: 'Earnings',
-    builder: (sheetContext) => Consumer(
-      builder: (sheetContext, sheetRef, _) {
-        final total = sheetRef.watch(trainerRevenueProvider).value ?? 0;
-        final month = sheetRef.watch(trainerMonthRevenueProvider).value ?? 0;
-        final completed =
-            sheetRef.watch(trainerCompletedProvider).value ?? const <Booking>[];
-        final outstanding =
-            sheetRef.watch(trainerOutstandingProvider).value ?? 0;
-        final tones = sheetContext.tones;
-
-        return ListView(
-          shrinkWrap: true,
-          padding: const EdgeInsets.fromLTRB(24, 14, 24, 24),
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      gradient: tones.heroGradient,
-                      borderRadius: FlowRadii.inset,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('ALL TIME',
-                            style: microLabel(
-                                Colors.white.withValues(alpha: .7),
-                                size: 10)),
-                        const SizedBox(height: 6),
-                        Text(euro(total),
-                            style: sora(24, 780, color: Colors.white)),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FlowCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('THIS MONTH',
-                            style:
-                                microLabel(tones.textFaint, size: 10)),
-                        const SizedBox(height: 6),
-                        Text(euro(month),
-                            style: sora(24, 780,
-                                color: tones.azureBrand)),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            // Only when there is something owing. A permanent "€0 owed" row
-            // would be one more number to scan past on the screen a trainer
-            // opens to see one figure.
-            if (outstanding > 0) ...[
-              const SizedBox(height: 12),
-              FlowNotice(
-                icon: Icons.payments_outlined,
-                title: '${euro(outstanding)} still to collect',
-                bordered: true,
-              ),
-            ],
-            const SizedBox(height: 20),
-            if (completed.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 20),
-                child: Text(
-                  'Finished sessions land here with their payout.',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(sheetContext).textTheme.bodyMedium,
-                ),
-              )
-            else
-              for (final b in completed)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(b.studentName,
-                                style: Theme.of(sheetContext)
-                                    .textTheme
-                                    .titleSmall),
-                            Text(
-                                '${prettyYmd(b.date)} · ${b.hours}h',
-                                style: inter(11.5, 500,
-                                    color: tones.textFaint)),
-                          ],
-                        ),
-                      ),
-                      // One tap to settle a session that was finished
-                      // unpaid — the trainer is usually chasing this the
-                      // next morning, not at the moment it happened.
-                      if (b.payment.isOutstanding)
-                        TextButton(
-                          onPressed: () => _settle(sheetContext, sheetRef, b),
-                          child: Text('MARK PAID',
-                              style: inter(11.5, 800, color: tones.warning)),
-                        ),
-                      const SizedBox(width: 4),
-                      Text(euro(b.amountDue),
-                          style: interNum(14, 720,
-                              color: b.payment.isOutstanding
-                                  ? tones.warning
-                                  : tones.success)),
-                    ],
-                  ),
-                ),
-          ],
-        );
-      },
-    ),
-  );
-}
-
-/// Settle a session that was finished without payment.
-///
-/// Confirms first: this is the one action in the ledger that changes money,
-/// and it is a single tap away from a scrolling list.
-Future<void> _settle(
-    BuildContext context, WidgetRef ref, Booking booking) async {
-  final ok = await confirmAction(
-    context,
-    title: 'Mark as paid?',
-    body: 'Records that ${booking.studentName} paid '
-        '${euro(booking.amountDue)} for ${prettyYmd(booking.date)}.',
-    confirmLabel: 'Mark paid',
-  );
-  if (!ok) return;
-  Haptics.medium();
-  try {
-    await ref.read(bookingRepositoryProvider).markPaid(
-          booking.id,
-          trainerId: booking.instructorId,
-        );
-    if (context.mounted) {
-      showFlowToast(context, '${euro(booking.amountDue)} collected 💶');
-    }
-  } on PaymentFailure catch (e) {
-    if (context.mounted) showFlowToast(context, e.message);
-  } catch (e) {
-    if (context.mounted) {
-      showFlowToast(context, "Couldn't save that. ${ErrorView.friendly(e)}");
-    }
-  }
-}
-
 /// The 4-step first-run tour (§3.8).
 Future<void> showTrainerTour(BuildContext context) {
   var step = 0;
   const steps = [
     (
-      Icons.space_dashboard_rounded,
+      Symbols.space_dashboard_rounded,
       'Your Command Center',
       'Everything for the day in one place: requests, the manifest and your earnings.'
     ),
     (
-      Icons.how_to_reg_rounded,
+      Symbols.how_to_reg_rounded,
       'Approve or decline',
       'New requests appear under "Action required". Approve in one tap — undo is right there in the toast.'
     ),
     (
-      Icons.qr_code_scanner_rounded,
+      Symbols.qr_code_scanner_rounded,
       'Scan riders in',
       'Sessions only start when you scan the rider\'s QR ticket on the beach. Tap CHECK IN from anywhere.'
     ),
     (
-      Icons.edit_calendar_rounded,
+      Symbols.edit_calendar_rounded,
       'Own your calendar',
       'Block hours, add walk-ins and set time off in the Schedule tab. Riders only ever see true availability.'
     ),

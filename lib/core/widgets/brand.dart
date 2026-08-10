@@ -39,10 +39,17 @@ class FlowWordmark extends StatelessWidget {
     return Column(
       children: [
         Text('FLOW',
-            style: sora(32, 800, color: color, spacing: 6)),
+            style: display(32, 800, color: color, spacing: 6)),
         const SizedBox(height: 4),
+        // The tagline follows the same decision the wordmark does. It was
+        // pinned to the raw logo azure, which is a glow colour: fine on the
+        // dark gates it was written for, and 2.42:1 the moment the wordmark
+        // was put on a white surface — the ticket, which is white in both
+        // themes because a camera reads it.
         Text('OWN THE WIND',
-            style: inter(11.5, 700, color: FlowColors.azure, spacing: 4.5)),
+            style: inter(11.5, 700,
+                color: onDark ? FlowColors.azure : FlowColors.azureDeep,
+                spacing: 4.5)),
       ],
     );
   }

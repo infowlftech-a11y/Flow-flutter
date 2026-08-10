@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../theme/motion.dart';
 import '../theme/radii.dart';
@@ -94,7 +95,7 @@ class FlowPickerField extends StatelessWidget {
                                     Theme.of(context).colorScheme.onSurface))),
               ),
               Icon(
-                multiSelect ? Icons.add_rounded : Icons.expand_more_rounded,
+                multiSelect ? Symbols.add_rounded : Symbols.expand_more_rounded,
                 size: 20,
                 color: enabled ? tones.textFaint : tones.line,
               ),
@@ -144,7 +145,7 @@ class _Tags extends StatelessWidget {
                   borderRadius: FlowRadii.card,
                   child: Padding(
                     padding: const EdgeInsets.all(2),
-                    child: Icon(Icons.close_rounded,
+                    child: Icon(Symbols.close_rounded,
                         size: 14, color: tones.azureBrand),
                   ),
                 ),
@@ -285,11 +286,11 @@ class _PickerBodyState extends State<_PickerBody> {
             onSubmitted: (_) => _canAddCustom ? _addCustom() : null,
             decoration: InputDecoration(
               hintText: widget.allowCustom ? 'Search or add…' : 'Search…',
-              prefixIcon: const Icon(Icons.search_rounded, size: 20),
+              prefixIcon: const Icon(Symbols.search_rounded, size: 20),
               suffixIcon: _query.isEmpty
                   ? null
                   : IconButton(
-                      icon: const Icon(Icons.close_rounded, size: 17),
+                      icon: const Icon(Symbols.close_rounded, size: 17),
                       onPressed: () => setState(_search.clear),
                     ),
             ),
@@ -308,7 +309,7 @@ class _PickerBodyState extends State<_PickerBody> {
                   children: [
                     if (_canAddCustom)
                       ListTile(
-                        leading: Icon(Icons.add_circle_outline_rounded,
+                        leading: Icon(Symbols.add_circle_outline_rounded,
                             color: tones.azureBrand),
                         title: Text('Add “$_query”',
                             style:
@@ -374,13 +375,13 @@ class _Row extends StatelessWidget {
       trailing: selected
           ? Icon(
               multiSelect
-                  ? Icons.check_box_rounded
-                  : Icons.check_circle_rounded,
+                  ? Symbols.check_box_rounded
+                  : Symbols.check_circle_rounded,
               color: tones.azureBrand,
               size: 21,
             )
           : (multiSelect
-              ? Icon(Icons.check_box_outline_blank_rounded,
+              ? Icon(Symbols.check_box_outline_blank_rounded,
                   color: tones.line, size: 22)
               : null),
     );

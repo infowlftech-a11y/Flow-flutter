@@ -1,25 +1,28 @@
 import 'package:flutter/material.dart';
 
-/// Sora (display) + Inter (text), both bundled as variable fonts.
+/// Space Grotesk (display) + Inter (text), both bundled as variable fonts.
 ///
 /// Weight is driven through the `wght` variation axis; `fontWeight` is set to
 /// the nearest static weight too so fallback fonts (and TalkBack's bold-text
 /// setting) still behave.
-TextStyle sora(
+TextStyle display(
   double size,
   double weight, {
   Color? color,
   double? spacing,
   double? height,
 }) {
+  // Space Grotesk's wght axis runs 300–700; the scale asks for up to 780,
+  // which some engines would treat as out-of-range rather than clamping.
+  final w = weight.clamp(300.0, 700.0);
   return TextStyle(
-    fontFamily: 'Sora',
+    fontFamily: 'SpaceGrotesk',
     fontSize: size,
     color: color,
     letterSpacing: spacing,
     height: height,
-    fontWeight: _nearest(weight),
-    fontVariations: [FontVariation('wght', weight)],
+    fontWeight: _nearest(w),
+    fontVariations: [FontVariation('wght', w)],
   );
 }
 

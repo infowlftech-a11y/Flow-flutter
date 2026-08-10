@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -51,7 +52,7 @@ class WelcomeScreen extends ConsumerWidget {
                 const Spacer(flex: 3),
                 PrimaryButton(
                   label: 'Create an account',
-                  icon: Icons.kitesurfing_rounded,
+                  icon: Symbols.kitesurfing_rounded,
                   onPressed: () {
                     Haptics.select();
                     // Each entry point starts from a clean slate — an error

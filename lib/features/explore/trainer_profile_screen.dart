@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -6,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/radii.dart';
 import '../../core/theme/typography.dart';
 import '../../core/utils/date_x.dart';
 import '../../core/utils/haptics.dart';
@@ -43,7 +45,7 @@ class TrainerProfileScreen extends ConsumerWidget {
         data: (trainer) {
           if (trainer == null) {
             return EmptyView(
-              icon: Icons.person_off_outlined,
+              icon: Symbols.person_off_rounded,
               title: 'Trainer not found',
               subtitle: 'This profile may have been removed.',
               action: OutlinedButton(
@@ -134,16 +136,16 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
                 pinned: true,
                 expandedHeight: 320,
                 leading: ScrimIconButton(
-                  icon: Icons.arrow_back_rounded,
+                  icon: Symbols.arrow_back_rounded,
                   tooltip: 'Back',
                   onTap: () => context.pop(),
                 ),
                 actions: [
                   if (!isSelf) ...[
                     ScrimIconButton(
-                      icon: isFav
-                          ? Icons.favorite_rounded
-                          : Icons.favorite_outline_rounded,
+                      icon: Symbols.favorite_rounded,
+                      // Fill is the state carrier; the red is reinforcement.
+                      fill: isFav ? 1 : 0,
                       tooltip: isFav
                           ? 'Remove from favourites'
                           : 'Add to favourites',
@@ -159,7 +161,7 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
                             },
                     ),
                     ScrimIconButton(
-                      icon: Icons.flag_outlined,
+                      icon: Symbols.flag_rounded,
                       tooltip: 'Report trainer',
                       onTap: () => _openReportSheet(context, trainer),
                     ),
@@ -173,6 +175,7 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
                     pageIndex: _pageIndex,
                     onPageChanged: (i) => setState(() => _pageIndex = i),
                     onTap: () => _openViewer(context),
+                    badge: _CertBadge(label: _certLabel(trainer.ikoId)),
                   ),
                 ),
               ),
@@ -186,7 +189,7 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
                         Padding(
                           padding: const EdgeInsets.only(bottom: 10),
                           child: TagPill('YOUR PUBLIC PROFILE',
-                              icon: Icons.visibility_outlined),
+                              icon: Symbols.visibility_rounded),
                         ),
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -203,8 +206,8 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
                                 const SizedBox(width: 8),
                                 Tooltip(
                                   message: 'Verified trainer',
-                                  child: Icon(Icons.verified_rounded,
-                                      color: tones.azureBrand, size: 24),
+                                  child: Icon(Symbols.verified_rounded,
+                                      fill: 1, color: tones.azureBrand, size: 24),
                                 ),
                               ],
                             ),
@@ -213,7 +216,7 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               Text(euro(trainer.displayRate),
-                                  style: sora(24, 760,
+                                  style: display(24, 760,
                                       color: tones.azureBrand,
                                       spacing: -.5)),
                               Text('per hour',
@@ -238,31 +241,19 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
                         ],
                       ),
                       const SizedBox(height: 18),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: InfoTile(
-                              icon: Icons.place_outlined,
-                              label: 'Location',
-                              value: trainer.location ?? 'Red Sea',
-                              onTap: trainer.mapsLink == null
-                                  ? null
-                                  : () => launchUrl(
-                                      Uri.parse(trainer.mapsLink!),
-                                      mode: LaunchMode.externalApplication),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: InfoTile(
-                              icon: Icons.workspace_premium_outlined,
-                              label: 'Certification',
-                              value: trainer.ikoId != null
-                                  ? 'IKO ${trainer.ikoId}'
-                                  : 'Verified trainer',
-                            ),
-                          ),
-                        ],
+                      // Certification used to sit here, level with the place
+                      // name — the same weight for "is this person qualified"
+                      // as for "where are they". It floats on the photo now,
+                      // which leaves Location the tile it always wanted: one
+                      // that fits a real spot name without ellipsing it.
+                      InfoTile(
+                        icon: Symbols.place_rounded,
+                        label: 'Location',
+                        value: trainer.location ?? 'Red Sea',
+                        onTap: trainer.mapsLink == null
+                            ? null
+                            : () => launchUrl(Uri.parse(trainer.mapsLink!),
+                                mode: LaunchMode.externalApplication),
                       ),
                       if ((trainer.bio ?? '').isNotEmpty) ...[
                         const SizedBox(height: 24),
@@ -281,7 +272,7 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
                           runSpacing: 8,
                           children: [
                             for (final lang in trainer.languages)
-                              TagPill(lang, icon: Icons.language_rounded),
+                              TagPill(lang, icon: Symbols.language_rounded),
                           ],
                         ),
                       ],
@@ -367,7 +358,7 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
                         setSheet(() => shots.addAll(picked));
                       }
                     },
-              icon: const Icon(Icons.attach_file_rounded, size: 20),
+              icon: const Icon(Symbols.attach_file_rounded, size: 20),
               label: Text(shots.isEmpty
                   ? 'Attach screenshots (optional)'
                   : '${shots.length} attachment${shots.length == 1 ? '' : 's'}'),
@@ -428,6 +419,7 @@ class _GalleryHeader extends StatelessWidget {
     required this.pageIndex,
     required this.onPageChanged,
     required this.onTap,
+    this.badge,
   });
 
   final List<String> images;
@@ -436,25 +428,36 @@ class _GalleryHeader extends StatelessWidget {
   final ValueChanged<int> onPageChanged;
   final VoidCallback onTap;
 
+  /// Floated bottom-left over the photo. Null shows nothing.
+  final Widget? badge;
+
   @override
   Widget build(BuildContext context) {
-    if (images.isEmpty) {
-      return const FlowImage(url: null, height: double.infinity);
-    }
+    // The no-photo case used to return early, straight out of this method —
+    // which meant the credential badge below was never built for a trainer
+    // with an empty gallery. That is not an edge case while Storage is
+    // unprovisioned: it is every trainer in the app. The empty state is now a
+    // layer in the same stack, so anything floated over the photo is floated
+    // over the placeholder too.
+    final empty = images.isEmpty;
+
     return GestureDetector(
-      onTap: onTap,
+      onTap: empty ? null : onTap,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          PageView.builder(
-            controller: controller,
-            onPageChanged: (i) {
-              Haptics.select();
-              onPageChanged(i);
-            },
-            itemCount: images.length,
-            itemBuilder: (_, i) => FlowImage(url: images[i]),
-          ),
+          if (empty)
+            const FlowImage(url: null, height: double.infinity)
+          else
+            PageView.builder(
+              controller: controller,
+              onPageChanged: (i) {
+                Haptics.select();
+                onPageChanged(i);
+              },
+              itemCount: images.length,
+              itemBuilder: (_, i) => FlowImage(url: images[i]),
+            ),
           // Bottom gradient so the page dots always read.
           Positioned(
             left: 0,
@@ -488,7 +491,74 @@ class _GalleryHeader extends StatelessWidget {
                 inactiveColor: Colors.white.withValues(alpha: .5),
               ),
             ),
+          // Sits above the dots rather than beside them: centred dots and a
+          // left-aligned badge collide on a narrow phone at the moment the
+          // credential gets long, which is exactly when it matters.
+          if (badge != null)
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: images.length > 1 ? 42 : 16,
+              child: Align(alignment: Alignment.centerLeft, child: badge!),
+            ),
         ],
+      ),
+    );
+  }
+}
+
+/// The credential as a label, without saying IKO twice.
+///
+/// `ikoId` is stored with its issuer prefix already on it (`IKO-0ZMVF2`), and
+/// both this badge and the fact tile it replaced prepended another — the hero
+/// read "IKO IKO-0ZMVF2". Checked rather than assumed, because nothing
+/// guarantees the prefix: an id entered without it still gets one.
+String _certLabel(String? ikoId) {
+  final id = ikoId?.trim();
+  if (id == null || id.isEmpty) return 'VERIFIED TRAINER';
+  return id.toUpperCase().startsWith('IKO') ? id : 'IKO $id';
+}
+
+/// The trainer's credential, floated over their photo.
+///
+/// It was a tile in the fact grid below, level with "Location" — which is to
+/// say the one thing a rider is trying to establish about a stranger they are
+/// about to get in the water with had the same weight as a place name. On the
+/// photo it is the first thing read.
+///
+/// Fixed dark colours: this is one of the documented exceptions, a surface
+/// that sits over a photograph in both themes.
+class _CertBadge extends StatelessWidget {
+  const _CertBadge({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: .55),
+        borderRadius: FlowRadii.pill,
+        border: Border.all(color: Colors.white.withValues(alpha: .22)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(10, 6, 12, 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Symbols.workspace_premium_rounded,
+                size: 15, color: Colors.white),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: inter(11.5, 700, color: Colors.white, spacing: .4),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -621,7 +691,7 @@ class _ReviewTile extends StatelessWidget {
                   onPressed: onDelete,
                   tooltip: 'Delete review',
                   iconSize: 18,
-                  icon: const Icon(Icons.delete_outline_rounded),
+                  icon: const Icon(Symbols.delete_outline_rounded),
                 ),
             ],
           ),
@@ -654,7 +724,7 @@ class _BottomBar extends ConsumerWidget {
       child: isSelf
           ? PrimaryButton(
               label: 'Edit profile',
-              icon: Icons.edit_outlined,
+              icon: Symbols.edit_rounded,
               onPressed: () => context.push('/profile/edit'),
             )
           : Row(
@@ -663,7 +733,7 @@ class _BottomBar extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(euro(trainer.displayRate),
-                        style: sora(20, 760, color: tones.azureBrand)),
+                        style: display(20, 760, color: tones.azureBrand)),
                     Text('per hour',
                         style: inter(11.5, 540, color: tones.textFaint)),
                   ],
@@ -682,7 +752,7 @@ class _BottomBar extends ConsumerWidget {
                       context.push(
                           '/chat/${trainer.uid}?name=${Uri.encodeComponent(trainer.name)}');
                     },
-                    icon: const Icon(Icons.chat_bubble_outline_rounded,
+                    icon: const Icon(Symbols.chat_bubble_outline_rounded,
                         size: 20),
                     label: const Text('Message'),
                   ),

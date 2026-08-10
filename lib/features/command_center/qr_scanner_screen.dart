@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../core/theme/motion.dart';
@@ -113,14 +114,14 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
             // void (§3.10).
             errorBuilder: (context, error) => EmptyView(
               onScrim: true,
-              icon: Icons.no_photography_outlined,
+              icon: Symbols.no_photography_rounded,
               title: 'Camera unavailable',
               subtitle:
                   'FLOW needs the camera to scan rider tickets. Check the '
                   'camera permission in your system settings, then retry.',
               action: FilledButton.icon(
                 onPressed: () => _controller.start(),
-                icon: const Icon(Icons.refresh_rounded, size: 20),
+                icon: const Icon(Symbols.refresh_rounded, size: 20),
                 label: const Text('Retry'),
               ),
             ),
@@ -140,7 +141,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       ScrimIconButton(
-                        icon: Icons.close_rounded,
+                        icon: Symbols.close_rounded,
                         tooltip: 'Close scanner',
                         onTap: () => Navigator.pop(context),
                       ),
@@ -151,8 +152,8 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                           final on = state.torchState == TorchState.on;
                           return ScrimIconButton(
                             icon: on
-                                ? Icons.flash_on_rounded
-                                : Icons.flash_off_rounded,
+                                ? Symbols.flash_on_rounded
+                                : Symbols.flash_off_rounded,
                             tooltip: on ? 'Torch off' : 'Torch on',
                             active: on,
                             onTap: () => _controller.toggleTorch(),
@@ -164,6 +165,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                   const Spacer(),
                   AnimatedSize(
                     duration: FlowMotion.base,
+                    curve: FlowMotion.curve,
                     child: _warning == null
                         ? Text(
                             "Point at the rider's ticket",
@@ -179,7 +181,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.warning_amber_rounded,
+                                const Icon(Symbols.warning_amber_rounded,
                                     color: Colors.white, size: 20),
                                 const SizedBox(width: 8),
                                 Flexible(

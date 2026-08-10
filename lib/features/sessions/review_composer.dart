@@ -97,6 +97,7 @@ class _ReviewComposerCardState extends ConsumerState<ReviewComposerCard> {
           ),
           AnimatedSize(
             duration: FlowMotion.base,
+            curve: FlowMotion.curve,
             alignment: Alignment.topCenter,
             child: _stars == 0
                 ? const SizedBox.shrink()

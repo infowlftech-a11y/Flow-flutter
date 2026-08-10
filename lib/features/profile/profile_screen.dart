@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -13,6 +14,7 @@ import '../../core/widgets/flow_image.dart';
 import '../../core/widgets/misc.dart';
 import '../../core/widgets/sheets.dart';
 import '../../core/widgets/surfaces.dart';
+import '../../core/widgets/theme_swap.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../providers/providers.dart';
 import '../../providers/settings_provider.dart';
@@ -57,7 +59,7 @@ class ProfileScreen extends ConsumerWidget {
                                   .scaffoldBackgroundColor,
                               width: 2),
                         ),
-                        child: const Icon(Icons.edit_rounded,
+                        child: const Icon(Symbols.edit_rounded,
                             size: 12, color: Colors.white),
                       ),
                     ),
@@ -89,7 +91,7 @@ class ProfileScreen extends ConsumerWidget {
                               color: tones.textFaint),
                         if ((user?.location ?? user?.homeSpot) != null)
                           TagPill(user!.location ?? user.homeSpot!,
-                              icon: Icons.place_outlined,
+                              icon: Symbols.place_rounded,
                               color: tones.textFaint),
                       ],
                     ),
@@ -105,7 +107,7 @@ class ProfileScreen extends ConsumerWidget {
               Builder(builder: (context) {
                 final queue = ref.watch(adminQueueCountProvider);
                 return ListTile(
-                  leading: Icon(Icons.shield_moon_outlined,
+                  leading: Icon(Symbols.shield_moon_rounded,
                       size: 22, color: tones.azureBrand),
                   title: Text('Admin console',
                       style: inter(15, 620, color: context.scheme.onSurface)),
@@ -117,7 +119,7 @@ class ProfileScreen extends ConsumerWidget {
                         Badge.count(count: queue)
                       else
                         const SizedBox.shrink(),
-                      Icon(Icons.chevron_right_rounded,
+                      Icon(Symbols.chevron_right_rounded,
                           size: 20, color: tones.textFaint),
                     ],
                   ),
@@ -129,15 +131,15 @@ class ProfileScreen extends ConsumerWidget {
           const SizedBox(height: 28),
           const SectionHeader('Account'),
           _SettingsCard(children: [
-            _row(context, Icons.badge_outlined, 'Personal details',
+            _row(context, Symbols.badge_rounded, 'Personal details',
                 onTap: () => context.push('/profile/edit')),
             if (session.isTrainer)
-              _row(context, Icons.visibility_outlined,
+              _row(context, Symbols.visibility_rounded,
                   'View my public profile',
                   onTap: () => context.push('/trainer/${session.uid}')),
-            _row(context, Icons.notifications_outlined, 'Notifications',
+            _row(context, Symbols.notifications_rounded, 'Notifications',
                 onTap: () => context.push('/notifications')),
-            _row(context, Icons.support_agent_rounded, 'Help & support',
+            _row(context, Symbols.support_agent_rounded, 'Help & support',
                 onTap: () => context.push('/support')),
           ]),
           const SizedBox(height: 20),
@@ -149,21 +151,30 @@ class ProfileScreen extends ConsumerWidget {
                 segments: const [
                   ButtonSegment(
                       value: ThemeMode.system,
-                      icon: Icon(Icons.brightness_auto_rounded, size: 17),
+                      icon: Icon(Symbols.brightness_auto_rounded, size: 17),
                       label: Text('Auto')),
                   ButtonSegment(
                       value: ThemeMode.light,
-                      icon: Icon(Icons.light_mode_rounded, size: 17),
+                      icon: Icon(Symbols.light_mode_rounded, size: 17),
                       label: Text('Light')),
                   ButtonSegment(
                       value: ThemeMode.dark,
-                      icon: Icon(Icons.dark_mode_rounded, size: 17),
+                      icon: Icon(Symbols.dark_mode_rounded, size: 17),
                       label: Text('Dark')),
                 ],
                 selected: {themeMode},
+                // Material 3 replaces the leading icon with a tick on the
+                // selected segment, and segments size to their content — so
+                // every selection change re-flowed the row and the fill sat
+                // over a different span than the label under it. Keeping the
+                // brightness icons holds all three widths constant.
+                showSelectedIcon: false,
                 onSelectionChanged: (s) {
                   Haptics.select();
-                  ref.read(themeModeProvider.notifier).set(s.first);
+                  // Through ThemeSwap: the old frame fades out over the new
+                  // theme instead of the whole tree lerping per tick.
+                  ThemeSwap.of(context)
+                      .run(() => ref.read(themeModeProvider.notifier).set(s.first));
                 },
                 style: ButtonStyle(
                   side: WidgetStatePropertyAll(
@@ -175,12 +186,12 @@ class ProfileScreen extends ConsumerWidget {
           const SizedBox(height: 20),
           const SectionHeader('Privacy'),
           _SettingsCard(children: [
-            _row(context, Icons.shield_outlined, 'Security & data',
+            _row(context, Symbols.shield_rounded, 'Security & data',
                 onTap: () => _openPrivacySheet(context)),
           ]),
           const SizedBox(height: 20),
           _SettingsCard(children: [
-            _row(context, Icons.logout_rounded, 'Sign out', onTap: () async {
+            _row(context, Symbols.logout_rounded, 'Sign out', onTap: () async {
               final ok = await confirmAction(
                 context,
                 title: 'Sign out?',
@@ -193,7 +204,7 @@ class ProfileScreen extends ConsumerWidget {
           const SizedBox(height: 28),
           const SectionHeader('Danger zone'),
           _SettingsCard(children: [
-            _row(context, Icons.delete_forever_outlined, 'Delete my account',
+            _row(context, Symbols.delete_forever_rounded, 'Delete my account',
                 color: tones.danger,
                 onTap: () => _deleteAccountFlow(context, ref)),
           ]),
@@ -214,7 +225,7 @@ class ProfileScreen extends ConsumerWidget {
       leading: Icon(icon, size: 22, color: color),
       title: Text(label,
           style: inter(15, 560, color: color ?? context.scheme.onSurface)),
-      trailing: Icon(Icons.chevron_right_rounded,
+      trailing: Icon(Symbols.chevron_right_rounded,
           size: 20, color: context.tones.textFaint),
       onTap: onTap,
     );
@@ -230,21 +241,21 @@ class ProfileScreen extends ConsumerWidget {
         padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
         children: const [
           _PrivacyItem(
-            icon: Icons.lock_outline_rounded,
+            icon: Symbols.lock_outline_rounded,
             title: 'Your session is encrypted',
             body:
                 'Sign-in is handled by Firebase Authentication over TLS. FLOW '
                 'never stores your password — not on the device, not anywhere.',
           ),
           _PrivacyItem(
-            icon: Icons.visibility_outlined,
+            icon: Symbols.visibility_rounded,
             title: 'What trainers see',
             body:
                 'When you book, your trainer sees your name, kite level and '
                 'the message you attach — enough to prep your session, nothing more.',
           ),
           _PrivacyItem(
-            icon: Icons.photo_outlined,
+            icon: Symbols.photo_rounded,
             title: 'Your photos',
             body:
                 'Profile and gallery photos are stored in Firebase Storage and '
@@ -355,13 +366,30 @@ class _SettingsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: context.tones.card,
-        borderRadius: FlowRadii.card,
-        border: Border.all(color: context.tones.line),
+    // A `Material` for the fill, an `Ink` for the outline — deliberately not
+    // the `Container` this was, and deliberately not `FlowCard` either.
+    //
+    // A `ListTile` paints its splash on the nearest `Material` ancestor. With
+    // an opaque `Container` in between, every ripple on this card was drawn
+    // *behind* that background and never seen: the whole settings list — which
+    // is nothing but tappable rows — gave no touch feedback at all. Flutter
+    // asserts about this in debug, and the assertion only surfaced once the
+    // app was actually driven; no widget test renders this screen.
+    //
+    // `Ink` paints its decoration onto the Material rather than stacking a
+    // DecoratedBox above it, so the border survives without hiding anything.
+    // `clipBehavior` keeps the first and last row's splash inside the radius.
+    return Material(
+      color: context.tones.card,
+      borderRadius: FlowRadii.card,
+      clipBehavior: Clip.antiAlias,
+      child: Ink(
+        decoration: BoxDecoration(
+          borderRadius: FlowRadii.card,
+          border: Border.all(color: context.tones.line),
+        ),
+        child: Column(children: children),
       ),
-      child: Column(children: children),
     );
   }
 }

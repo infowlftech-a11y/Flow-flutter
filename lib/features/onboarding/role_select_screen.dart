@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -24,7 +25,7 @@ class RoleSelectScreen extends ConsumerWidget {
                 const SizedBox(height: 12),
                 Text('Who are you\non the beach?',
                     style:
-                        sora(32, 780, color: context.scheme.onSurface, spacing: -1, height: 1.1)),
+                        display(32, 780, color: context.scheme.onSurface, spacing: -1, height: 1.1)),
                 const SizedBox(height: 12),
                 Text(
                   'This decides what FLOW looks like for you. You only pick once.',
@@ -32,7 +33,7 @@ class RoleSelectScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 32),
                 _RoleCard(
-                  icon: Icons.kitesurfing_rounded,
+                  icon: Symbols.kitesurfing_rounded,
                   title: "I'm a Kiter",
                   body:
                       'Find certified trainers, book hours on the water and check in with a QR ticket.',
@@ -47,7 +48,7 @@ class RoleSelectScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 18),
                 _RoleCard(
-                  icon: Icons.storefront_rounded,
+                  icon: Symbols.storefront_rounded,
                   title: "I'm a Trainer",
                   body:
                       'Run your calendar, approve requests, scan riders in and track earnings.',
@@ -115,10 +116,10 @@ class _RoleCard extends StatelessWidget {
                   const SizedBox(width: 16),
                   Expanded(
                     child: Text(title,
-                        style: sora(20, 720,
+                        style: display(20, 720,
                             color: context.scheme.onSurface, spacing: -.3)),
                   ),
-                  Icon(Icons.arrow_forward_rounded,
+                  Icon(Symbols.arrow_forward_rounded,
                       color: context.scheme.primary),
                 ],
               ),
@@ -130,7 +131,7 @@ class _RoleCard extends StatelessWidget {
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    Icon(Icons.verified_user_outlined,
+                    Icon(Symbols.verified_user_rounded,
                         size: 15, color: context.tones.textFaint),
                     const SizedBox(width: 8),
                     Expanded(

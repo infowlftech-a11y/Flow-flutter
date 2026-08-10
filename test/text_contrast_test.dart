@@ -13,7 +13,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:flow/core/theme/app_theme.dart';
+import 'package:flow/core/widgets/booking_grid.dart';
 import 'package:flow/core/widgets/buttons.dart';
+import 'package:flow/core/widgets/conditions.dart';
+import 'package:flow/core/widgets/provider_card.dart';
+import 'package:flow/core/widgets/ticket.dart';
+import 'package:flow/data/models/wind.dart';
 import 'package:flow/core/widgets/feedback.dart';
 import 'package:flow/core/widgets/misc.dart';
 import 'package:flow/core/widgets/picker_field.dart';
@@ -26,6 +31,43 @@ void _noop() {}
 final _cases = <String, Widget Function()>{
   'FlowCard': () =>
       const FlowCard(child: Text('Confirmed with Ahmed at El Gouna')),
+  // Fixed ink on fixed white, in *both* themes — the ticket does not follow
+  // the scheme because a camera reads it. That exemption is exactly why it
+  // needs measuring: nothing else in the app would catch a label colour that
+  // was picked to look right on a dark page and then painted on white.
+  'TicketCard': () => const TicketCard(
+        payload: '{"bookingId":"b","trainerId":"t"}',
+        qrSize: 120,
+        ticketId: 'FLW-13MAY-10AM-7X8K',
+        rows: [
+          ('SESSION', '13 May 2026 · 10:00 – 11:00'),
+          ('SPOT', 'El Gouna, Red Sea'),
+        ],
+      ),
+  'ProviderCard': () => ProviderCard(
+        name: 'Nadia Cherif',
+        photoUrl: null,
+        rating: 4.8,
+        reviewCount: 96,
+        location: 'Soma Bay',
+        priceLabel: '€60',
+        onTap: () {},
+      ),
+  'ConditionsStrip': () => const ConditionsStrip(
+        day: WindDay(
+          date: '2026-05-13',
+          knots: 18,
+          gustKnots: 24,
+          directionDegrees: 315,
+          airC: 28,
+          waterC: 26,
+        ),
+      ),
+  'SlotTile.free': () =>
+      const SlotTile(range: '09:00 – 10:00', state: SlotState.free),
+  'SlotTile.booked': () =>
+      const SlotTile(range: '09:00 – 10:00', state: SlotState.booked),
+  'SlotLegend': () => const SlotLegend(),
   'FlowNotice': () => const FlowNotice(
       icon: Icons.warning_amber_rounded,
       title: 'Away until Friday',

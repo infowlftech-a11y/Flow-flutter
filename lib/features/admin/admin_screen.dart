@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -34,7 +35,7 @@ class AdminScreen extends ConsumerWidget {
       return Scaffold(
         appBar: AppBar(title: const Text('Admin')),
         body: EmptyView(
-          icon: Icons.lock_outline_rounded,
+          icon: Symbols.lock_outline_rounded,
           title: 'Staff only',
           subtitle: 'This console is limited to admin and support accounts.',
           action: OutlinedButton(
@@ -92,7 +93,7 @@ class _ApprovalsTab extends ConsumerWidget {
       data: (list) {
         if (list.isEmpty) {
           return const EmptyView.scrollable(
-            icon: Icons.verified_outlined,
+            icon: Symbols.verified_rounded,
             title: 'No applications waiting',
             subtitle:
                 'New trainer sign-ups land here for certification review.',
@@ -232,10 +233,10 @@ class _ApplicantCardState extends ConsumerState<_ApplicantCard> {
             runSpacing: 6,
             children: [
               TagPill(t.ikoId == null ? 'NO IKO ID' : 'IKO ${t.ikoId}',
-                  icon: Icons.workspace_premium_outlined,
+                  icon: Symbols.workspace_premium_rounded,
                   color: t.ikoId == null ? tones.danger : null),
               if (t.location != null)
-                TagPill(t.location!, icon: Icons.place_outlined),
+                TagPill(t.location!, icon: Symbols.place_rounded),
               for (final lang in t.languages.take(3)) TagPill(lang),
             ],
           ),
@@ -258,7 +259,7 @@ class _ApplicantCardState extends ConsumerState<_ApplicantCard> {
                   label: t.certificateUrl == null
                       ? 'NO CERTIFICATE'
                       : 'VIEW CERTIFICATE',
-                  icon: Icons.description_outlined,
+                  icon: Symbols.description_rounded,
                   filled: false,
                   color: t.certificateUrl == null ? tones.textFaint : null,
                   onPressed: t.certificateUrl == null
@@ -290,7 +291,7 @@ class _ApplicantCardState extends ConsumerState<_ApplicantCard> {
                 flex: 2,
                 child: MicroAction(
                   label: _busy ? '…' : 'APPROVE',
-                  icon: Icons.check_rounded,
+                  icon: Symbols.check_rounded,
                   onPressed: _busy ? null : _approve,
                 ),
               ),
@@ -325,7 +326,7 @@ class _ReportsTab extends ConsumerWidget {
       data: (list) {
         if (list.isEmpty) {
           return const EmptyView.scrollable(
-            icon: Icons.flag_outlined,
+            icon: Symbols.flag_rounded,
             title: 'No reports',
             subtitle: 'Rider reports about trainers appear here.',
           );
@@ -502,7 +503,7 @@ class _AppealsTab extends ConsumerWidget {
       data: (list) {
         if (list.isEmpty) {
           return const EmptyView.scrollable(
-            icon: Icons.gavel_outlined,
+            icon: Symbols.gavel_rounded,
             title: 'No appeals',
             subtitle: 'Suspended users can appeal, and it lands here.',
           );
@@ -669,8 +670,8 @@ class _AppealCardState extends ConsumerState<_AppealCard> {
                   children: [
                     Icon(
                       m.senderId == a.userId
-                          ? Icons.person_outline_rounded
-                          : Icons.support_agent_rounded,
+                          ? Symbols.person_outline_rounded
+                          : Symbols.support_agent_rounded,
                       size: 16,
                       color: tones.textFaint,
                     ),
@@ -703,7 +704,7 @@ class _AppealCardState extends ConsumerState<_AppealCard> {
               IconButton.filled(
                 onPressed: _busy ? null : _send,
                 tooltip: 'Send reply',
-                icon: const Icon(Icons.send_rounded, size: 20),
+                icon: const Icon(Symbols.send_rounded, size: 20),
               ),
             ],
           ),
@@ -713,7 +714,7 @@ class _AppealCardState extends ConsumerState<_AppealCard> {
               width: double.infinity,
               child: MicroAction(
                 label: 'LIFT SUSPENSION',
-                icon: Icons.lock_open_rounded,
+                icon: Symbols.lock_open_rounded,
                 color: tones.success,
                 onPressed: _busy ? null : _lift,
               ),

@@ -35,6 +35,8 @@ class PrimaryButton extends StatelessWidget {
       onPressed: busy ? () {} : onPressed,
       child: AnimatedSwitcher(
         duration: FlowMotion.fast,
+        switchInCurve: FlowMotion.curve,
+        switchOutCurve: FlowMotion.curve,
         child: busy
             ? SizedBox(
                 key: const ValueKey('busy'),
@@ -81,6 +83,7 @@ class ScrimIconButton extends StatelessWidget {
     this.color,
     this.active = false,
     this.size = 48,
+    this.fill = 0,
   });
 
   final IconData icon;
@@ -89,6 +92,11 @@ class ScrimIconButton extends StatelessWidget {
 
   /// Tints the glyph. Ignored while [active].
   final Color? color;
+
+  /// Material Symbols fill axis — 1 for a solid glyph (the favourited
+  /// heart), 0 for the outline everything else uses. State must not be
+  /// carried by colour alone.
+  final double fill;
 
   /// Inverts the button — brand fill, ink glyph. Used for the scanner torch.
   final bool active;
@@ -113,6 +121,7 @@ class ScrimIconButton extends StatelessWidget {
             child: Icon(
               icon,
               size: size * .44,
+              fill: fill,
               color: active ? FlowColors.ink : (color ?? Colors.white),
             ),
           ),

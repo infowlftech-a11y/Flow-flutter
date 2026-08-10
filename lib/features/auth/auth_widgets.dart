@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../../core/theme/motion.dart';
 import '../../core/theme/app_theme.dart';
@@ -68,7 +69,7 @@ class AuthScaffold extends StatelessWidget {
                     children: [
                       const SizedBox(height: 8),
                       Text(title,
-                          style: sora(32, 780,
+                          style: display(32, 780,
                               color: scheme.onSurface,
                               spacing: -.8,
                               height: 1.12)),
@@ -108,6 +109,7 @@ class AuthBanner extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return AnimatedSize(
       duration: FlowMotion.base,
+      curve: FlowMotion.curve,
       alignment: Alignment.topCenter,
       child: message == null
           ? const SizedBox(width: double.infinity)
@@ -124,7 +126,7 @@ class AuthBanner extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.error_outline_rounded,
+                  Icon(Symbols.error_outline_rounded,
                       size: 18, color: tones.danger),
                   const SizedBox(width: 10),
                   Expanded(
@@ -264,8 +266,8 @@ class AuthTextField extends StatelessWidget {
                       tooltip: obscure ? 'Show password' : 'Hide password',
                       icon: Icon(
                         obscure
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
+                            ? Symbols.visibility_rounded
+                            : Symbols.visibility_off_rounded,
                         size: 20,
                         color: scheme.onSurfaceVariant,
                       ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -181,7 +182,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   data: (list) {
                     if (list.isEmpty) {
                       return EmptyView(
-                        icon: Icons.waving_hand_outlined,
+                        icon: Symbols.waving_hand_rounded,
                         title: 'Say hi to ${widget.partnerName}',
                         subtitle:
                             'Ask about conditions, gear or the next session.',
@@ -229,6 +230,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     child: AnimatedScale(
                       scale: _missedWhileAway > 0 ? 1 : 0,
                       duration: FlowMotion.base,
+                      curve: FlowMotion.curve,
                       child: Material(
                         color: context.tones.azureBrand,
                         borderRadius: FlowRadii.card,
@@ -242,7 +244,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.arrow_downward_rounded,
+                                const Icon(Symbols.arrow_downward_rounded,
                                     size: 16, color: Colors.white),
                                 const SizedBox(width: 6),
                                 Text(

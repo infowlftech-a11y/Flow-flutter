@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -289,7 +290,7 @@ class _KiterFormScreenState extends ConsumerState<KiterFormScreen> {
               ),
               PrimaryButton(
                 label: "Let's ride",
-                icon: Icons.kitesurfing_rounded,
+                icon: Symbols.kitesurfing_rounded,
                 busy: _busy,
                 onPressed: _submit,
               ),

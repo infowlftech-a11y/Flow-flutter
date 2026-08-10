@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -210,6 +211,7 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
                     Expanded(
                       child: AnimatedContainer(
                         duration: FlowMotion.base,
+                        curve: FlowMotion.curve,
                         height: 4,
                         decoration: BoxDecoration(
                           color: i <= _step
@@ -232,7 +234,11 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
               Expanded(
                 child: AnimatedSwitcher(
                   duration: FlowMotion.slow,
-                  switchInCurve: Curves.easeOutCubic,
+                  // Asymmetric on purpose, and left as-is: the step slides in
+                  // decelerating and out accelerating, which reads as travel
+                  // in a direction rather than a cross-fade. `FlowMotion.curve`
+                  // is the same easeOutCubic; only the outgoing half differs.
+                  switchInCurve: FlowMotion.curve,
                   switchOutCurve: Curves.easeInCubic,
                   transitionBuilder: (child, animation) {
                     // Slide in the direction of travel (§10.9).
@@ -274,13 +280,13 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
                     if (_step > 0)
                       OutlinedButton(
                         onPressed: _busy ? null : _back,
-                        child: const Icon(Icons.arrow_back_rounded, size: 20),
+                        child: const Icon(Symbols.arrow_back_rounded, size: 20),
                       ),
                     if (_step > 0) const SizedBox(width: 12),
                     Expanded(
                       child: PrimaryButton(
                         label: _step < 3 ? 'Continue' : 'Submit for review',
-                        icon: _step < 3 ? null : Icons.verified_outlined,
+                        icon: _step < 3 ? null : Symbols.verified_rounded,
                         busy: _busy,
                         onPressed: _next,
                       ),
@@ -413,7 +419,7 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
                       padding: EdgeInsets.zero,
                       shape: RoundedRectangleBorder(
                           borderRadius: FlowRadii.chip)),
-                  child: const Icon(Icons.add_photo_alternate_outlined),
+                  child: const Icon(Symbols.add_photo_alternate_rounded),
                 ),
               ),
             ],
@@ -483,10 +489,10 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
               FilteringTextInputFormatter.digitsOnly,
               LengthLimitingTextInputFormatter(3),
             ],
-            style: sora(32, 720, color: context.scheme.onSurface),
+            style: display(32, 720, color: context.scheme.onSurface),
             decoration: InputDecoration(
               prefixText: '€ ',
-              prefixStyle: sora(32, 720, color: tones.azureBrand),
+              prefixStyle: display(32, 720, color: tones.azureBrand),
               hintText: '80',
               helperText:
                   'Platform range: €${FlowConst.minHourlyRate}–€${FlowConst.maxHourlyRate}/h',
@@ -499,7 +505,7 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
         ),
         if (_step3Ok)
           FlowNotice(
-            icon: Icons.payments_outlined,
+            icon: Symbols.payments_rounded,
             title:
                 'A 3-hour session earns you ${euro(int.parse(_rate.text) * 3)}.',
             tone: tones.success,
@@ -545,7 +551,7 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
                             setState(() => _certificate = picked);
                           }
                         },
-                  icon: const Icon(Icons.upload_file_rounded, size: 20),
+                  icon: const Icon(Symbols.upload_file_rounded, size: 20),
                   label: const Text('Upload certificate (optional)'),
                 )
               : Row(
@@ -563,13 +569,13 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
                     IconButton(
                       onPressed: () => setState(() => _certificate = null),
                       tooltip: 'Remove certificate',
-                      icon: const Icon(Icons.delete_outline_rounded),
+                      icon: const Icon(Symbols.delete_outline_rounded),
                     ),
                   ],
                 ),
         ),
         FlowNotice(
-          icon: Icons.hourglass_top_rounded,
+          icon: Symbols.hourglass_top_rounded,
           title: 'Reviewed by hand',
           body: "After you submit, we review your application. You'll be "
               'live for riders the moment an admin approves it.',

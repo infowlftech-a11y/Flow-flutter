@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_theme.dart';
@@ -27,7 +28,7 @@ class SupportScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('Help & support')),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openNewTicketSheet(context, ref),
-        icon: const Icon(Icons.add_rounded),
+        icon: const Icon(Symbols.add_rounded),
         label: const Text('NEW TICKET'),
       ),
       body: AsyncView<List<SupportTicket>>(
@@ -41,7 +42,7 @@ class SupportScreen extends ConsumerWidget {
         data: (list) {
           if (list.isEmpty) {
             return const EmptyView.scrollable(
-              icon: Icons.support_agent_rounded,
+              icon: Symbols.support_agent_rounded,
               title: 'How can we help?',
               subtitle:
                   'Open a ticket and our crew will get back to you here.',
@@ -88,7 +89,7 @@ class SupportScreen extends ConsumerWidget {
                             ],
                           ),
                         ),
-                        Icon(Icons.chevron_right_rounded,
+                        Icon(Symbols.chevron_right_rounded,
                             color: tones.textFaint),
                       ],
                     ),

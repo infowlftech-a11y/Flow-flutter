@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -33,7 +34,7 @@ class StationProfileScreen extends ConsumerWidget {
         data: (station) {
           if (station == null) {
             return EmptyView(
-              icon: Icons.storefront_outlined,
+              icon: Symbols.storefront_rounded,
               title: 'Not found',
               subtitle: 'This operator may have been removed.',
               action: OutlinedButton(
@@ -83,7 +84,7 @@ class _StationBody extends ConsumerWidget {
             expandedHeight: 260,
             leading: Center(
               child: ScrimIconButton(
-                icon: Icons.arrow_back_rounded,
+                icon: Symbols.arrow_back_rounded,
                 tooltip: 'Back',
                 onTap: () => context.pop(),
               ),
@@ -94,7 +95,7 @@ class _StationBody extends ConsumerWidget {
                 children: [
                   FlowImage(
                       url: station.photoUrl,
-                      placeholderIcon: Icons.storefront_rounded),
+                      placeholderIcon: Symbols.storefront_rounded),
                   DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
@@ -115,7 +116,7 @@ class _StationBody extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(station.name,
-                            style: sora(26, 760,
+                            style: display(26, 760,
                                 color: Colors.white, spacing: -.5)),
                         const SizedBox(height: 8),
                         Wrap(
@@ -123,13 +124,13 @@ class _StationBody extends ConsumerWidget {
                           runSpacing: 6,
                           children: [
                             TagPill(station.location ?? 'Red Sea',
-                                icon: Icons.place_outlined,
+                                icon: Symbols.place_rounded,
                                 color: Colors.white),
                             TagPill(
                               safariOnly ? 'SAFARI OPERATOR' : 'STATION',
                               icon: safariOnly
-                                  ? Icons.sailing_rounded
-                                  : Icons.storefront_rounded,
+                                  ? Symbols.sailing_rounded
+                                  : Symbols.storefront_rounded,
                             ),
                           ],
                         ),
@@ -187,7 +188,7 @@ class _LessonsTab extends StatelessWidget {
   Widget build(BuildContext context) {
     if (instructors.isEmpty) {
       return const EmptyView(
-          icon: Icons.school_outlined,
+          icon: Symbols.school_rounded,
           title: 'No instructors listed',
           subtitle: 'Check back soon.');
     }
@@ -262,8 +263,8 @@ class _ServicesTab extends StatelessWidget {
     if (services.isEmpty) {
       return EmptyView(
           icon: bookingType == 'rental'
-              ? Icons.surfing_outlined
-              : Icons.beach_access_outlined,
+              ? Symbols.surfing_rounded
+              : Symbols.beach_access_rounded,
           title: emptyLabel);
     }
     return ListView.separated(
@@ -333,7 +334,7 @@ class _ExpeditionsTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     if (trips.isEmpty) {
       return const EmptyView(
-          icon: Icons.sailing_outlined,
+          icon: Symbols.sailing_rounded,
           title: 'No expeditions scheduled',
           subtitle: 'New trips appear here as soon as they open.');
     }
@@ -412,13 +413,13 @@ class _TripCardState extends ConsumerState<_TripCard> {
                     style: Theme.of(context).textTheme.titleLarge),
               ),
               if (trip.duration != null)
-                TagPill(trip.duration!, icon: Icons.schedule_rounded),
+                TagPill(trip.duration!, icon: Symbols.schedule_rounded),
             ],
           ),
           const SizedBox(height: 8),
           Row(
             children: [
-              Icon(Icons.event_rounded, size: 15, color: tones.textFaint),
+              Icon(Symbols.event_rounded, size: 15, color: tones.textFaint),
               const SizedBox(width: 4),
               Text('Departs ${prettyYmd(trip.startDate)}',
                   style: inter(14, 540, color: tones.textFaint)),
@@ -460,7 +461,7 @@ class _TripCardState extends ConsumerState<_TripCard> {
           const SizedBox(height: 14),
           PrimaryButton(
             label: trip.isSoldOut ? 'Manifest full' : 'Reserve my seat',
-            icon: trip.isSoldOut ? null : Icons.sailing_rounded,
+            icon: trip.isSoldOut ? null : Symbols.sailing_rounded,
             busy: _busy,
             onPressed: trip.isSoldOut ? null : _reserve,
           ),

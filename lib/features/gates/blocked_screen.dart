@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -95,7 +96,7 @@ class _BlockedScreenState extends ConsumerState<BlockedScreen> {
             children: [
               Center(
                 child: FlowIconChip(
-                  icon: Icons.front_hand_rounded,
+                  icon: Symbols.front_hand_rounded,
                   color: context.tones.danger,
                   size: 88,
                   tintOpacity: .14,
@@ -104,7 +105,7 @@ class _BlockedScreenState extends ConsumerState<BlockedScreen> {
               const SizedBox(height: 28),
               Center(
                 child: Text('Account suspended',
-                    style: sora(26, 760, color: context.scheme.onSurface, spacing: -.5)),
+                    style: display(26, 760, color: context.scheme.onSurface, spacing: -.5)),
               ),
               const SizedBox(height: 10),
               Center(
@@ -132,7 +133,7 @@ class _BlockedScreenState extends ConsumerState<BlockedScreen> {
                 AsyncValue(hasValue: true, value: final a) => a == null
                     ? PrimaryButton(
                         label: 'Appeal this decision',
-                        icon: Icons.gavel_rounded,
+                        icon: Symbols.gavel_rounded,
                         onPressed: () => _openAppealSheet(context),
                       )
                     : _AppealThread(appeal: a),
@@ -235,7 +236,7 @@ class _BlockedScreenState extends ConsumerState<BlockedScreen> {
                               setSheet(() => evidence.add(picked));
                             }
                           },
-                    icon: const Icon(Icons.add_photo_alternate_outlined,
+                    icon: const Icon(Symbols.add_photo_alternate_rounded,
                         size: 20),
                     label: const Text('Evidence'),
                   ),
@@ -347,7 +348,7 @@ class _AppealThreadState extends ConsumerState<_AppealThread> {
             maxLines: 4,
             isDense: true,
             hintText: 'Reply to the team…',
-            sendIcon: Icons.send_rounded,
+            sendIcon: Symbols.send_rounded,
             textStyle: inter(14, 460, color: context.scheme.onSurface),
             onSend: _reply,
           ),

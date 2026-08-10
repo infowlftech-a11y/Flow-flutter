@@ -1,5 +1,6 @@
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -423,7 +424,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                             shape: const RoundedRectangleBorder(
                                 borderRadius: FlowRadii.chip)),
                         child: const Icon(
-                            Icons.add_photo_alternate_outlined),
+                            Symbols.add_photo_alternate_rounded),
                       ),
                     ),
                   ],

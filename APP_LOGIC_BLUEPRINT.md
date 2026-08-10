@@ -9,10 +9,12 @@ Nothing here describes styling. Where a visual detail is mentioned, it is becaus
 carries meaning (e.g. "blocked hours are not tappable"), not because it should look
 that way.
 
-- **Codebase:** Flutter 3.44+ / Dart 3.12, Android only (`com.kiteflow.app`)
-- **Backend:** Firebase — Auth, Firestore, Storage, Cloud Messaging (project `go-kite-ccc33`)
+- **Codebase:** Flutter / Dart SDK ^3.12.2, Android only (`com.wlftech.flow`)
+- **Backend:** Firebase — Auth, Firestore, Storage, Cloud Messaging (project `wlf-flow`)
+- **Server code:** `functions/` (TypeScript, Firebase Functions v2) — push fan-out and
+  scheduled session reminders
 - **State:** Riverpod 3 · **Routing:** go_router 17 · **Local prefs:** shared_preferences
-- **Source of truth:** `lib/`, 56 Dart files, ~17k lines
+- **Source of truth:** `lib/`, 89 Dart files, ~22.5k lines
 
 > **There is no AI integration.** No Gemini, no Google AI Studio, no LLM API, no prompt
 > templates, no system instructions. The predecessor React app imported `GoogleGenAI`
@@ -20,13 +22,21 @@ that way.
 > intentionally dropped. Section 12 documents the complete set of external calls. If the
 > redesign is expected to *add* AI, it is a new feature with no existing contract to honour.
 
+> **Backend provisioning is incomplete, and it shapes what can be demonstrated.** Firebase
+> Storage has never been initialised on `wlf-flow`, so every upload path fails — avatars,
+> galleries, certificates and evidence attachments. The Cloud Functions API has never been
+> enabled, so no push has ever been delivered. Firestore is in `nam5` (US), which adds a
+> transatlantic round trip to every read and write for an Egyptian user base. None of these
+> are app defects and none are fixed by a redesign, but a redesign that assumes rich imagery
+> will be designing for data that cannot currently exist.
+
 ---
 
 ## Table of contents
 
 1. [Core concept & value proposition](#1-core-concept--value-proposition)
 2. [Roles, account lifecycle & the gate state machine](#2-roles-account-lifecycle--the-gate-state-machine)
-3. [Complete feature catalogue](#3-complete-feature-catalogue)
+3. [Capability catalogue](#3-capability-catalogue)
 4. [Navigation map & user flows](#4-navigation-map--user-flows)
 5. [Data models — field by field](#5-data-models--field-by-field)
 6. [Firestore schema — every read and write](#6-firestore-schema--every-read-and-write)
@@ -148,258 +158,225 @@ invalidates the profile stream once so the router releases the user automaticall
 
 ---
 
-## 3. Complete feature catalogue
+## 3. Capability catalogue
 
-### 3.1 Authentication (`features/auth/auth_screen.dart`)
+This section describes **what the system does**, not where any of it appears. It is
+deliberately organised by domain rather than by screen, because the screen inventory is
+the thing a redesign is free to discard. Every rule below has to survive regardless of
+how the app is laid out, how many screens it has, or what those screens are called.
 
-- Single screen toggling between **Log in** and **Create account**.
-- Sign-up collects: full name, email, password. Log-in: email, password.
-- Password visibility toggle.
-- **Forgot password** — sends a Firebase reset email. Requires a syntactically valid
-  email in the field first; otherwise it errors and focuses the email field.
-- Platform password-manager integration via `AutofillGroup` +
-  `TextInput.finishAutofillContext()` on success.
-- On sign-up, the Firebase `displayName` is set from the name field.
-- **No "remember me" and no credential storage** — Firebase persists the session itself.
-  (The predecessor web app wrote plaintext email/password into `localStorage`; this was
-  removed deliberately.)
-- **Silent fallback:** signing up with an already-registered email attempts a sign-in with
-  the same credentials instead of erroring.
+Where a rule constrains presentation, it is stated as a constraint on *meaning* ("a
+blocked hour must not be selectable"), never as a layout instruction.
 
-### 3.2 Onboarding
+### 3.1 Identity & access
 
-**Role selection** (`features/onboarding/role_select_screen.dart`)
-- Two choices: "I'm a Kiter" / "I'm a Trainer". Sign-out lives in the app-bar *trailing*
-  slot (never the back slot).
-- States plainly that trainer accounts are reviewed before going live.
+**Credentials.** Email and password only. There is no social sign-in, no phone auth, no
+magic link, no "remember me" and no credential storage of any kind — Firebase owns the
+session. Password reset is by Firebase email; it requires a syntactically valid address
+before it will send.
 
-**Rider form** (`kiter_form_screen.dart`) — single page:
-avatar (optional) · full name\* · nationality\* · age\* · kite level (default `Independent`)
-· home spot · languages\* · quiver · short bio.
-Writes `role: 'kiter'`, `status: 'active'`.
+**Account creation is two acts, not one.** Creating credentials and creating a *profile*
+are separate, and a user can exist in the first state without the second. This is what
+makes onboarding resumable and what makes the gate machine (§2.3) necessary: a signed-in
+user with no profile document is a legitimate, reachable state.
 
-**Trainer form** (`trainer_form_screen.dart`) — 4 gated steps:
-1. **Trainer profile** — photo\*, name\* (>2 chars), professional bio\*, languages\*, gallery (multi-image)
-2. **Training spot** — spot from the fixed list\*, optional Google Maps link
-3. **Your rate** — hourly rate\*, integer, €60–€110
-4. **Verification** — IKO/VDWS ID\* (>3 chars), optional certificate image
+**Sign-up collects credentials only.** Name is collected once, on the profile form, because
+the profile document is the only place it is ever read from.
 
-Writes `role: 'business'`, `status: 'pending'`, `businessType: 'Instructor'`, and both
-`priceList` (string) and `hourlyRate` (int) for web-client compatibility.
+**Recoverable failures are recovered, not reported.** Signing up with an address that
+already exists offers sign-in rather than an error. Password managers are supported through
+the platform autofill contract.
 
-### 3.3 Rider — Explore (`features/explore/explore_screen.dart`)
+### 3.2 Identity of a provider — profiles & the catalogue
 
-- Grid of every **approved** trainer/station (`role == 'business' && status == 'active'`).
-- **Free-text search** across name + location + bio (case-insensitive substring).
-- **Filter sheet:** spot (single-select from the 10 spots) and languages (multi-select).
-- **Quick toggles:** All trainers / Favourites; active spot and language filters appear as
-  individually removable chips.
-- Result count and a one-tap **RESET** for all filters + search.
-- Per card: photo, favourite heart (optimistic), name, average rating, location, hourly
-  rate, and a "Station" badge for stations.
-- Notification bell with unread badge.
-- Pull-to-refresh; skeleton grid on first load.
+Two profile shapes exist behind one `users` document:
 
-### 3.4 Rider — Trainer profile (`explore/trainer_profile_screen.dart`)
+- **Rider** — nationality, age, kite level, home spot, languages, quiver, bio.
+- **Business** — bio, languages, training spot, optional map link, hourly rate,
+  certification id, optional certificate document, gallery. A `businessType` further
+  splits businesses into **instructor**, **station** and **safari operator**, which changes
+  what they can offer (§3.3) but not how they are governed.
 
-- Collapsing photo header — swipeable gallery (profile photo + gallery images), page dots,
-  tap to open a full-screen zoomable viewer.
-- Name, verified badge, average rating + review count, hourly rate.
-- Info tiles: **Location** (tappable → opens Google Maps externally if `mapsLink` set) and
-  **Certification** (`IKO {id}` or "Verified trainer").
-- About (bio), Speaks (languages).
-- **Reviews** — full list; each shows name, time-ago, stars, comment. You can delete your own.
-- **Review composer** appears *only* if the rider has a completed, not-yet-reviewed booking
-  with this trainer (checked before render, not just on submit).
-- **Report trainer** — reason (from a fixed list) + free-text details + optional screenshot
-  attachments.
-- Favourite toggle.
-- Sticky bottom bar: rate · **Message** · **Book now**.
-- **Self-view:** when the viewer *is* this trainer, favourite/report/message/book are replaced
-  by **Edit profile**, and a "Your public profile" marker is shown.
+**The catalogue is the set of businesses that are `active`.** Pending, rejected and blocked
+businesses are not discoverable by anyone. This is a single rule with wide reach: approval
+is what makes a provider exist commercially.
 
-### 3.5 Rider — Station / safari profile (`explore/station_profile_screen.dart`)
+**Discovery supports** free-text matching across name, location and bio; filtering by spot
+and by language; and a favourites-only view. Favourites are stored on the rider's own
+profile and toggle optimistically — the rule is that a favourite must never block on the
+network.
 
-Collapsing cover header, name, location pill, type pill, bio, and pinned tabs that differ
-by operator type:
+**Self-view is a distinct case.** When a provider views their own public listing, the
+commercial actions (book, message, report, favourite) are meaningless and must be replaced
+by an edit affordance. A redesign must keep this branch; without it a trainer can book
+themselves.
 
-- **Safari operator** → one tab: **Expeditions**
-- **Station** → three tabs: **Lessons**, **Rentals**, **Beach** (each tab shows its count)
+### 3.3 What a provider sells
 
-**Lessons tab** — station instructors (name, level, rate, photo) each with a **BOOK** button
-that opens the booking flow against the *station's* calendar with the instructor as `subTarget`.
+- **Instructor** — hourly lessons against their own calendar.
+- **Station** — lessons delivered by named staff instructors, plus rentals and beach-use
+  services priced per unit. A station booking targets the *station's* calendar with the
+  chosen instructor recorded as a sub-target.
+- **Safari operator** — multi-day expeditions sold by the seat, with capacity.
 
-**Rentals / Beach tabs** — services with name, description, price + unit, and a **BOOK** button
-(`bookingType` `rental` or `beach_use`).
+Seat sales are the only capacity-constrained product and are therefore the only one that
+must be **transactional** (§8.6): two riders taking the last seat simultaneously must
+resolve to one sale and one honest refusal.
 
-**Expeditions tab** — safari trips with title, duration pill, departure date, price per seat,
-seats-left counter, a fill-ratio progress bar, description, and **Reserve my seat** (disabled
-and labelled "Manifest full" when sold out). Reserving is **transactional** (see §8.6).
+### 3.4 Availability — what "free" means
 
-### 3.6 Rider — Booking flow (`features/booking/booking_sheet.dart`)
+Availability is **derived, never stored as truth**. A given hour is bookable only if all of
+the following hold:
 
-Full-screen flow, four conceptual stages on one scroll:
+1. it falls inside the bookable window (§8.3),
+2. it is not in the past, and clears the same-day lead time (§8.2),
+3. the provider has not blocked it,
+4. the provider is not on whole-day time off,
+5. no existing booking occupies it, including the buffer that follows a session (§8.1).
 
-1. **Who** — provider card (avatar, name/sub-target, location, rate).
-2. **Pick a day** — horizontal strip of the next **21 days** starting today; "TODAY" label
-   on day 0.
-3. **Available hours** — 3-column grid of the 10 bookable hours. Each tile shows its range
-   (`09:00–10:00`) and a state word: `Free`, `Selected`, or a blocked reason (`Away`,
-   `Too soon`, `Booked`, `Unavailable`). Free tiles are tappable; blocked ones are not.
-   - Whole-day time off → a single "Away on this date" notice instead of the grid.
-   - Every hour taken → "Fully booked" notice.
-   - **CLEAR** appears once anything is selected.
-4. **Summary** (appears only with a selection) — time range, hour count, total, a free-text
-   message to the trainer, and an "I need gear" switch.
+Each failure has a **distinct reason** — away, too soon, booked, unavailable. Collapsing
+them into one "not available" state is a regression: the rider's next action differs per
+reason. An hour that is not bookable must not be selectable.
 
-Sticky bottom bar: hour count + live total (a dash, not `€0`, before selection) and
-**Review & confirm**.
+Multi-hour bookings must be **contiguous** (§8.4). Selecting a non-adjacent hour prunes the
+prior selection rather than creating a gap.
 
-**Review sheet** — Service, Date, Time, Duration, Gear rows; a total panel showing
-`€rate × hours`, the total, and a "Pay at centre" marker; a note that the rider's level is
-shared with the trainer; **Confirm booking**.
+### 3.5 The booking lifecycle
 
-**Success dialog** — "Request sent!", not dismissible by tapping outside; the single **Done**
-button closes the dialog and pops the booking screen.
+A booking is a small state machine, and every state below is reachable in production data:
 
-### 3.7 Rider — My sessions (`features/sessions/sessions_screen.dart`)
+`pending → confirmed → inProgress → completed`, with `cancelled` and `rejected` as terminal
+exits from the early states.
 
-Three tabs — **UPCOMING** (with a count), **ACTIVE** (with a live dot when non-empty),
-**HISTORY** — over the rider's bookings.
+- **pending** — requested by a rider, awaiting the provider. The rider may cancel.
+- **confirmed** — the provider accepted. A check-in credential now exists.
+- **inProgress** — the provider verified the rider's credential in person (§3.6). Started
+  sessions cannot be cancelled by either party.
+- **completed** — the provider ended the session. This is what makes the booking reviewable
+  (§3.8) and what moves money into the earnings figure (§3.7).
+- **rejected** — declined by the provider, optionally with a reason delivered to the rider.
+- **cancelled** — withdrawn by the rider.
 
-Per booking card: date block (month + day), title, time range, total price, status pill,
-and a sub-label explaining the status in words. Actions depend on status:
+**Walk-ins** are provider-created bookings that skip `pending` — the rider is standing there.
 
-| Status | Actions |
-|---|---|
-| `pending` | Cancel |
-| `confirmed` | **Check in** (QR ticket) · Cancel |
-| `inProgress` | **Check in** (shows live ticket) |
-| `completed` | **Rate** |
-| `cancelled` / `rejected` | none |
+A booking carries the rider's kite level to the provider, because it changes how the session
+is prepared. It also carries an optional free-text message and a gear flag.
 
-- **QR ticket dialog** — renders a QR encoding `{"bookingId":…,"trainerId":…}`, always on a
-  white background so scanners work in dark mode. It watches the booking live and flips to
-  "Session started" the moment the trainer scans, with a haptic on that transition.
-- **Rate** — inline review composer (stars + optional comment) without leaving the screen.
-- **Cancel** — confirmation dialog naming the session and date; warns the trainer is notified.
-- **Deep link:** `/sessions?highlight=<bookingId>` (from a booking notification) selects the
-  tab that actually contains that booking, scrolls the card into view and tints it ~4s.
-- Pull-to-refresh per tab.
+**Both parties can hide a booking from their own history independently.** Hiding is per-party
+and never deletes.
 
-### 3.8 Trainer — Command Center (`features/command_center/command_center_screen.dart`)
+### 3.6 Check-in — proving who turned up
 
-Two tabs: **TODAY** and **SCHEDULE**, plus a persistent **CHECK IN** floating action button
-that opens the QR scanner from anywhere.
+Check-in exists to stop a session being marked started by mistake or by claim. The rider
+holds a credential encoding the booking and the provider; the provider verifies it in
+person, which is the transition into `inProgress`.
 
-**TODAY tab**
-- **Three stat tiles:** Requests (taps → scrolls to the requests section), Upcoming,
-  Total earned (taps → opens the earnings ledger).
-- **Action required** — pending requests. Each card shows rider avatar, name, level, price,
-  date + time range, the rider's message, and a "Needs gear" pill.
-  - **APPROVE** — busy-guarded, haptic, and an **UNDO** action in the confirmation toast.
-  - **DECLINE** — opens a sheet for an optional reason, which is delivered to the rider.
-- **Today · {date}** — today's manifest, sorted by start time. Each card shows the rider,
-  time range, walk-in/gear pills, price, and:
-  - `confirmed` → **SCAN TO START**
-  - `inProgress` → **FINISH SESSION** (confirmation names the amount added to earnings)
-  - Tapping the card opens read-only details (message, level, gear) + **Message rider**.
-  - Empty state: "No sessions today — Enjoy the wind."
-- **Coming up** — next 10 upcoming bookings (compact rows, tap for details).
+Two constraints are load-bearing and easy to lose in a redesign:
 
-**Earnings ledger** (sheet) — all-time and month-to-date totals, plus every completed session
-with rider, date, hours and amount.
+- The credential must render on a **light surface regardless of theme**, because it is read
+  by a camera, not by a person.
+- The rider's view must be **live**: the moment the provider verifies, the rider's screen
+  must reflect it without a manual refresh.
 
-**First-run tour** — a 4-step dialog (Command Center / approve-decline / QR check-in /
-calendar control) shown once per uid, persisted in SharedPreferences.
+The credential is only meaningful for a `confirmed` or `inProgress` booking.
 
-### 3.9 Trainer — Schedule (`command_center/schedule_tab.dart`)
+### 3.7 Money
 
-- **Day navigator** — previous/next chevrons and a tappable date that opens a date picker
-  (today → +1 year).
-- **WALK-IN** and **TIME OFF** buttons kept above the timeline (time-critical beach tasks).
-- **Day timeline** — one row per bookable hour showing either the booking that occupies it
-  (rider name, walk-in marker) or its state: `Available`, `Blocked`, `Past`, `Away`.
-  - Tap a free hour to block it; tap a blocked hour to release it. Booked, past and
-    away hours are not tappable.
-  - A "{n} blocked" counter, hidden while loading rather than showing a misleading `0`.
-- **Whole-day-off banner** when a vacation covers the day.
-- **Add walk-in** sheet — student name\*, start time (only genuinely free hours are offered)\*,
-  duration (1/2/3/4h), total price (pre-filled with `rate × 1`). Creates a confirmed booking.
-- **Time off** sheet — reason, from-date, to-date (the "to" picker cannot precede "from").
-- **Scheduled time off** list with per-entry delete, and **UNDO** in the confirmation toast.
-- Pull-to-refresh resyncs blocks, bookings and vacations.
+**FLOW moves no money.** The rider pays the provider directly, in person. What the system
+does is *record* the obligation, so that neither party has to remember it.
 
-### 3.10 Trainer — QR scanner (`command_center/qr_scanner_screen.dart`)
+Every booking records what was owed, in what currency, by what method, and whether it has
+been collected. The states are `unknown`, `unpaid`, `processing`, `paid`, `refunded`,
+`failed`. Three rules matter:
 
-- Rear camera, `noDuplicates` detection, torch toggle whose icon reflects actual torch state.
-- Scrimmed viewfinder cutout; the frame flashes emerald for 250 ms on a successful capture
-  before popping.
-- **Validation:** payload must be JSON containing `bookingId` and `trainerId`, and the
-  `trainerId` must match the scanning trainer. Failures show an inline warning banner for
-  3 s and **keep the camera open** rather than dismissing.
-- Denied/unavailable camera renders an explanatory screen with a retry, never a black void.
-- On success the caller calls `checkIn(bookingId)` and toasts "Session started 🤙".
+- **`unknown` is not `unpaid`.** Bookings written before payments were tracked have no
+  payment information, and relabelling them as owing would tell every provider they are out
+  of pocket for work already paid for. `unknown` must render as nothing at all.
+- **Only the provider can say they were paid.** A rider who could mark their own lesson paid
+  could walk off the beach owing for it with the app agreeing they did not.
+- **Cash is one method among several, not an assumption.** Card, wallet and transfer are
+  modelled but not offered; the vocabulary exists so a processor can be added without a
+  data migration.
 
-### 3.11 Messaging (`features/chat/`)
+Earnings are the sum of completed sessions. Outstanding money is the sum of sessions that
+are `unpaid` or `failed` — this is what drives a "still to collect" figure and a settle
+action.
 
-**Inbox** — every thread the user participates in, newest first. Per row: partner avatar,
-name, last message preview, time-ago, and **unread count**. Unread rows are tinted and
-bolded. Search filters by partner name. The **Inbox tab carries a total unread badge**.
+### 3.8 Reputation
 
-**Chat thread** — grouped bubbles (consecutive messages from one sender share a run),
-absolute timestamps inserted only when there is a >10-minute gap, long-press any bubble to
-copy, send button disabled while the input is empty.
-- Sending is **fire-and-forget** — Firestore's local snapshot paints the bubble instantly;
-  a failure restores the text to the composer and toasts.
-- Scroll behaviour: jumps to the newest message on first load; afterwards follows new
-  messages **only when already near the bottom** (within 120 px), so reading history is
-  never interrupted.
-- A **jump-to-latest** control appears once scrolled up, showing how many messages arrived
-  while away.
-- Opening a thread creates the thread document if needed and clears the unread counter.
+A rider may review a provider **only** against a completed booking they have not already
+reviewed. Eligibility is checked before the composer is offered, not merely on submit — an
+ineligible rider must never be invited to write something that will be refused.
 
-### 3.12 Notifications (`features/notifications/notifications_screen.dart`)
+A review is a 1–5 rating plus optional text. Authors may delete their own. Reviews are
+immutable once written; there is no edit. Ratings aggregate to an average and a count.
 
-- Chronological list; unread items are tinted and carry a dot.
-- **Mark all read** (batched) appears only when something is unread.
-- **Swipe to delete** with a confirming toast; also exposed to screen readers as a custom
-  action.
-- Tapping routes by kind — see §11.2.
-- Broadcast/system notifications have no destination, so tapping opens a sheet with the
-  full untruncated text.
+### 3.9 Conversations
 
-### 3.13 Profile & settings (`features/profile/`)
+Direct threads between a rider and a provider, created on first message. Messages are
+**immutable once sent** — no edit, no delete. Unread state is tracked per participant.
 
-- Identity block: avatar (tap → edit), name, email, and pills for role/level, nationality,
-  location.
-- **Account:** Personal details · *View my public profile* (trainers only) · Notifications · Help & support
-- **Appearance:** Auto / Light / Dark, persisted locally
-- **Privacy:** "Security & data" explainer sheet (session encryption, what trainers see,
-  photo storage)
-- **Sign out** (confirmed)
-- **Danger zone → Delete my account** — placed last, behind two steps: a destructive
-  confirmation, then a "why are you leaving?" sheet. Records the reason, deletes the
-  Firestore profile, then deletes the auth user. If Firebase requires recent login, the
-  user is told to sign out and back in.
-- App version label.
+Threads are also the delivery mechanism for two administrative conversations: **support
+tickets** and **appeals**. All three are the same idea — an append-only thread between two
+parties — and a redesign that unifies them should preserve their differing lifecycles:
 
-**Edit personal details** — avatar, name\*, email (read-only), phone, nationality, age,
-kite level (riders only), training spot (trainers, read-only), bio, languages\*, and a
-gallery manager (trainers only) with "New" badges on not-yet-uploaded picks.
-- Save is disabled until something actually changes.
-- Leaving with unsaved changes prompts to discard.
+- **Chat** — never closes.
+- **Support ticket** — support can resolve it, which locks the composer; the user can reopen.
+- **Appeal** — available only to blocked users, and must survive a flaky connection: a typed
+  appeal is never discarded because an upload failed.
 
-### 3.14 Support & appeals (`features/support/`, `features/gates/blocked_screen.dart`)
+### 3.10 Notifications & reminders
 
-**Support tickets** — list of the user's tickets with open/resolved state; open a new ticket
-(subject\* + body\*); a thread view with a composer that locks when support resolves the
-ticket, replaced by a **REOPEN** action.
+The system notifies the *other* party on every state change that affects them: a request
+arrives, a request is approved or declined, a session is cancelled, a message is sent, a
+session is about to start.
 
-**Appeals** (blocked users only) — submit an appeal with a written reason\* and optional
-image evidence, then continue a conversation with admins in-thread. The appeal sheet
-**stays open until the upload succeeds**, so a flaky connection can never discard a typed
-appeal.
+Notifications exist in two layers that must stay consistent:
+
+- **In-app** — a durable, readable list with unread state; tapping one navigates to the
+  thing it is about.
+- **Push** — delivered by a server-side function watching new notification documents. Push
+  is best-effort: a device token can be stale, and a failed push must never fail the action
+  that generated it.
+
+Session reminders are generated on a schedule server-side, not by the client — a client
+cannot be relied upon to be running.
+
+**Push tokens are per-device, not per-account.** A token must be dropped on sign-out, or the
+previous user's notifications arrive on the next user's handset.
+
+### 3.11 Conditions
+
+An eight-day wind forecast per spot, from a public weather API. It is advisory only and is
+banded into rider-meaningful terms — too light, light, good, strong, too strong — rather
+than raw numbers, because a forecast that far out does not support the precision.
+
+**It never blocks a booking.** The provider decides on the day; a forecast is not an
+authority. Failure is silent: no forecast simply means no forecast, never an error state.
+
+### 3.12 Trust & safety
+
+- **Reporting** — any user may report a provider with a reason and optional evidence.
+  Reports are write-only for the reporter: you cannot read others' reports, or discover that
+  you have been reported.
+- **Blocking** — staff may block an account, with an expiry or permanently. A blocked user
+  retains exactly one capability: appealing.
+- **Approval** — business accounts are reviewed before becoming discoverable. This is the
+  gate the whole catalogue depends on.
+- **Privileged fields are staff-only.** Role, status and block state can never be written by
+  the account they describe. This is enforced server-side, and it is why the first staff
+  account must be promoted out-of-band.
+
+### 3.13 Account & data
+
+Profile editing covers presentational identity only. **Rate and training spot are
+deliberately not self-editable** — they are commercial terms, changed through support.
+
+Account deletion removes the profile and the credentials, and asks (optionally) why. It is
+irreversible and must be presented as such.
+
+Emptying an optional field must actually clear it. "Not editing this field" and "clearing
+this field" are different intents and cannot share a representation.
 
 ---
 
@@ -1213,8 +1190,8 @@ Tapping also marks the item read (fire-and-forget).
 
 ## 12. External services & API contracts
 
-**There are no HTTP APIs, no REST endpoints, no GraphQL, no AI/LLM calls, and no prompt
-templates anywhere in this application.** Every external interaction is a Firebase SDK call.
+**There are no AI/LLM calls and no prompt templates anywhere in this application.** There is
+exactly **one** non-Firebase HTTP call: the wind forecast.
 
 | Service | Package | Used for |
 |---|---|---|
@@ -1222,17 +1199,29 @@ templates anywhere in this application.** Every external interaction is a Fireba
 | Cloud Firestore | `cloud_firestore` | All application data (§6) |
 | Firebase Storage | `firebase_storage` | Profile photos, galleries, certificates, report/appeal evidence |
 | Firebase Messaging | `firebase_messaging` | Push tokens, foreground messages, tap routing |
+| Open-Meteo | `dart:io` `HttpClient` | 8-day wind forecast per spot (§3.11) |
 | Google Maps | `url_launcher` | Opens a trainer's `mapsLink` externally |
 | Camera / gallery | `image_picker`, `mobile_scanner` | Photo picking, QR scanning |
 
-**Firebase project:** `go-kite-ccc33` (Android app id `1:1046182479508:android:1861e99d8b1c408569d681`,
-bucket `go-kite-ccc33.firebasestorage.app`). Config lives in `lib/firebase_options.dart` and
-`android/app/google-services.json`. **`applicationId` must remain `com.kiteflow.app`** — changing
-it breaks push and turns the app into an unrelated Play listing.
+**Wind contract.** `GET https://api.open-meteo.com/v1/forecast`, keyless and unauthenticated,
+called directly through `HttpClient` rather than adding `package:http` for one request. Every
+error path — offline, DNS failure, timeout, malformed body — returns an empty forecast rather
+than throwing, so a dead connection degrades to "no forecast" and never to an error state.
 
-**Server-side (not in this repo):** a Cloud Function `onNewNotification` fires on new
-`notifications` documents and sends the FCM push, reading the recipient as
-`data.userId || data.targetUserId`.
+**Firebase project:** `wlf-flow` (Android app id
+`1:194435155894:android:6751bfee6f9b0b3c82e317`). Config lives in `lib/firebase_options.dart`
+and `android/app/google-services.json`. **`applicationId` must remain `com.wlftech.flow`** —
+changing it breaks push and turns the app into an unrelated Play listing.
+
+**Server-side — `functions/`, in this repo** (TypeScript, Firebase Functions v2):
+
+| Function | Trigger | Does |
+|---|---|---|
+| `onNewNotification` | new `notifications/{id}` document | Sends the FCM push to the recipient's token; prunes tokens the messaging API reports as dead |
+| `sendSessionReminders` | schedule | Generates reminder notifications for imminent sessions |
+
+Neither has ever run: the Cloud Functions API is not enabled on the project, so nothing is
+deployed. Push is therefore specified but not operational.
 
 ### 12.1 Upload contract
 
@@ -1362,7 +1351,7 @@ Treat every item here as a functional requirement, not a stylistic one.
 - [ ] Dual-write `targetUserId` + `userId` on notifications
 - [ ] Tolerant readers for every Firestore field
 - [ ] Collection names unchanged; client-side sorting retained
-- [ ] `applicationId` stays `com.kiteflow.app`
+- [ ] `applicationId` stays `com.wlftech.flow`
 
 **Correctness**
 - [ ] Availability composition and same-day lead-time rule (§8.2, §8.5)
