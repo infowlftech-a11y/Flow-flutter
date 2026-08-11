@@ -336,3 +336,59 @@ The fix is to clear `blockedUntil` and `statusBeforeBlock` in
 frozen repository, so it needs your approval, and I would want the
 blocked-users UI decided first since that is what determines the intended
 semantics.
+
+---
+
+## BUG-013 / BUG-014 — Booking status writes have no preconditions
+
+**Severity:** BUG-013 major · BUG-014 **critical** (money)
+**Found:** `test/flow_booking_test.dart`, adversarial pass
+**File:** [booking_repository.dart:319-323](lib/data/repositories/booking_repository.dart#L319-L323),
+[booking_repository.dart:444-449](lib/data/repositories/booking_repository.dart#L444-L449)
+**Status:** not fixed — frozen repository, needs your approval
+
+### The shared root cause
+
+`markPaid`, `markRefunded` and `checkIn` are all transactional and all
+re-read state before writing — `checkIn` has an entire documented
+stale-ticket matrix behind it. `setStatus` and `cancelByRider` are plain
+unconditional `update` calls. The money and check-in paths were hardened;
+the status path was not, and it moves the same document.
+
+### BUG-013 — an in-flight approval resurrects a cancelled booking
+
+The trainer's request list is a live stream, so a row can be tapped moments
+after the rider cancels it. `setStatus` writes `confirmed` over
+`cancelled` without looking, and then notifies: the rider is told "Booking
+approved ✅" for a session they cancelled, and the hour goes back to
+blocking the trainer's calendar (§8.5, `isLive`).
+
+The `_busy` guard in §10.5 protects against a double tap on the same
+control. It does nothing about state that changed underneath.
+
+### BUG-014 — a rider can cancel a delivered session and erase the earnings
+
+Pinned by a passing test that follows the money:
+
+```
+2h at €50  ->  confirmed  ->  completed  ->  markPaid   earnings: €100
+                           rider cancels                earnings:   €0
+```
+
+`trainerRevenueProvider` is Σ `totalPrice` over bookings whose status is
+`completed` ([providers.dart:395](lib/providers/providers.dart#L395)). Once
+the rider flips a completed booking to `cancelled`, it leaves that set, and
+€100 of delivered, settled work disappears from the trainer's revenue. The
+payment record survives on the document — `paidAt` is still there — so the
+booking is simultaneously paid and cancelled, and the two figures disagree.
+
+Reachable from the app's own UI: the rider's Sessions list offers Cancel,
+and nothing filters it by whether the session already ran.
+
+### Fix
+
+Give both writes the same treatment `markPaid` already has: a transaction
+that re-reads `status` and refuses a transition out of a terminal state
+(`completed`, `cancelled`, `rejected`), throwing the way `CheckInFailure`
+does so the UI can say why. Two frozen methods change, so this needs your
+say-so — and BUG-014 deserves it soon, because it is live and it is money.
