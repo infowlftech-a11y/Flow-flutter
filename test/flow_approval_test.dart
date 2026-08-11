@@ -53,8 +53,17 @@ void main() {
         photoUrl: 'https://example.test/a.jpg',
       );
 
-  Future<AppUser> pending(String uid) async =>
-      (await users.watchUser(uid).first)!;
+  /// Reads with a direct `get`, not `watchUser(...).first`.
+  ///
+  /// blockUser and unblockUser write inside a transaction, and
+  /// fake_cloud_firestore's snapshot streams do not reliably re-emit after
+  /// one — `.first` can hand back the pre-transaction document. Real
+  /// Firestore notifies listeners on commit; this is the double, not the app.
+  /// The suspension tests below would otherwise be quietly flaky.
+  Future<AppUser> pending(String uid) async {
+    final snap = await db.collection(Col.users).doc(uid).get();
+    return AppUser.fromDoc(snap.id, snap.data()!);
+  }
 
   Future<List<String>> queueUids() async =>
       [for (final t in await admin.watchPendingTrainers().first) t.uid];

@@ -443,3 +443,46 @@ on 2, and the trip flips to `full`. §8.6's claim holds.
 That file exercises the *pattern* the repository uses, not the Dart code —
 `flutter test` cannot reach an emulator. Closing that last gap needs an
 `integration_test` run on a device pointed at the emulator.
+
+Two more divergences found the same way, both now settled in
+`test_rules/arrays.test.mjs`:
+
+| Behaviour | Real Firestore | fake_cloud_firestore |
+|---|---|---|
+| `arrayUnion` of an identical value twice | collapses to one | appends both |
+| transactional `update` of a missing doc | rejects (NOT_FOUND) | creates it |
+| snapshot stream after a **transactional** write | re-emits | may not |
+
+The last one is the dangerous one, because it fails *silently in the
+app's favour*. `watchUser(uid).first` returned a profile reading `active`
+for an account the database had already stored as `blocked` — a
+transactional `blockUser` had committed, and the stream had not re-emitted.
+A test written the obvious way therefore asserts the suspension did not
+take effect, and passes for the wrong reason.
+
+`test/flow_approval_test.dart` and `test/flow_moderation_test.dart` both
+read profiles with a direct `get()` for this reason; the comment is on the
+helper in each. Any future test asserting state after `blockUser`,
+`unblockUser`, `markPaid`, `markRefunded`, `checkIn` or `reserveSafariSeat`
+needs the same treatment.
+
+---
+
+## BUG-016 — A user can file more than one appeal, and only ever sees one
+
+**Severity:** minor
+**Found:** `test/flow_moderation_test.dart`, adversarial pass
+**Files:** [support_repository.dart:109-124](lib/data/repositories/support_repository.dart#L109-L124),
+§6.2 (`My appeal` — `userId == uid`, limit 1)
+**Status:** not fixed — reported only
+
+`submitAppeal` always `add`s a new document, with no check for an existing
+one. `watchMyAppeal` reads `where('userId', ==, uid).limit(1)`.
+
+So a user who submits twice creates two appeals; their own screen shows
+whichever the limit-1 query returns, while the admin queue shows both. If
+staff answer the one the user is not looking at, the reply is invisible to
+them and the thread appears dead from both ends.
+
+Whether the fix is "refuse a second appeal while one is pending" or "show
+them all" is a product decision.
