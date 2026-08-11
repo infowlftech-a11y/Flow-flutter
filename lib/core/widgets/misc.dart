@@ -113,11 +113,18 @@ class TagPill extends StatelessWidget {
             Icon(icon, size: 12, fill: iconFill, color: ink),
             const SizedBox(width: 4),
           ],
-          Text(
-            label,
-            style: dense
-                ? inter(10, 740, color: ink, spacing: .8)
-                : inter(11.5, 680, color: ink, spacing: .4),
+          // A pill carries whatever it is given — a location, a duration, a
+          // business type — and several of those are user-entered. Unflexed,
+          // a long one pushes straight through the pill's own rounded edge.
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: dense
+                  ? inter(10, 740, color: ink, spacing: .8)
+                  : inter(11.5, 680, color: ink, spacing: .4),
+            ),
           ),
         ],
       ),

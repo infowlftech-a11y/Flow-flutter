@@ -18,12 +18,40 @@ import 'surfaces.dart';
 ///
 /// Takes [onSignOut] as a callback rather than reading the provider, so the
 /// component library stays clear of the provider graph.
+/// A column that fills the viewport and starts scrolling once it cannot.
+///
+/// The `minHeight` + [IntrinsicHeight] pair is what lets `Spacer` and
+/// `Expanded` keep working inside a scroll view: the child is handed at least
+/// the viewport's height to distribute, and only grows past it — into a
+/// scroll — when the content genuinely needs more. A plain
+/// [SingleChildScrollView] gives its child unbounded height, where a flex
+/// child throws instead.
+///
+/// [IntrinsicHeight] cannot measure a viewport, so the child must not be
+/// scrollable itself. Anything that already scrolls does not need this.
+class ScrollableFill extends StatelessWidget {
+  const ScrollableFill({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: IntrinsicHeight(child: child),
+          ),
+        ),
+      );
+}
+
 class GateScaffold extends StatelessWidget {
   const GateScaffold({
     super.key,
     required this.onSignOut,
     required this.child,
     this.padding = const EdgeInsets.all(28),
+    this.ownsScroll = false,
   });
 
   final VoidCallback onSignOut;
@@ -32,6 +60,11 @@ class GateScaffold extends StatelessWidget {
   /// Pass [EdgeInsets.zero] when [child] is itself scrollable and wants to own
   /// its padding, so content scrolls to the edges instead of being clipped.
   final EdgeInsetsGeometry padding;
+
+  /// Set when [child] already scrolls. The gate then adds no scroll view of
+  /// its own — [ScrollableFill] measures its child's intrinsic height, and a
+  /// viewport has none to give.
+  final bool ownsScroll;
 
   @override
   Widget build(BuildContext context) {
@@ -56,7 +89,15 @@ class GateScaffold extends StatelessWidget {
       ),
       body: WaveBackdrop(
         child: SafeArea(
-          child: Padding(padding: padding, child: child),
+          // Gates are read, not skimmed: an explanation, a reason, an appeal
+          // form. Held in a bare Column they had exactly one screen to fit
+          // in, and at 1.3x text they overflowed by as much as 639px — the
+          // sign-out button and half the explanation simply gone.
+          child: ownsScroll
+              ? Padding(padding: padding, child: child)
+              : ScrollableFill(
+                  child: Padding(padding: padding, child: child),
+                ),
         ),
       ),
     );

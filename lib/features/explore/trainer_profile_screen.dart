@@ -234,9 +234,13 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
                           Text(rating.display,
                               style: interNum(14, 720,
                                   color: context.scheme.onSurface)),
-                          Text(
-                            '  ·  ${rating.count} review${rating.count == 1 ? '' : 's'}',
-                            style: inter(14, 480, color: tones.textFaint),
+                          Flexible(
+                            child: Text(
+                              '  ·  ${rating.count} review${rating.count == 1 ? '' : 's'}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: inter(14, 480, color: tones.textFaint),
+                            ),
                           ),
                         ],
                       ),

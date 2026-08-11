@@ -91,6 +91,7 @@ class _BlockedScreenState extends ConsumerState<BlockedScreen> {
     return GateScaffold(
       onSignOut: () => ref.read(signOutProvider)(),
       padding: EdgeInsets.zero,
+      ownsScroll: true,
       child: ListView(
             padding: const EdgeInsets.all(28),
             children: [

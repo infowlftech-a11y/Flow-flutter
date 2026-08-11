@@ -122,7 +122,16 @@ class FormGroup extends StatelessWidget {
       children: [
         Row(
           children: [
-            Text(label.toUpperCase(), style: microLabel(tones.textFaint)),
+            // Flexible so the asterisk always has somewhere to be. Half-width
+            // fields (AGE beside NATIONALITY) are narrow enough at 1.3x that
+            // an unflexed label pushed the required marker out of the row and
+            // the two painted on top of each other.
+            Flexible(
+              child: Text(label.toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: microLabel(tones.textFaint)),
+            ),
             if (required)
               Text(' *', style: microLabel(tones.azureBrand)),
           ],

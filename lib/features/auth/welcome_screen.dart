@@ -8,6 +8,7 @@ import '../../core/theme/typography.dart';
 import '../../core/utils/haptics.dart';
 import '../../core/widgets/brand.dart';
 import '../../core/widgets/buttons.dart';
+import '../../core/widgets/gate.dart';
 import 'auth_controller.dart';
 
 /// The front door.
@@ -31,7 +32,12 @@ class WelcomeScreen extends ConsumerWidget {
       backgroundColor: scheme.surface,
       body: WaveBackdrop(
         child: SafeArea(
-          child: Padding(
+          // The front door has a logo, a wordmark, a paragraph and two
+          // buttons held apart by Spacers — at 1.3x text that stopped fitting
+          // one screen. Scrolls only when it has to; the Spacers still do the
+          // work at every size where it fits.
+          child: ScrollableFill(
+            child: Padding(
             padding: const EdgeInsets.fromLTRB(28, 24, 28, 28),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -88,6 +94,7 @@ class WelcomeScreen extends ConsumerWidget {
                       height: 1.45),
                 ),
               ],
+            ),
             ),
           ),
         ),

@@ -55,7 +55,14 @@ class PrimaryButton extends StatelessWidget {
                     Icon(icon, size: 20),
                     const SizedBox(width: 8),
                   ],
-                  Text(label),
+                  // Flexible, because the label is the one part of a button
+                  // nobody controls: "Reserve my seat" at 1.3x on a narrow
+                  // phone is wider than the button, and an unflexed Text in a
+                  // Row cannot shrink — it overflows past the edge instead.
+                  Flexible(
+                    child: Text(label,
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ),
                 ],
               ),
       ),
@@ -167,7 +174,9 @@ class MicroAction extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (icon != null) ...[Icon(icon, size: 17), const SizedBox(width: 6)],
-        Text(label),
+        Flexible(
+          child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+        ),
       ],
     );
     if (filled) {

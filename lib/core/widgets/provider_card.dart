@@ -111,9 +111,15 @@ class ProviderCard extends StatelessWidget {
                         if (location != null || priceLabel != null) ...[
                           const SizedBox(height: 6),
                           Row(
+                            // Both sides flex loosely with the slack between
+                            // them: identical to Expanded + trailing price at
+                            // normal widths, but on a 320px phone the capped
+                            // price no longer claims 132px of a row that has
+                            // not got it, and ran 30px off the card.
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               if (location != null)
-                                Expanded(
+                                Flexible(
                                   child: Row(
                                     children: [
                                       Icon(Symbols.place_rounded,
@@ -143,25 +149,27 @@ class ProviderCard extends StatelessWidget {
                                 // room to spare. The cap only bites at the
                                 // largest text scales, where dropping the
                                 // unit is the right thing to lose.
-                                ConstrainedBox(
-                                  constraints:
-                                      const BoxConstraints(maxWidth: 132),
-                                  child: Text.rich(
-                                    TextSpan(children: [
-                                      TextSpan(
-                                        text: priceLabel,
-                                        style: interNum(16, 760,
-                                            color: scheme.onSurface),
-                                      ),
-                                      TextSpan(
-                                        text: ' / $priceUnit',
-                                        style: inter(11.5, 500,
-                                            color: tones.textFaint),
-                                      ),
-                                    ]),
-                                    textAlign: TextAlign.right,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                                Flexible(
+                                  child: ConstrainedBox(
+                                    constraints:
+                                        const BoxConstraints(maxWidth: 132),
+                                    child: Text.rich(
+                                      TextSpan(children: [
+                                        TextSpan(
+                                          text: priceLabel,
+                                          style: interNum(16, 760,
+                                              color: scheme.onSurface),
+                                        ),
+                                        TextSpan(
+                                          text: ' / $priceUnit',
+                                          style: inter(11.5, 500,
+                                              color: tones.textFaint),
+                                        ),
+                                      ]),
+                                      textAlign: TextAlign.right,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
                                 ),
                               ],

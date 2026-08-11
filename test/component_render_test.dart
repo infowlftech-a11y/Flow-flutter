@@ -215,10 +215,27 @@ final _cases = <String, Widget Function()>{
       color: FlowColors.coral,
       title: 'Application not approved',
       body: _long),
+  // The point of ScrollableFill is that a Spacer keeps working inside it —
+  // that is the whole reason it is not a bare SingleChildScrollView, which
+  // hands its child unbounded height and makes any flex child throw.
+  'ScrollableFill': () => ScrollableFill(
+        child: Column(
+          children: [
+            const Spacer(),
+            const Text(_long),
+            const Spacer(),
+            PrimaryButton(label: 'Create account', onPressed: () {}),
+          ],
+        ),
+      ),
 };
 
 /// Cases that own a scrollable and must not be nested inside another.
-const _selfScrolling = {'EmptyView.scrollable', 'SkeletonList'};
+const _selfScrolling = {
+  'EmptyView.scrollable',
+  'SkeletonList',
+  'ScrollableFill',
+};
 
 void main() {
   // 320x640 is the smallest phone the app realistically meets; 1.3 on top of

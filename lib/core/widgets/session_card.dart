@@ -313,8 +313,14 @@ class SessionRow extends StatelessWidget {
                           ),
                           if (statusLabel != null) ...[
                             const SizedBox(width: 6),
-                            TagPill(statusLabel!,
-                                color: statusColor, dense: true),
+                            // Flexible: the pill is unflexed content in a Row
+                            // whose other child is Expanded, so on a 320px
+                            // phone at 1.3x it took its full intrinsic width
+                            // and ran 23px off the card.
+                            Flexible(
+                              child: TagPill(statusLabel!,
+                                  color: statusColor, dense: true),
+                            ),
                           ],
                         ],
                       ),

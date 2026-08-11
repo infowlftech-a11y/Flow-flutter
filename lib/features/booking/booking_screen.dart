@@ -553,8 +553,15 @@ class _DayStrip extends ConsumerWidget {
     // strip must never wait on the network to become usable.
     final wind = ref.watch(providerWindProvider(instructorId)).value;
 
+    // A fixed height keeps the tiles from jittering as the strip scrolls,
+    // but every row inside one is text — weekday, date, month, wind — so the
+    // whole box has to scale with the text rather than a share of it. Flat at
+    // 104 it overflowed at 1.3x; the extra 8px at 1.0x is slack so the column
+    // is not sitting flush against its own border.
+    final height = MediaQuery.textScalerOf(context).scale(112);
+
     return SizedBox(
-      height: 104,
+      height: height,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: FlowConst.bookingDayStripLength,
@@ -907,8 +914,13 @@ class _StickyBar extends StatelessWidget {
     final tones = context.tones;
     return StickyBar(
       child: Row(
+        // Both sides flex loosely and the gap goes between them, which looks
+        // identical to an Expanded price + trailing button at 1.0x but caps
+        // each at half the bar when the text grows. Previously the button
+        // took its full intrinsic width first and pushed 36px off the edge.
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Expanded(
+          Flexible(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -937,10 +949,13 @@ class _StickyBar extends StatelessWidget {
               ],
             ),
           ),
-          PrimaryButton(
-            label: 'Review & confirm',
-            expand: false,
-            onPressed: onReview,
+          const SizedBox(width: 12),
+          Flexible(
+            child: PrimaryButton(
+              label: 'Review & confirm',
+              expand: false,
+              onPressed: onReview,
+            ),
           ),
         ],
       ),

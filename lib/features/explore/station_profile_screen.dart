@@ -75,6 +75,16 @@ class _StationBody extends ConsumerWidget {
             Tab(text: 'BEACH (${beach.length})'),
           ];
 
+    // Scrollable, because three labels that each carry a count cannot be
+    // promised to fit a third of a narrow phone: at 1.3x text they ran into
+    // each other, and a non-scrollable TabBar has nowhere to put the excess
+    // so the labels simply overlapped. Left-aligned like the admin console's.
+    final tabBar = TabBar(
+      isScrollable: true,
+      tabAlignment: TabAlignment.start,
+      tabs: tabs,
+    );
+
     return DefaultTabController(
       length: tabs.length,
       child: NestedScrollView(
@@ -111,7 +121,11 @@ class _StationBody extends ConsumerWidget {
                   Positioned(
                     left: 20,
                     right: 20,
-                    bottom: 18,
+                    // `flexibleSpace` fills the WHOLE app bar, including the
+                    // strip `bottom` occupies — so anything placed against
+                    // its bottom edge lands *behind* the tabs. That is what
+                    // put the location and STATION chips under the tab row.
+                    bottom: tabBar.preferredSize.height + 18,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -140,7 +154,7 @@ class _StationBody extends ConsumerWidget {
                 ],
               ),
             ),
-            bottom: TabBar(isScrollable: false, tabs: tabs),
+            bottom: tabBar,
           ),
           if ((station.bio ?? '').isNotEmpty)
             SliverToBoxAdapter(
@@ -421,9 +435,16 @@ class _TripCardState extends ConsumerState<_TripCard> {
             children: [
               Icon(Symbols.event_rounded, size: 15, color: tones.textFaint),
               const SizedBox(width: 4),
-              Text('Departs ${prettyYmd(trip.startDate)}',
-                  style: inter(14, 540, color: tones.textFaint)),
-              const Spacer(),
+              // Expanded rather than a trailing Spacer: the date and the
+              // price both grow with the text scale, and a Spacer can only
+              // give away slack that exists. This lets the date yield.
+              Expanded(
+                child: Text('Departs ${prettyYmd(trip.startDate)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: inter(14, 540, color: tones.textFaint)),
+              ),
+              const SizedBox(width: 8),
               Text(euro(trip.price),
                   style: interNum(17, 760, color: tones.azureBrand)),
               Text(' / seat', style: inter(12.5, 540, color: tones.textFaint)),

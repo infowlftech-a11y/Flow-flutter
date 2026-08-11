@@ -110,6 +110,12 @@ class _SessionsScreenState extends ConsumerState<SessionsScreen>
         // one of them made the other two read as empty at a glance.
         bottom: TabBar(
           controller: _tabs,
+          // Scrollable: three labels that each carry a count cannot be
+          // promised to fit a third of a narrow phone. At 1.3x text they ran
+          // out of their cells and HISTORY painted over ACTIVE — a
+          // non-scrollable TabBar has nowhere to put the excess.
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
           tabs: [
             Tab(child: _tabLabel(buckets, 'UPCOMING', BookingBucket.upcoming)),
             Tab(
