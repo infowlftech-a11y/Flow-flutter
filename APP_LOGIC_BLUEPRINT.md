@@ -520,7 +520,6 @@ client still needs.
 | `hourlyRate` | double? | `priceList` → `hourlyRate` → `hostProfile.rate` | |
 | `blockedUntilRaw` | String? | `blockedUntil` | ISO string or `'forever'` |
 | `fcmToken` | String? | | Push target |
-| `instantBooking` | bool | | Read but **never used** to skip approval |
 | `travelBufferMinutes` | int? | `travelBuffer` | |
 
 **Derived:** `isSafariOperator`, `isStation`, `isPermanentlyBlocked`, `blockedUntil`,
@@ -583,8 +582,8 @@ zero-padded `YYYY-MM-DD`.
 
 ### 5.4 Social
 
-**`Review`** — `reviews/{id}`: `listingId` (**this is the trainer's uid**, misleadingly
-named for historical reasons), `userId`, `userName`, `rating` (clamped 1–5), `comment`,
+**`Review`** — `reviews/{id}`: `trainerId` (renamed from `listingId`, which
+held the same value under a misleading name), `userId`, `userName`, `rating` (clamped 1–5), `comment`,
 `bookingId`, `createdAt`.
 
 **`RatingSummary`** — computed. `none` is **average 5.0, count 0** (so unrated trainers
@@ -673,7 +672,7 @@ on the document** (not a sub-collection).
 | Day blocks | `instructorId` ∧ `date` | — |
 | Day bookings | `instructorId` ∧ `date` | — |
 | Vacations | `instructorId` | client-side by `startDate` |
-| Reviews for trainer | `listingId == trainerId` | client-side, newest first |
+| Reviews for trainer | `trainerId == trainerId` | client-side, newest first |
 | All ratings | *(entire collection)* | grouped client-side |
 | Inbox | `participants array-contains uid` | client-side, `lastMessageAt` desc |
 | Messages | — | `orderBy('createdAt')` |
@@ -690,24 +689,29 @@ the server without creating indexes breaks those screens with a `failed-precondi
 
 ### 6.3 Document writes
 
-**Booking created by a rider** (`createBooking`) writes *both* legacy and modern field names:
+**Booking created by a rider** (`createBooking`) — one canonical name per
+field. v2.6 dual-wrote `guestId`/`kiterId`, `time`/`startTime`,
+`price`/`totalPrice` and `bookingType`/`type` for a web client that shared the
+database; this app is the sole writer, so the legacy aliases are gone:
 
 ```jsonc
 {
   "id": "<docId>", "instructorId": "...", "instructorName": "...",
-  "kiterId": "<riderUid>", "guestId": "<riderUid>",
-  "studentName": "...", "studentLevel": "Rider",
+  "kiterId": "<riderUid>",
+  "studentName": "...", "studentLevel": "<the rider's level>",
   "listingTitle": "Trainer — SubTarget",   // or just the title
-  "serviceName": "<subTarget or title>",
   "subTarget": "...",                       // only when present
   "date": "2026-08-14",
-  "time": "09:00", "startTime": "09:00",    // both, for the web client
+  "startTime": "09:00",
   "endTime": "11:00", "bufferedEndTime": "12:00",
   "selectedTimes": ["09:00","10:00"], "durationHours": 2,
-  "price": 240, "totalPrice": 240,          // both
-  "type": "lesson", "bookingType": "lesson",// both
+  "totalPrice": 240,
+  "type": "lesson",
   "gearNeeded": false, "message": "...",
   "status": "pending",
+  // ...PaymentInfo.initialFields(amount:) — paymentStatus 'unpaid',
+  // amountDue, currency. Payment is recorded from the first write, never
+  // bolted on at the end.
   "createdAt": "<serverTimestamp>"
 }
 ```
@@ -726,9 +730,9 @@ safari seat via `bookedSeats: -1`, `status: 'open'`).
 **Check-in** — `{status: 'in_progress', checkedIn: true, startedAt}`.
 **Hide** — `{hiddenByInstructor | hiddenByGuest: true}`.
 
-**Notification** — always writes **both** recipient fields:
+**Notification** — `targetUserId` only. v2.6 also wrote `userId` as an alias for a web client that queried it; the `onNewNotification` Cloud Function reads `data.userId || data.targetUserId`, so dropping it still resolves the recipient:
 ```jsonc
-{ "targetUserId": "<uid>", "userId": "<uid>", "title": "...", "message": "...",
+{ "targetUserId": "<uid>", "title": "...", "message": "...",
   "type": "booking_request", "read": false, "createdAt": "<serverTimestamp>",
   "bookingId": "..." }
 ```
@@ -739,7 +743,7 @@ Then the thread: `{lastMessage, lastMessageTimestamp, updatedAt, unreadCount: {<
 
 **Availability block** — `{instructorId, date, startTime, endTime, status: 'host-blocked', label, createdAt}`
 **Vacation** — `{instructorId, startDate, endDate, label, createdAt}`
-**Review** — `{listingId, userId, userName, rating, comment, bookingId, createdAt}`
+**Review** — `{trainerId, userId, userName, rating, comment, bookingId, createdAt}`
 **Report** — `{reporterId, reporterName, reportedUserId, reportedUserName, reason, details, attachments, status: 'pending', createdAt}`
 **Leave reason** — `{userId, userName, userEmail, reason, createdAt}`
 **Ticket** — `{userId, userName, subject, status: 'open', createdAt, lastMessageAt}` + a first message
@@ -924,7 +928,7 @@ silently no-ops if found — so double submission is impossible even by race.
 `RatingSummary.from(reviews)` averages `rating`. With **no reviews the summary is 5.0/0**,
 so an unrated trainer displays "5.0" next to "(0 reviews)". Ratings for the whole
 marketplace come from one snapshot of the entire `reviews` collection grouped by
-`listingId`.
+`trainerId`.
 
 ### 8.11 Unread messages
 
@@ -1138,7 +1142,6 @@ reads `data.userId || data.targetUserId`).
 | Trigger | Recipient | `type` | Title | Body |
 |---|---|---|---|---|
 | Rider requests a booking | trainer | `booking_request` | "New booking request" | "{rider} requested {date} at {time}." |
-| …with instant confirm | trainer | `booking_confirmed` | "New instant booking ⚡" | "{rider} booked {date} at {time}." |
 | Trainer approves | rider | `booking_confirmed` | "Booking approved ✅" | "Your session on {date} is confirmed." |
 | Trainer declines | rider | `booking_rejected` | "Booking declined" | "…was declined." + " Reason: {reason}" when given |
 | Booking cancelled | rider | `booking_cancelled` | "Booking cancelled" | "Your session on {date} was cancelled." |
@@ -1146,6 +1149,13 @@ reads `data.userId || data.targetUserId`).
 | Rider cancels | trainer | `booking_cancelled` | "Rider cancelled ⚠️" | "{rider} cancelled {title} on {date}." |
 | Safari seat reserved | host | `booking_confirmed` | "New safari booking 🛥️" | "{rider} reserved a seat on {trip}." |
 | Chat message | recipient | `message` | "Message from {sender}" | body, truncated to 117 chars + "…" |
+| Admin approves a trainer | trainer | `account_approved` | "You're live on Flow 🤙" | "Your trainer profile is approved…" |
+| Admin declines an application | trainer | `account_rejected` | "Application not approved" | "We could not verify…" + " Reason: {reason}" when given |
+| Admin lifts a suspension | user | `account_restored` | "Your account is active again" | "Welcome back. Your suspension has been lifted." |
+
+> The three `account_*` types have no case in `NotificationKind.parse`, so they
+> all resolve to `system` and open a plain text sheet rather than routing
+> anywhere (§11.2). Unintended rather than chosen — see BUGS.md BUG-011.
 
 Walk-ins never notify (`kiterId == 'manual_entry'` has no account behind it), and
 `setStatus` returns early for manual bookings or an empty `kiterId`.
@@ -1321,9 +1331,8 @@ Unprofessional conduct · Safety concerns · Other
 | **Trainers cannot change their spot in-app** | `location` is rendered read-only with "Message support if you've moved". |
 | **Unrated trainers show "5.0"** | `RatingSummary.none` is `average: 5.0, count: 0`. |
 | **Travel buffer is stored but not enforced** | See §8.3. |
-| **`instantBooking` is dead** | Parsed from the profile and `createBooking` accepts an `instantConfirm` flag, but **no caller ever passes it** — every rider booking is created as `pending`. |
+| **`instantBooking` is gone** | Removed from `AppUser`: it was parsed from the profile and no caller ever used it. Every rider booking is created `pending`. |
 | **`rejected` accounts fall through to `ready`** | See §2.4. They get a Command Center but are absent from Explore. |
-| **`listingId` means trainer uid** | On `reviews` documents, for historical reasons. |
 | **`paymentStatus: 'paid'`** | Written on safari bookings; means nothing. |
 | **`Col.listings` / `Col.broadcasts`** | Declared but never read or written by this client. |
 | **All ratings load as one collection snapshot** | `ratingsProvider` streams the entire `reviews` collection to compute Explore's averages. Fine at current scale; a scaling risk. |
