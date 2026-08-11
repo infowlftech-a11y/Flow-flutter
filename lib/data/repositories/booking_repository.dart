@@ -48,6 +48,26 @@ class PaymentFailure implements Exception {
   String toString() => message;
 }
 
+/// The booking moved on before this write landed (§8.7).
+///
+/// Both lists are live streams, so a control can be tapped on a row that has
+/// already changed underneath. Two things went wrong while that was
+/// unguarded: an approval tapped just after the rider cancelled resurrected
+/// the booking as `confirmed` and told the rider it was on, and a rider
+/// cancelling a session that had already been delivered and settled took it
+/// out of `completed` — and so out of the trainer's earnings, which are a sum
+/// over exactly that status.
+///
+/// Distinct from the others because the recovery is neither "retry" nor
+/// "check the ticket": the caller's copy is simply stale, and the fix is to
+/// look again.
+class StatusConflictFailure implements Exception {
+  const StatusConflictFailure(this.message);
+  final String message;
+  @override
+  String toString() => message;
+}
+
 /// The same-day lead-time cutoff moved past a selected hour while the rider
 /// had the sheet open (§8.2). A subclass so existing `on SlotTakenFailure`
 /// handlers keep working — they already clear the selection, which is the
@@ -314,14 +334,68 @@ class BookingRepository {
 
   // ── Status transitions ─────────────────────────────────────────────────
 
+  /// Statuses nothing moves out of.
+  ///
+  /// `confirmed` is deliberately absent: the approve toast has no confirm
+  /// dialog, only an UNDO, and that UNDO writes `confirmed -> pending`
+  /// (§10.4). Catching it here would break the one control that depends on
+  /// being reversible.
+  static const _terminal = {
+    BookingStatus.completed,
+    BookingStatus.cancelled,
+    BookingStatus.rejected,
+  };
+
+  /// Applies [data] only if the booking has not already reached a terminal
+  /// state, with the read and the write in one transaction.
+  ///
+  /// Both lists are live streams, so the caller's copy can be stale by the
+  /// time they act on it. `markPaid`, `markRefunded` and `checkIn` have always
+  /// re-read state before writing; `setStatus` and `cancelByRider` moved the
+  /// same document with a bare `update` and did not.
+  /// Returns false when the booking was already in [target] and nothing was
+  /// written, so the caller can skip the notification that would otherwise
+  /// announce a change that did not happen.
+  Future<bool> _writeIfLive(
+          String bookingId, BookingStatus target, Map<String, dynamic> data) =>
+      _db.runTransaction((tx) async {
+        final ref = _col.doc(bookingId);
+        final snap = await tx.get(ref);
+        if (!snap.exists) {
+          throw const StatusConflictFailure('That booking no longer exists.');
+        }
+        final current = BookingStatus.parse(snap.data()?.str('status'));
+        // Asking for the state it is already in is a retry, not a conflict:
+        // a cancel issued from two screens, or one that had actually landed.
+        // The same reading `markPaid` takes of a second settlement — and the
+        // reason the safari seat count cannot be decremented twice.
+        if (current == target) return false;
+        if (_terminal.contains(current)) {
+          throw StatusConflictFailure(switch (current) {
+            BookingStatus.completed => 'That session is already finished.',
+            BookingStatus.cancelled => 'That booking was cancelled.',
+            BookingStatus.rejected => 'That booking was already declined.',
+            _ => 'That booking has already moved on.',
+          });
+        }
+        tx.update(ref, data);
+        return true;
+      });
+
   /// Approve / decline / complete, with the matching rider notification.
   /// Returns early for manual bookings or an empty kiterId (§11.1).
+  ///
+  /// Throws [StatusConflictFailure] if the booking has already finished, been
+  /// cancelled or been declined — the notification below is sent only when the
+  /// write actually lands, so a refused approval cannot tell the rider their
+  /// session is on.
   Future<void> setStatus(Booking booking, BookingStatus status,
       {String? declineReason}) async {
-    await _col.doc(booking.id).update({
+    final written = await _writeIfLive(booking.id, status, {
       'status': status.wire,
       'updatedAt': FieldValue.serverTimestamp(),
     });
+    if (!written) return;
 
     if (booking.isManual || booking.kiterId.isEmpty) return;
 
@@ -441,12 +515,20 @@ class BookingRepository {
   }
 
   /// Rider cancel — releases a safari seat too, and tells the trainer (§6.3).
+  ///
+  /// Throws [StatusConflictFailure] on a session that has already finished:
+  /// earnings are a sum over `completed` bookings, so cancelling a delivered,
+  /// settled lesson used to take the money off the trainer's books while
+  /// `paidAt` stayed on the document.
   Future<void> cancelByRider(Booking booking) async {
-    await _col.doc(booking.id).update({
+    final written = await _writeIfLive(booking.id, BookingStatus.cancelled, {
       'status': 'cancelled',
       'cancelledAt': FieldValue.serverTimestamp(),
       'cancelledBy': 'user',
     });
+    // A cancel that had already landed releases no second seat and sends no
+    // second warning to the trainer.
+    if (!written) return;
     if (booking.isSafari && booking.tripId != null) {
       final tripRef = _db.collection(Col.safariTrips).doc(booking.tripId!);
       await _db.runTransaction((tx) async {

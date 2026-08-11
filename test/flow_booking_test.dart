@@ -126,18 +126,18 @@ void main() {
       expect(trainers.single.title, 'New booking request');
     });
 
-    test('approving twice does not double-notify the rider', () async {
-      // IDEMPOTENCY. Unlike the admin console, approve here has a busy guard
-      // (§10.5) — but a second device can still land the same write.
+    test('approving twice notifies the rider once', () async {
+      // IDEMPOTENCY. Approve has a busy guard (§10.5), but a second device
+      // can still land the same write. The second one changes nothing, so it
+      // announces nothing.
       final id = await request();
       final b = await asTrainer(id);
       await repo.setStatus(b, BookingStatus.confirmed);
       await repo.setStatus(b, BookingStatus.confirmed);
 
       await expectBothSee(id, BookingStatus.confirmed);
-      expect(await inbox(rider), hasLength(2),
-          reason: 'documents current behaviour: the write is idempotent, '
-              'the notification is not');
+      expect(await inbox(rider), hasLength(1),
+          reason: 'a notification must describe a change that happened');
     });
   });
 
@@ -321,31 +321,32 @@ void main() {
     });
   });
 
-  group('adversarial — state moved under the actor', () {
-    test('approving a booking the rider already cancelled still lands',
+  group('a terminal booking cannot be moved again (BUG-013, BUG-014)', () {
+    // markPaid, markRefunded and checkIn all re-read state inside a
+    // transaction before writing. setStatus and cancelByRider did not, and
+    // they move the same document. These pin the guard that closes that.
+
+    test('approving a booking the rider already cancelled is refused',
         () async {
-      // ORDERING. The trainer's list is a stream; they can tap approve on a
-      // row the rider cancelled a moment earlier. Nothing prevents it, so
-      // both parties end up looking at a confirmed session neither wants.
+      // ORDERING. The trainer's request list is a stream, so approve can be
+      // tapped on a row the rider cancelled a moment earlier.
       final id = await request();
       await repo.cancelByRider(await asRider(id));
       final stale = await asTrainer(id); // read before, acted on after
 
-      await repo.setStatus(stale, BookingStatus.confirmed);
+      await expectLater(
+        repo.setStatus(stale, BookingStatus.confirmed),
+        throwsA(isA<StatusConflictFailure>()),
+      );
 
-      await expectBothSee(id, BookingStatus.confirmed);
+      await expectBothSee(id, BookingStatus.cancelled);
       expect((await inbox(rider)).any((n) => n.title == 'Booking approved ✅'),
-          isTrue,
-          reason: 'BUG-013: a cancelled booking was resurrected by an '
-              'in-flight approval, and the rider was told it was confirmed');
+          isFalse,
+          reason: 'no approval notification for a booking that stayed cancelled');
     });
 
-    test('a rider can cancel a session that already happened, and it leaves '
-        'the trainers earnings', () async {
-      // BUG-014. `cancelByRider` writes unconditionally, and earnings are
-      // Σ totalPrice over *completed* bookings — so cancelling a delivered,
-      // settled session silently removes it from the trainer's revenue.
-      // Pinned as current behaviour, not asserted as intended.
+    test('a rider cancelling a session that already happened is refused, and '
+        'the earnings survive', () async {
       final id = await request(hours: ['10:00', '11:00']); // 2h × €50
       await repo.setStatus(await asTrainer(id), BookingStatus.confirmed);
       await repo.setStatus(await asTrainer(id), BookingStatus.completed);
@@ -359,13 +360,121 @@ void main() {
 
       expect(await earnings(), 100);
 
+      await expectLater(
+        repo.cancelByRider(await asRider(id)),
+        throwsA(isA<StatusConflictFailure>()),
+      );
+
+      await expectBothSee(id, BookingStatus.completed);
+      expect(await earnings(), 100,
+          reason: 'delivered, settled work stays on the books');
+    });
+
+    // Every terminal state, against every move out of it.
+    for (final from in [
+      BookingStatus.completed,
+      BookingStatus.cancelled,
+      BookingStatus.rejected,
+    ]) {
+      for (final to in [
+        BookingStatus.pending,
+        BookingStatus.confirmed,
+        BookingStatus.inProgress,
+        BookingStatus.completed,
+      ].where((s) => s != from)) {
+        test('${from.wire} -> ${to.wire} is refused', () async {
+          final id = await request();
+          await repo.setStatus(await asTrainer(id), from);
+
+          await expectLater(
+            repo.setStatus(await asTrainer(id), to),
+            throwsA(isA<StatusConflictFailure>()),
+          );
+          await expectBothSee(id, from);
+        });
+      }
+
+      test('asking a ${from.wire} booking for ${from.wire} again is a no-op, '
+          'not an error', () async {
+        // A retry that had already landed, or the same tap from two screens.
+        // The same reading markPaid takes of a second settlement — and what
+        // keeps a double cancel from releasing a safari seat twice.
+        final id = await request();
+        await repo.setStatus(await asTrainer(id), from);
+
+        await expectLater(repo.setStatus(await asTrainer(id), from), completes);
+        await expectBothSee(id, from);
+      });
+
+      if (from != BookingStatus.cancelled) {
+        test('${from.wire} cannot be cancelled by the rider', () async {
+          final id = await request();
+          await repo.setStatus(await asTrainer(id), from);
+
+          await expectLater(
+            repo.cancelByRider(await asRider(id)),
+            throwsA(isA<StatusConflictFailure>()),
+          );
+          await expectBothSee(id, from);
+        });
+      }
+
+      test('a refused move on a ${from.wire} booking notifies nobody',
+          () async {
+        final id = await request();
+        await repo.setStatus(await asTrainer(id), from);
+        final before = (await inbox(rider)).length;
+
+        await repo
+            .setStatus(await asTrainer(id), BookingStatus.confirmed)
+            .catchError((_) {});
+
+        expect((await inbox(rider)).length, before,
+            reason: 'the notification must not outlive the refused write');
+      });
+    }
+
+    test('the approve UNDO still works — confirmed is not terminal', () async {
+      // §10.4: approve has no confirm dialog, only an UNDO in the toast. A
+      // guard that caught confirmed -> pending would silently break it.
+      final id = await request();
+      await repo.setStatus(await asTrainer(id), BookingStatus.confirmed);
+      await repo.setStatus(await asTrainer(id), BookingStatus.pending);
+
+      await expectBothSee(id, BookingStatus.pending);
+    });
+
+    test('the ordinary path is untouched: pending -> confirmed -> completed',
+        () async {
+      final id = await request();
+      await repo.setStatus(await asTrainer(id), BookingStatus.confirmed);
+      await expectBothSee(id, BookingStatus.confirmed);
+      await repo.setStatus(await asTrainer(id), BookingStatus.completed);
+      await expectBothSee(id, BookingStatus.completed);
+    });
+
+    test('a rider can still cancel a live booking', () async {
+      final id = await request();
+      await repo.setStatus(await asTrainer(id), BookingStatus.confirmed);
       await repo.cancelByRider(await asRider(id));
 
       await expectBothSee(id, BookingStatus.cancelled);
-      expect(await earnings(), 0,
-          reason: 'BUG-014: €100 of delivered, paid work vanished from the '
-              'trainer’s earnings because the rider cancelled afterwards');
     });
+
+    test('a booking that vanished mid-flight is a named failure, not a crash',
+        () async {
+      final id = await request();
+      final stale = await asTrainer(id);
+      await db.collection(Col.bookings).doc(id).delete();
+
+      await expectLater(
+        repo.setStatus(stale, BookingStatus.confirmed),
+        throwsA(isA<StatusConflictFailure>()),
+      );
+    });
+  });
+
+  group('adversarial — state moved under the actor', () {
 
     test('a booking whose trainer account is gone still resolves', () async {
       // EMPTY. The rider must not lose their history because the other party
