@@ -1,0 +1,14 @@
+{
+  "name": "flow-rules-tests",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Security-rules tests for firestore.rules. Run with: npm test",
+  "scripts": {
+    "_comment": "test-concurrency=1 is load-bearing: every file's reset() calls clearFirestore() on the one emulator project, so files running in parallel wipe each other's seed data mid-test and produce results that look like rule failures.",
+    "test": "firebase emulators:exec --only firestore --project wlf-flow \"node --test --test-concurrency=1\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.1",
+    "firebase": "^12.17.1"
+  }
+}

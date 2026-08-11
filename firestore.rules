@@ -99,6 +99,28 @@ service cloud.firestore {
                    'paymentRef', 'amountDue', 'currency', 'totalPrice']);
       }
 
+      // What a rider may touch after the booking exists, as a closed set.
+      //
+      // Stripping money fields from an otherwise open document was not
+      // enough: `status`, `date` and `instructorId` were left writable, so a
+      // rider could confirm their own pending request, check themselves in
+      // without the QR scan, self-complete a session to unlock a review for
+      // a lesson that never ran (§8.9), or move the booking onto another
+      // trainer's calendar. A rider's real write surface is exactly one call
+      // — `cancelByRider` — plus `hide`.
+      function riderFieldsOnly() {
+        return request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'cancelledAt', 'cancelledBy', 'hiddenByGuest',
+                    'updatedAt']);
+      }
+
+      // …and `cancelled` is the only status a rider may write.
+      function riderStatusIsCancellation() {
+        return !request.resource.data.diff(resource.data).affectedKeys()
+                 .hasAny(['status'])
+            || request.resource.data.status == 'cancelled';
+      }
+
       allow read: if signedIn() && (isParty() || isStaff());
 
       // On create the rider states what they owe, never that it is settled.
@@ -119,7 +141,8 @@ service cloud.firestore {
       // with no profile document rather than simply denying them.
       allow update: if signedIn()
         && (isProvider()
-            || (isParty() && paymentFieldsUnchanged())
+            || (isParty() && paymentFieldsUnchanged()
+                && riderFieldsOnly() && riderStatusIsCancellation())
             || isStaff());
 
       allow delete: if isStaff();
@@ -166,11 +189,24 @@ service cloud.firestore {
         return uid() in resource.data.participants;
       }
 
+      // Who is in a conversation is fixed when it opens. Leaving this field
+      // writable let a participant add an outsider — which grants them every
+      // message in the thread, since the sub-collection resolves access
+      // through this same array — or drop the other party, who then loses a
+      // thread that `allow delete: if false` means nobody can ever remove.
+      //
+      // `ensureThread` re-writes `participants` on every open, but always the
+      // identical sorted pair, so this leaves it untouched.
+      function participantsUnchanged() {
+        return !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['participants']);
+      }
+
       allow read: if signedIn() && isParticipant();
       // The thread is created on first open, so authorise from the payload.
       allow create: if signedIn()
         && uid() in request.resource.data.participants;
-      allow update: if signedIn() && isParticipant();
+      allow update: if signedIn() && isParticipant() && participantsUnchanged();
       allow delete: if false;
 
       match /messages/{messageId} {
