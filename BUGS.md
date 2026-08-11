@@ -392,3 +392,54 @@ that re-reads `status` and refuses a transition out of a terminal state
 (`completed`, `cancelled`, `rejected`), throwing the way `CheckInFailure`
 does so the UI can say why. Two frozen methods change, so this needs your
 say-so — and BUG-014 deserves it soon, because it is live and it is money.
+
+---
+
+## BUG-015 — `createBooking` accepts a non-contiguous selection
+
+**Severity:** minor (latent — unreachable from the UI)
+**Found:** `test/flow_collision_test.dart`
+**File:** [booking_repository.dart:140-160](lib/data/repositories/booking_repository.dart#L140-L160)
+**Status:** not fixed — reported only
+
+Booking `['10:00', '15:00']` succeeds. Duration is the *count* of selected
+hours, so the window is cut as start + 2h: the booking claims 10:00 and
+15:00 on the calendar but records `endTime: '12:00'`, and any consumer
+reading the range rather than `selectedTimes` sees a two-hour 10:00-12:00
+session that does not match the hours actually held.
+
+§8.4's contiguous-run rule lives in the booking grid's `_tapSlot`, so this
+selection cannot be produced by the app. `createBooking` itself does not
+re-check it, which makes the invariant a property of one widget rather than
+of the write.
+
+Left alone because the guard belongs next to the rule it enforces, and
+deciding where that is — the repository, or `BookingMath` beside
+`leadingRun` — is a design call rather than a fix.
+
+---
+
+## NOTE — what the Dart harness cannot verify
+
+Not a defect in the app, but it shapes every concurrency claim in
+COVERAGE.md, so it is recorded here.
+
+`fake_cloud_firestore.runTransaction` provides **no isolation**. A probe of
+two concurrent transactions that each read a counter and write `read + 1`
+lands on **1**, not 2 — a plain lost update.
+
+Consequence: no test in `test/` can verify a transactional-isolation claim.
+That covers safari seat capacity (§8.6), `markPaid`'s double-settle guard,
+`checkIn`, and `blockUser`/`unblockUser`. Those tests verify their
+*precondition logic*, which is real and worth having; they say nothing
+about contention.
+
+Three concurrent `reserveSafariSeat` calls against a two-seat trip sell
+three seats **in the fake** — which reads exactly like an overselling bug
+and is not one. `test_rules/transactions.test.mjs` settles it against real
+Firestore on the emulator: the third rider is refused, `bookedSeats` lands
+on 2, and the trip flips to `full`. §8.6's claim holds.
+
+That file exercises the *pattern* the repository uses, not the Dart code —
+`flutter test` cannot reach an emulator. Closing that last gap needs an
+`integration_test` run on a device pointed at the emulator.
