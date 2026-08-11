@@ -249,3 +249,90 @@ Pin the field. The app's only write of `participants` is
 [chat_repository.dart:77-81](lib/data/repositories/chat_repository.dart#L77-L81),
 a merge that writes `[me, partnerId]..sort()` — the identical value every
 time, so `affectedKeys()` stays empty and the guard does not affect it.
+
+---
+
+## BUG-009 — Blueprint §6.2/§6.3/§8.10 name a review field the code renamed
+
+**Severity:** minor (documentation drift)
+**File:** [APP_LOGIC_BLUEPRINT.md](APP_LOGIC_BLUEPRINT.md) §6.2, §6.3, §8.10
+**Status:** not fixed — blueprint edit, needs your say-so
+
+The blueprint says reviews carry `listingId` and that ratings are grouped by
+it. The code writes and queries **`trainerId`**, and
+[social.dart:5-7](lib/data/models/social.dart#L5-L7) explains the rename:
+"The field was called `listingId` while it held the trainer's uid — on a
+database only this app writes, it is stored honestly as `trainerId`."
+
+The code is right and the blueprint was not updated. Flagged rather than
+silently corrected because the blueprint is the specification of record.
+
+---
+
+## BUG-010 — Blueprint §11.1/§6.3 say notifications dual-write `userId`
+
+**Severity:** minor (documentation drift)
+**File:** [APP_LOGIC_BLUEPRINT.md](APP_LOGIC_BLUEPRINT.md) §6.3, §11.1
+**Status:** not fixed — blueprint edit, needs your say-so
+
+Both sections state notifications are written with **both** `targetUserId`
+and `userId`. `NotificationRepository.notify` writes only `targetUserId`,
+and [notification_repository.dart:26-32](lib/data/repositories/notification_repository.dart#L26-L32)
+explains why: the dual write existed for a web client that no longer
+shares the database, and the Cloud Function reads
+`data.userId || data.targetUserId` so it still resolves.
+
+Same as BUG-009 — code is right, blueprint is stale.
+
+---
+
+## BUG-011 — The admin's own notification types are unmodelled
+
+**Severity:** minor
+**Found:** `test/flow_approval_test.dart`
+**Files:** [admin_repository.dart](lib/data/repositories/admin_repository.dart),
+[social.dart:157-167](lib/data/models/social.dart#L157-L167)
+**Status:** not fixed — reported only
+
+`AdminRepository` writes `type: 'account_approved'` and
+`type: 'account_rejected'`. `NotificationKind.parse` has a case for neither,
+so both fall through to `_ => system` and route to a plain text sheet
+(§11.2) rather than anywhere useful. §11.1's table does not list them
+either, so all three places were written independently.
+
+Harmless as it stands — a text sheet is a reasonable destination for "your
+application was reviewed" — but it is unintended rather than chosen, and
+the approval notification arguably belongs on the trainer's own profile.
+
+---
+
+## BUG-012 — Approving a blocked account silently voids the suspension, and a later unblock then demotes them
+
+**Severity:** major (latent — not reachable from today's UI)
+**Found:** `test/flow_approval_test.dart`, adversarial pass
+**File:** [admin_repository.dart](lib/data/repositories/admin_repository.dart)
+**Status:** not fixed — needs a decision
+
+`approveTrainer` and `restoreToPending` write `status` without touching
+`blockedUntil` or `statusBeforeBlock`. Two consequences, both pinned by
+passing tests:
+
+1. **Approving a blocked trainer lifts the block as a side effect.** Status
+   becomes `active`, so the gate stops applying the suspension, and they are
+   bookable in Explore again — while `blockedUntil: 'forever'` sits stale on
+   the document.
+2. **A later unblock demotes them.** `unblockUser` restores
+   `statusBeforeBlock`, which still holds the pre-block value. An approved,
+   live trainer is pulled back to `pending` and disappears from Explore,
+   undoing an approval that happened in between.
+
+**Not reachable today:** the approvals queue filters `status == 'pending'`,
+so a blocked account never appears in it, and `watchBlockedUsers()` has no
+UI at all — so `unblockUser` currently has no caller either. This becomes
+live the moment the blocked-users list is built.
+
+The fix is to clear `blockedUntil` and `statusBeforeBlock` in
+`approveTrainer`, `rejectTrainer` and `restoreToPending` — a change to a
+frozen repository, so it needs your approval, and I would want the
+blocked-users UI decided first since that is what determines the intended
+semantics.
