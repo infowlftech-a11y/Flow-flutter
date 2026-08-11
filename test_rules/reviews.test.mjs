@@ -161,10 +161,8 @@ describe('reviews — what the rules deliberately do not enforce', () => {
     );
   });
 
-  test('a blocked user can still write a review', async () => {
-    const db = await as('blocked');
-    await assertSucceeds(
-      db.collection('reviews').doc('n2').set(review({ userId: 'blocked' })),
-    );
-  });
+  // "a blocked user can still write a review" used to live here, pinning
+  // BUG-007. It no longer holds: notBlocked() now guards this create, and the
+  // denial is asserted in misc.test.mjs alongside the rest of the suspension
+  // surface. Eligibility is still unenforced — that part of BUG-004 stands.
 });

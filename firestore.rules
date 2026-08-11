@@ -34,6 +34,31 @@ service cloud.firestore {
         && selfProfile().role in ['admin', 'owner', 'support'];
     }
 
+    // A suspension has to bite at the API, not only in the app's routing.
+    //
+    // Nothing here read `status` before, so a blocked account kept a valid
+    // token and full write access: it could still book, message the rider who
+    // reported it, and post reviews. The gate in the client stopped the app
+    // from *offering* those things, which is not the same as preventing them —
+    // the same distinction that made a rider able to confirm their own
+    // booking.
+    //
+    // Deliberately applied to `create` only, and only where a suspended
+    // account can reach someone else. What stays open:
+    //   * appeals      — the whole point of a suspension is to be appealable
+    //   * tickets      — support is the other lifeline
+    //   * leave_reasons — they may still delete their account (§3.13)
+    //   * every read   — they must see their own gate and appeal
+    //   * booking *updates* — otherwise a blocked rider cannot cancel, and
+    //     holds a trainer's calendar until the suspension lifts
+    //
+    // Fails closed: a signed-in user with no profile document is denied
+    // rather than let through.
+    function notBlocked() {
+      return exists(/databases/$(database)/documents/users/$(uid()))
+        && selfProfile().status != 'blocked';
+    }
+
     // Fields a user must never be able to set on themselves.
     function privilegedFieldsUnchanged() {
       return !request.resource.data.diff(resource.data).affectedKeys()
@@ -126,7 +151,7 @@ service cloud.firestore {
       // On create the rider states what they owe, never that it is settled.
       // A trainer creating a walk-in may record cash taken up front, so the
       // constraint is on riders only.
-      allow create: if signedIn()
+      allow create: if signedIn() && notBlocked()
         && (request.resource.data.kiterId == uid()
             || request.resource.data.instructorId == uid())
         && (request.resource.data.instructorId == uid()
@@ -173,7 +198,7 @@ service cloud.firestore {
     // repository; the rules pin authorship and the 1–5 range.
     match /reviews/{reviewId} {
       allow read: if signedIn();
-      allow create: if signedIn()
+      allow create: if signedIn() && notBlocked()
         && request.resource.data.userId == uid()
         && request.resource.data.rating is int
         && request.resource.data.rating >= 1
@@ -204,7 +229,7 @@ service cloud.firestore {
 
       allow read: if signedIn() && isParticipant();
       // The thread is created on first open, so authorise from the payload.
-      allow create: if signedIn()
+      allow create: if signedIn() && notBlocked()
         && uid() in request.resource.data.participants;
       allow update: if signedIn() && isParticipant() && participantsUnchanged();
       allow delete: if false;
@@ -217,7 +242,7 @@ service cloud.firestore {
         }
 
         allow read: if signedIn() && inThread();
-        allow create: if signedIn() && inThread()
+        allow create: if signedIn() && inThread() && notBlocked()
           && request.resource.data.senderId == uid();
         // Messages are immutable once sent.
         allow update, delete: if false;
@@ -276,7 +301,7 @@ service cloud.firestore {
     // others filed, or discover that you have been reported.
     match /reports/{reportId} {
       allow read: if isStaff();
-      allow create: if signedIn()
+      allow create: if signedIn() && notBlocked()
         && request.resource.data.reporterId == uid();
       allow update, delete: if isStaff();
     }

@@ -182,43 +182,101 @@ describe('the catch-all (deny by default)', () => {
   });
 });
 
-describe('what a blocked account can still reach', () => {
-  // The rules never read `status`, so suspension is a client-side gate only.
-  // Each of these is a real capability a blocked user retains at the API.
-  // Logged as BUG-007. Asserted as successes because that is the current
-  // truth — if any starts failing, enforcement moved and this must be revised.
+describe('a blocked account is stopped at the API, not just in the UI', () => {
+  // BUG-007. Nothing read `status` before, so a suspension was enforced by
+  // the client's routing alone — which stops the app from *offering* an
+  // action, not from performing it.
 
-  test('a blocked user reads profiles', async () => {
+  test('DENY a blocked user creating a booking', async () => {
     const db = await as('blocked');
-    await assertSucceeds(db.collection('users').doc('trainer').get());
-  });
-
-  test('a blocked user creates a booking', async () => {
-    const db = await as('blocked');
-    await assertSucceeds(
+    await assertFails(
       db.collection('bookings').doc('nb').set(bookingDoc({ id: 'nb', kiterId: 'blocked' })),
     );
   });
 
-  test('a blocked user sends a chat message', async () => {
+  test('DENY a blocked user opening a chat thread', async () => {
     const db = await as('blocked');
-    await assertSucceeds(
+    await assertFails(
+      db.collection('chats').doc('c2').set({ participants: ['blocked', 'trainer2'] }),
+    );
+  });
+
+  test('DENY a blocked user sending a chat message', async () => {
+    // The highest-harm case: the usual reasons for a block are
+    // "Inappropriate behavior" and "Safety concerns", and this is the path
+    // straight back to the person who reported them.
+    const db = await as('blocked');
+    await assertFails(
       db.collection('chats').doc('c1').collection('messages').doc('m1')
         .set({ senderId: 'blocked', receiverId: 'trainer', text: 'hi', read: false }),
     );
   });
 
-  test('a blocked user files a report', async () => {
+  test('DENY a blocked user posting a review', async () => {
     const db = await as('blocked');
-    await assertSucceeds(
-      db.collection('reports').doc('rp9').set({ reporterId: 'blocked', reportedUserId: 'trainer', reason: 'Other' }),
+    await assertFails(
+      db.collection('reviews').doc('r9').set({
+        trainerId: 'trainer', userId: 'blocked', userName: 'B',
+        rating: 1, comment: '', bookingId: 'b1',
+      }),
     );
   });
 
-  test('a blocked user files an appeal — intended (§3.12)', async () => {
+  test('DENY a blocked user filing a report', async () => {
+    const db = await as('blocked');
+    await assertFails(
+      db.collection('reports').doc('rp9')
+        .set({ reporterId: 'blocked', reportedUserId: 'trainer', reason: 'Other' }),
+    );
+  });
+});
+
+describe('…and keeps everything a suspension must not take away', () => {
+  test('a blocked user files an appeal — the point of a suspension (§3.12)',
+    async () => {
+      const db = await as('blocked');
+      await assertSucceeds(
+        db.collection('appeals').doc('ap9')
+          .set({ userId: 'blocked', reason: 'Please', status: 'pending' }),
+      );
+    });
+
+  test('a blocked user opens a support ticket', async () => {
     const db = await as('blocked');
     await assertSucceeds(
-      db.collection('appeals').doc('ap9').set({ userId: 'blocked', reason: 'Please', status: 'pending' }),
+      db.collection('tickets').doc('t9')
+        .set({ userId: 'blocked', subject: 'Help', status: 'open' }),
+    );
+  });
+
+  test('a blocked user reads profiles — they can still see the app', async () => {
+    const db = await as('blocked');
+    await assertSucceeds(db.collection('users').doc('trainer').get());
+  });
+
+  test('a blocked rider can still CANCEL an existing booking', async () => {
+    // Load-bearing. If a suspension froze their bookings, a blocked rider
+    // would hold a trainer's calendar hostage until it lifted.
+    await seed(async (db) => {
+      await db.collection('bookings').doc('b2')
+        .set(bookingDoc({ id: 'b2', kiterId: 'blocked', status: 'confirmed' }));
+    });
+    const db = await as('blocked');
+    await assertSucceeds(db.collection('bookings').doc('b2').update({
+      status: 'cancelled', cancelledAt: 'now', cancelledBy: 'user',
+    }));
+  });
+
+  test('a blocked user can still delete their account (§3.13)', async () => {
+    const db = await as('blocked');
+    await assertSucceeds(db.collection('users').doc('blocked').delete());
+  });
+
+  test('a blocked user can still record why they left', async () => {
+    const db = await as('blocked');
+    await assertSucceeds(
+      db.collection('leave_reasons').doc('l9')
+        .set({ userId: 'blocked', reason: 'Done with it' }),
     );
   });
 
@@ -231,6 +289,36 @@ describe('what a blocked account can still reach', () => {
     const db = await as('rejectedTrainer');
     await assertFails(
       db.collection('users').doc('rejectedTrainer').update({ status: 'active' }),
+    );
+  });
+});
+
+describe('notBlocked() fails closed', () => {
+  test('DENY a signed-in user with no profile document creating a booking',
+    async () => {
+      // Mid-onboarding there is no users/{uid} yet. Onboarding writes the
+      // profile before anything else, so nothing legitimate is caught here —
+      // and a missing profile must never read as "not blocked".
+      const db = await as('noProfile');
+      await assertFails(
+        db.collection('bookings').doc('nb')
+          .set(bookingDoc({ id: 'nb', kiterId: 'noProfile' })),
+      );
+    });
+
+  test('an active user with a profile is unaffected', async () => {
+    const db = await as('rider2');
+    await assertSucceeds(
+      db.collection('bookings').doc('nb')
+        .set(bookingDoc({ id: 'nb', kiterId: 'rider2' })),
+    );
+  });
+
+  test('a pending trainer is not blocked — pending is not blocked', async () => {
+    const db = await as('pendingTrainer');
+    await assertSucceeds(
+      db.collection('chats').doc('c3')
+        .set({ participants: ['pendingTrainer', 'rider'] }),
     );
   });
 });

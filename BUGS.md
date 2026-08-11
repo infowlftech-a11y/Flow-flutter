@@ -14,7 +14,7 @@ inconsistent but not exploitable.
 **Severity:** critical (privilege escalation)
 **Found:** rules suite, `test_rules/bookings.test.mjs`
 **File:** [firestore.rules:120-123](firestore.rules#L120-L123)
-**Status:** fix written, awaiting approval to deploy
+**Status:** FIXED and deployed to wlf-flow
 
 ### What
 
@@ -193,7 +193,7 @@ flow is outside the six flows in scope and I have not traced its writes.
 **Severity:** major
 **Found:** rules suite, `test_rules/misc.test.mjs`
 **File:** [firestore.rules](firestore.rules) (absence of a rule)
-**Status:** not fixed — needs a decision
+**Status:** FIXED and deployed to wlf-flow
 
 No rule anywhere reads `status`. A blocked account keeps a valid Firebase
 token and, at the API, retains the ability to read profiles, create
@@ -204,9 +204,31 @@ own UI from offering those actions and nothing else.
 Filing an appeal *must* stay available (§3.12, and the rules comment on
 appeals says so). The rest arguably should not be.
 
-The fix is one function — `notBlocked()` reading `selfProfile().status` —
-added to the write rules for bookings, chats, reviews and reports. It costs
-one `get()` per write on rules that mostly already pay for one.
+### Fix (applied)
+
+`notBlocked()` reads `selfProfile().status` and is applied to **create**
+only, on the four paths where a suspended account reaches someone else:
+bookings, chats, chat messages, reviews and reports.
+
+Deliberately left open, each with a test proving it still works:
+
+| Still permitted | Why |
+|---|---|
+| filing an appeal | the point of a suspension is that it can be appealed (§3.12) |
+| opening a support ticket | the other lifeline |
+| **cancelling an existing booking** | otherwise a blocked rider holds a trainer's calendar hostage until the suspension lifts |
+| deleting their account | §3.13 |
+| recording a leave reason | follows account deletion |
+| every read | they must see their own gate and their appeal |
+
+`notBlocked()` fails closed: it `exists()`-checks the profile first, so a
+signed-in user with no `users/{uid}` document is denied rather than read as
+"not blocked". Onboarding writes the profile before anything else, so
+nothing legitimate is caught by that.
+
+Cost: one extra `get()` per guarded create. Accepted — the alternative is a
+suspension that stops the UI from *offering* an action but not from
+performing it, which is the same distinction that made BUG-001 exploitable.
 
 ---
 
@@ -215,7 +237,7 @@ one `get()` per write on rules that mostly already pay for one.
 **Severity:** critical (privacy breach + denial of access)
 **Found:** rules suite, `test_rules/chats.test.mjs`
 **File:** [firestore.rules:164-189](firestore.rules#L164-L189)
-**Status:** fix written, awaiting approval to deploy
+**Status:** FIXED and deployed to wlf-flow
 
 ### What
 
@@ -345,7 +367,7 @@ semantics.
 **Found:** `test/flow_booking_test.dart`, adversarial pass
 **File:** [booking_repository.dart:319-323](lib/data/repositories/booking_repository.dart#L319-L323),
 [booking_repository.dart:444-449](lib/data/repositories/booking_repository.dart#L444-L449)
-**Status:** not fixed — frozen repository, needs your approval
+**Status:** FIXED — `StatusConflictFailure`, commit `318c84d`
 
 ### The shared root cause
 
