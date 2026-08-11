@@ -7,12 +7,12 @@ Every numbered section of §6.2, §6.3, §8, §9, §10 and §11 gets a row.
 
 | Suite | Runs against | Count |
 |---|---|---|
-| `test/` (`flutter test`) | `fake_cloud_firestore` — **rules are not evaluated** | 613 |
-| `test_rules/` (`npm test`) | Firestore emulator — the real `firestore.rules` | 260 |
+| `test/` (`flutter test`) | `fake_cloud_firestore` — **rules are not evaluated** | 636 |
+| `test_rules/` (`npm test`) | Firestore emulator — the real `firestore.rules` | 268 |
 
-613 = the 445 that existed before this work, unmodified and still green,
-plus 168 new. New files: `flow_approval_test.dart` (30),
-`flow_booking_test.dart` (29), `flow_collision_test.dart` (30),
+636 = the 445 that existed before this work, unmodified and still green,
+plus 191 new. New files: `flow_approval_test.dart` (30),
+`flow_booking_test.dart` (51), `flow_collision_test.dart` (30),
 `flow_checkin_test.dart` (17), `flow_review_test.dart` (34),
 `flow_moderation_test.dart` (28).
 
@@ -85,10 +85,10 @@ now routed to `test_rules/transactions.test.mjs` and
 | Ticket + first message | `support.test.mjs` | pass |
 | Appeal + arrayUnion replies | `flow_moderation_test`; `arrays.test.mjs` | pass |
 
-> **§6.3 is stale.** It documents the pre-cleanup dual-write shape —
-> `guestId`, `time`, `price`, `bookingType`, `serviceName` on bookings, and
-> `userId` on notifications. The code writes one canonical name each and says
-> why. BUG-009, BUG-010.
+> **§6.3 was stale** — it documented the pre-cleanup dual-write shape
+> (`guestId`, `time`, `price`, `bookingType` on bookings, `userId` on
+> notifications). Corrected in commit `f46996e`; BUG-009 and BUG-010 record
+> what changed.
 
 ## §8 Business logic rules — 11 of 11 have tests
 
@@ -138,7 +138,7 @@ now routed to `test_rules/transactions.test.mjs` and
 | Trigger | Test | Status |
 |---|---|---|
 | Rider requests a booking | `flow_booking_test` — "the request lands on both lists" | pass |
-| …with instant confirm | — | **does not exist**: `instantBooking` was removed from `AppUser` ("parsed from the profile but no caller ever used it"). §11.1 documents a dead feature |
+| …with instant confirm | — | **row removed from §11.1** (commit f46996e): `instantBooking` was deleted from `AppUser`, so the feature it described is unreachable |
 | Trainer approves | `flow_booking_test` — title, body, kind, bookingId | pass |
 | Trainer declines | `flow_booking_test` — with, without, and whitespace-only reason | pass |
 | Booking cancelled (by trainer) | `flow_booking_test` — "trainer cancels a confirmed session" | pass |
@@ -146,7 +146,7 @@ now routed to `test_rules/transactions.test.mjs` and
 | Rider cancels | `flow_booking_test` — "the trainer is told, with the session named" | pass |
 | Safari seat reserved | `booking_repository_test` (pre-existing) | pass |
 | Chat message | `chats.test.mjs` — permissions only | **partial** — the 117-char truncation is not tested |
-| *(undocumented)* account_approved / account_rejected / account_restored | `flow_approval_test`, `flow_moderation_test` | pass — but they parse to `NotificationKind.system` (BUG-011), and §11.1 does not list them |
+| account_approved / account_rejected / account_restored | `flow_approval_test`, `flow_moderation_test` | pass — **now documented in §11.1** (commit f46996e). All three still parse to `NotificationKind.system` (BUG-011, open) |
 
 | §11.2 In-app tap routing | Not covered | **not covered** — routing lives in `notifications_screen.dart` |
 | §11.3 Push (FCM) | Not covered | **not covered** — and **Cloud Functions are disabled on this project**, so no push is delivered at all today |
@@ -164,7 +164,7 @@ now routed to `test_rules/transactions.test.mjs` and
 | `chats` + messages | 25 | **BUG-008 found and fixed here** |
 | tickets, appeals, reports, leave_reasons | 44 | reports write-only for the reporter (§3.12) |
 | notifications, safari_trips, catch-all | 40 | BUG-005 and BUG-006 pinned as current behaviour |
-| blocked-account reach | 7 | **BUG-007** — no rule reads `status` |
+| blocked-account reach | 15 | **BUG-007 fixed** — notBlocked() on the five creates that reach someone else; the appeal, ticket, cancel, delete and read paths each have a test proving they stay open |
 | transactions + arrays | 9 | real-Firestore semantics the Dart double gets wrong |
 
 ---
