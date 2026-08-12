@@ -125,7 +125,12 @@ class _NotificationTile extends ConsumerWidget {
               : '/sessions');
         }
       case NotificationKind.message:
-        leaveTo('/inbox');
+        // Not leaveTo: `/inbox` is a pushed destination, not a shell branch,
+        // and `go()` made it the entire stack — no back arrow, and system
+        // back left the app. Pop this modal, then push the same inbox route
+        // the Discover header pushes, so Back returns to the shell.
+        if (context.canPop()) context.pop();
+        context.push('/inbox');
       case NotificationKind.review:
         leaveTo('/sessions');
       case NotificationKind.account:
