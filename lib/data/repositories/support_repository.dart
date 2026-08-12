@@ -3,6 +3,20 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../firestore_paths.dart';
 import '../models/support.dart';
 
+/// An appeal was refused because one is already under review (BUG-016).
+///
+/// Its own type, in the [CheckInFailure] pattern, because the recovery is
+/// specific: the case they need is already open — reply into it — and the
+/// generic "Something went wrong. Please try again." would invite exactly
+/// the retry this guard exists to refuse.
+class DuplicateAppealFailure implements Exception {
+  const DuplicateAppealFailure();
+  String get message =>
+      'Your appeal is already under review. Reply to it below instead.';
+  @override
+  String toString() => message;
+}
+
 class SupportRepository {
   SupportRepository(this._db);
   final FirebaseFirestore _db;
@@ -106,13 +120,25 @@ class SupportRepository {
         return appeals.first;
       });
 
+  /// Refuses a second appeal while one is still `pending` — per open case,
+  /// not per lifetime; a user suspended again may appeal again.
+  ///
+  /// Two open appeals split the conversation: `watchMyAppeal` surfaces one,
+  /// the admin queue lists both, and staff can answer the one the user is
+  /// not looking at — a thread that then looks dead from both ends (BUG-016).
   Future<void> submitAppeal({
     required String userId,
     required String userName,
     required String reason,
     List<String> attachments = const [],
-  }) {
-    return _appeals.add({
+  }) async {
+    final open = await _appeals
+        .where('userId', isEqualTo: userId)
+        .where('status', isEqualTo: 'pending')
+        .limit(1)
+        .get();
+    if (open.docs.isNotEmpty) throw const DuplicateAppealFailure();
+    await _appeals.add({
       'userId': userId,
       'userName': userName,
       'reason': reason,

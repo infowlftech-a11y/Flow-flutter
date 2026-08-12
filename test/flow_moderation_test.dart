@@ -19,7 +19,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:flow/data/firestore_paths.dart';
 import 'package:flow/data/models/app_user.dart';
-import 'package:flow/data/models/report.dart';
 import 'package:flow/data/models/support.dart';
 import 'package:flow/data/repositories/admin_repository.dart';
 import 'package:flow/data/repositories/notification_repository.dart';
@@ -356,17 +355,48 @@ void main() {
     // document with NOT_FOUND, fake_cloud_firestore accepts it and creates
     // one. Verified in test_rules/arrays.test.mjs.
 
-    test('a second appeal from the same user does not replace the first',
+    test('a second appeal while one is pending is refused (BUG-016)',
         () async {
+      // Two open appeals meant the user's screen (limit 1) and the admin
+      // queue could be looking at different documents: staff answer the one
+      // the user cannot see, and the thread appears dead from both ends.
       await support.submitAppeal(
           userId: 'rider1', userName: 'rider1', reason: 'First');
+      await expectLater(
+        () => support.submitAppeal(
+            userId: 'rider1', userName: 'rider1', reason: 'Second'),
+        throwsA(isA<DuplicateAppealFailure>()),
+      );
+
+      expect(await admin.watchAppeals().first, hasLength(1),
+          reason: 'the refusal must happen before the write');
+    });
+
+    test('a fresh appeal is allowed once the last one was decided', () async {
+      // A user suspended a second time must be able to appeal a second time
+      // — the guard is per open case, not per lifetime.
       await support.submitAppeal(
-          userId: 'rider1', userName: 'rider1', reason: 'Second');
+          userId: 'rider1', userName: 'rider1', reason: 'First');
+      final first = (await admin.watchAppeals().first).single.id;
+      await admin.setAppealStatus(first, 'rejected');
+
+      await support.submitAppeal(
+          userId: 'rider1', userName: 'rider1', reason: 'Second suspension');
 
       expect(await admin.watchAppeals().first, hasLength(2));
-      // watchMyAppeal is limit 1 (§6.2), so the user sees one of them and
-      // the admin sees both. Pinned as current behaviour — BUG-016.
-      expect(await support.watchMyAppeal('rider1').first, isNotNull);
+      expect((await support.watchMyAppeal('rider1').first)!.reason,
+          'Second suspension',
+          reason: 'watchMyAppeal surfaces the most recent — the open one');
+    });
+
+    test("one user's pending appeal does not lock out another user's",
+        () async {
+      await support.submitAppeal(
+          userId: 'rider1', userName: 'rider1', reason: 'Mine');
+      await support.submitAppeal(
+          userId: 'rider2', userName: 'rider2', reason: 'Also mine');
+
+      expect(await admin.watchAppeals().first, hasLength(2));
     });
 
     test('closing the same report twice is not an error', () async {

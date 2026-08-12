@@ -20,6 +20,7 @@ import '../../core/widgets/feedback.dart';
 import '../../core/widgets/sheets.dart';
 import '../../data/firestore_paths.dart';
 import '../../data/models/support.dart';
+import '../../data/repositories/support_repository.dart';
 import '../../providers/providers.dart';
 import '../../services/image_service.dart';
 
@@ -189,6 +190,14 @@ class _BlockedScreenState extends ConsumerState<BlockedScreen> {
                     attachments: urls,
                   );
               if (sheetContext.mounted) Navigator.pop(sheetContext);
+            } on DuplicateAppealFailure catch (e) {
+              // A case is already open — the sheet should never have been
+              // reachable, but a second device or a stale stream can get
+              // here. Close the sheet; the thread they need is behind it.
+              if (sheetContext.mounted) {
+                Navigator.pop(sheetContext);
+                showFlowToast(context, e.message);
+              }
             } catch (e) {
               // Keep the sheet (and the typed text) — let them retry.
               if (sheetContext.mounted) {
