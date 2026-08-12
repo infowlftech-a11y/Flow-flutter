@@ -6,6 +6,7 @@
 
 import { test, describe, before, beforeEach, after } from 'node:test';
 import { assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
+import { deleteField } from 'firebase/firestore';
 import { as, anon, reset, seed, cleanup, testEnv } from './helpers.mjs';
 
 before(async () => { await testEnv(); });
@@ -132,6 +133,94 @@ describe('users — update, self (lines 61-62)', () => {
     await assertFails(
       db.collection('users').doc('pendingTrainer').update({ status: 'active' }),
     );
+  });
+
+  // The one status transition a user may write for themselves: a declined
+  // trainer putting a corrected application back in the queue. Safe because
+  // of where it lands — `pending` is not bookable — and pinned tightly, so
+  // the exception cannot become a hole.
+  describe('re-application: rejected → pending', () => {
+    test('a declined trainer resubmits', async () => {
+      const db = await as('rejectedTrainer');
+      await assertSucceeds(
+        db.collection('users').doc('rejectedTrainer').update({
+          status: 'pending', bio: 'Fixed my IKO number', hourlyRate: 400,
+        }),
+      );
+    });
+
+    test('…and clears the note describing the decision it replaces',
+      async () => {
+        // The repository deletes these two fields in the same write; a
+        // deletion is an affectedKey like any other, so the rule has to
+        // tolerate them being in the diff.
+        await seed(async (db) => {
+          await db.collection('users').doc('rejectedTrainer')
+            .set({ reviewNote: 'Certificate unreadable', reviewedAt: 'x' },
+              { merge: true });
+        });
+        const db = await as('rejectedTrainer');
+        await assertSucceeds(
+          db.collection('users').doc('rejectedTrainer').update({
+            status: 'pending',
+            reviewNote: deleteField(),
+            reviewedAt: deleteField(),
+          }),
+        );
+      });
+
+    test('DENY resubmitting straight to active', async () => {
+      const db = await as('rejectedTrainer');
+      await assertFails(
+        db.collection('users').doc('rejectedTrainer').update({ status: 'active' }),
+      );
+    });
+
+    test('DENY a blocked account laundering itself into the queue', async () => {
+      // The path this rule must never open: blocked → pending → approved.
+      const db = await as('blocked');
+      await assertFails(
+        db.collection('users').doc('blocked').update({ status: 'pending' }),
+      );
+    });
+
+    test('a pending trainer writing their own status back is a no-op edit',
+      async () => {
+        // Not a hole, and worth stating: `affectedKeys()` ignores a write of
+        // an identical value, so `pending` over `pending` never reaches
+        // isReapplication() at all — the diff contains `bio` and nothing
+        // else, and this passes as the ordinary profile edit it is. The
+        // transition that would matter, pending → active, is denied above.
+        const db = await as('pendingTrainer');
+        await assertSucceeds(
+          db.collection('users').doc('pendingTrainer').update({
+            status: 'pending', bio: 'nudge',
+          }),
+        );
+      });
+
+    test('DENY changing role on the way through', async () => {
+      const db = await as('rejectedTrainer');
+      await assertFails(
+        db.collection('users').doc('rejectedTrainer')
+          .update({ status: 'pending', role: 'admin' }),
+      );
+    });
+
+    test('DENY clearing a block marker alongside the resubmission', async () => {
+      const db = await as('rejectedTrainer');
+      await assertFails(
+        db.collection('users').doc('rejectedTrainer')
+          .update({ status: 'pending', blockedUntil: null }),
+      );
+    });
+
+    test('DENY resubmitting someone else’s application', async () => {
+      const db = await as('rider');
+      await assertFails(
+        db.collection('users').doc('rejectedTrainer').update({ status: 'pending' }),
+      );
+    });
   });
 
   test('DENY a blocked user lifting their own block', async () => {

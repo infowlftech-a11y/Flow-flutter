@@ -76,11 +76,25 @@ final routerProvider = Provider<GoRouter>((ref) {
         case AppStage.blocked:
           return loc == '/blocked' ? null : '/blocked';
         case AppStage.rejected:
-          // Support stays reachable so a declined trainer can appeal to a
-          // human instead of hitting a dead end.
-          return (loc == '/rejected' || loc == '/support')
+          // Support and the correction form stay reachable: a declined
+          // trainer can fix what was wrong and go back in the queue, or talk
+          // to a human. Anything else would make a decline a dead end.
+          return (loc == '/rejected' ||
+                  loc == '/support' ||
+                  loc == '/onboarding/trainer/reapply')
               ? null
               : '/rejected';
+        case AppStage.staff:
+          // The console *is* the app for staff. Everything they legitimately
+          // do hangs off it, so the only other routes worth allowing are the
+          // ones the console pushes: a profile it is moderating, and the
+          // conversation behind a support ticket.
+          return (loc == '/admin' ||
+                  loc.startsWith('/trainer/') ||
+                  loc.startsWith('/station/') ||
+                  loc == '/notifications')
+              ? null
+              : '/admin';
         case AppStage.ready:
           if (loc == '/' ||
               loc == '/auth' ||
@@ -91,8 +105,9 @@ final routerProvider = Provider<GoRouter>((ref) {
               loc.startsWith('/onboarding')) {
             return '/home';
           }
-          // The console is staff-only; anyone else is sent home.
-          if (loc == '/admin' && !session.isStaff) return '/home';
+          // Non-staff never reach the console. (Staff never reach *here* —
+          // they resolve to AppStage.staff above.)
+          if (loc == '/admin') return '/home';
           // Trainers are never routed to the Sessions branch (§14.3).
           if (session.isTrainer && loc.startsWith('/sessions')) return '/home';
           return null;
@@ -137,6 +152,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/onboarding/trainer',
         builder: (context, state) => const TrainerFormScreen(),
+      ),
+      // The same form, prefilled, for a declined trainer correcting their
+      // application. A distinct path rather than a query flag so the
+      // `rejected` redirect above can name exactly what it allows.
+      GoRoute(
+        path: '/onboarding/trainer/reapply',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const TrainerFormScreen(reapply: true),
       ),
       GoRoute(
         path: '/pending',

@@ -61,6 +61,7 @@ class AppUser {
     this.hourlyRate,
     this.blockedUntilRaw,
     this.fcmToken,
+    this.reviewNote,
     this.travelBufferMinutes,
   });
 
@@ -90,6 +91,15 @@ class AppUser {
   /// ISO date string or the literal `'forever'`.
   final String? blockedUntilRaw;
   final String? fcmToken;
+
+  /// Why staff declined the application, in their words.
+  ///
+  /// `rejectTrainer` has always written this; nothing ever read it, so a
+  /// declined trainer was told to "check your notifications for the reason"
+  /// and the reason itself sat unread on their own profile. The rejected
+  /// gate shows it, because a decline the applicant cannot act on is a dead
+  /// end rather than a decision.
+  final String? reviewNote;
 
   // `instantBooking` removed: parsed from the profile but no caller ever
   // passed it, so every booking was created `pending` regardless (§14.3).
@@ -124,6 +134,7 @@ class AppUser {
         hourlyRate: d.money('hourlyRate'),
         blockedUntilRaw: d.str('blockedUntil'),
         fcmToken: d.str('fcmToken'),
+        reviewNote: d.str('reviewNote'),
         travelBufferMinutes: d.integer('travelBuffer'),
       );
 

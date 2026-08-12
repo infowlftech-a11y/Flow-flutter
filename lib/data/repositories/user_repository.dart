@@ -145,6 +145,50 @@ class UserRepository {
     });
   }
 
+  /// A declined trainer fixes their application and puts it back in the queue.
+  ///
+  /// This is the one status transition a user may write for themselves, and
+  /// it is safe precisely because of where it lands: `pending` is not
+  /// bookable, so re-applying buys nothing but another review. The rules
+  /// permit it only from `rejected` — a blocked account cannot launder itself
+  /// through here, and a pending one cannot promote itself to active.
+  ///
+  /// `reviewNote` and `reviewedAt` go with it: they describe the decision on
+  /// the *previous* submission, and leaving them behind would show the
+  /// applicant last time's reason on a form they have already corrected.
+  Future<void> resubmitTrainerApplication(
+    String uid, {
+    required String name,
+    required String bio,
+    required List<String> languages,
+    required String trainingSpot,
+    String? mapsLink,
+    required int hourlyRate,
+    required String ikoId,
+    String? certificateUrl,
+    required String photoUrl,
+    List<String> gallery = const [],
+  }) {
+    return _users.doc(uid).update({
+      ...compact({
+        'name': name,
+        'bio': bio,
+        'languages': languages,
+        'location': trainingSpot,
+        'mapsLink': mapsLink,
+        'hourlyRate': hourlyRate,
+        'ikoId': ikoId,
+        'certificateUrl': certificateUrl,
+        'photoURL': photoUrl,
+        'gallery': gallery,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }),
+      'status': 'pending',
+      'reviewNote': FieldValue.delete(),
+      'reviewedAt': FieldValue.delete(),
+    });
+  }
+
   /// Optimistic favourite toggle target.
   Future<void> setFavorite(String uid, String trainerId, bool fav) {
     return _users.doc(uid).update({

@@ -39,15 +39,16 @@ class PendingScreen extends ConsumerWidget {
               border:
                   Border.all(color: context.scheme.primary.withValues(alpha: .25)),
             ),
+            // No spinner. A CircularProgressIndicator promises something is
+            // happening *now* and will finish shortly; a certification review
+            // is a person reading a document, possibly tomorrow. A permanent
+            // spinner on a screen with nothing to wait for reads as the app
+            // being stuck. The static mark says the same thing honestly.
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: context.scheme.primary),
-                ),
+                Icon(Symbols.schedule_rounded,
+                    size: 18, color: context.scheme.primary),
                 const SizedBox(width: 12),
                 Flexible(
                   child: Text(

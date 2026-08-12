@@ -46,30 +46,27 @@ import 'support/overlap.dart';
 import 'support/screen_harness.dart';
 
 void main() {
-  /// One screen across the four combinations that matter: both themes, and
-  /// both ends of the text-scale clamp.
+  /// One screen at both ends of the text-scale clamp. This ran both themes as
+  /// well until dark mode was removed.
   void screenTest(
     String name,
     Widget Function() build, {
     AppUserRole role = AppUserRole.rider,
     bool populated = true,
   }) {
-    for (final dark in [true, false]) {
-      for (final scale in [1.0, 1.3]) {
-        final label = '$name — ${dark ? 'dark' : 'light'} @${scale}x';
-        testWidgets(label, (tester) async {
-          final db = await seededDb(withStationDetail: populated);
-          await pumpScreen(
-            tester,
-            build(),
-            db: db,
-            as: role == AppUserRole.trainer ? trainer : rider,
-            dark: dark,
-            textScale: scale,
-          );
-          expectNoTextOverlaps(tester, where: label);
-        });
-      }
+    for (final scale in [1.0, 1.3]) {
+      final label = '$name — @${scale}x';
+      testWidgets(label, (tester) async {
+        final db = await seededDb(withStationDetail: populated);
+        await pumpScreen(
+          tester,
+          build(),
+          db: db,
+          as: role == AppUserRole.trainer ? trainer : rider,
+          textScale: scale,
+        );
+        expectNoTextOverlaps(tester, where: label);
+      });
     }
   }
 
@@ -120,6 +117,15 @@ void main() {
         role: AppUserRole.trainer);
     screenTest('admin console', () => const AdminScreen(),
         role: AppUserRole.trainer);
+  });
+
+  // The correction form a declined trainer reaches from the rejected gate.
+  // Same four steps as the application, prefilled — and every field is one
+  // character longer than it was, because it arrives with real content in it
+  // rather than a placeholder.
+  group('re-application', () {
+    screenTest('trainer form, prefilled',
+        () => const TrainerFormScreen(reapply: true));
   });
 
   group('conversations', () {
