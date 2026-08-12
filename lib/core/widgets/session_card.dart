@@ -302,28 +302,22 @@ class SessionRow extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(when,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: inter(13.5, 700,
-                                    color: scheme.onSurface)),
-                          ),
-                          if (statusLabel != null) ...[
-                            const SizedBox(width: 6),
-                            // Flexible: the pill is unflexed content in a Row
-                            // whose other child is Expanded, so on a 320px
-                            // phone at 1.3x it took its full intrinsic width
-                            // and ran 23px off the card.
-                            Flexible(
-                              child: TagPill(statusLabel!,
-                                  color: statusColor, dense: true),
-                            ),
-                          ],
-                        ],
-                      ),
+                      // `when` gets the line to itself, and the pill rides
+                      // with the name below it.
+                      //
+                      // The two used to share this row, which cannot work:
+                      // once the thumbnail and an `EGP 95` are taken out of a
+                      // 360px card the column is ~164px, and `Sat 29 Aug ·
+                      // 14:00` beside a `CONFIRMED` pill wants 200. Flexing
+                      // the pill stopped it running off the card but left it
+                      // reading `CONFIRM…`, which on a colour-coded status
+                      // token looks like a rendering fault rather than a
+                      // shortage of room. Now each line has exactly one child
+                      // that can give way, and it is never the pill.
+                      Text(when,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: inter(13.5, 700, color: scheme.onSurface)),
                       const SizedBox(height: 4),
                       Text(
                         location == null ? who : '$who · $location',
@@ -332,6 +326,22 @@ class SessionRow extends StatelessWidget {
                         style:
                             inter(12.5, 500, color: scheme.onSurfaceVariant),
                       ),
+                      // The pill gets a line of its own rather than a share of
+                      // one. Once a thumbnail and an `EGP 95` are taken out of
+                      // a 360px card the text column is ~146px, and at 1.3x a
+                      // `CONFIRMED` pill alone wants 110 of it — so whichever
+                      // line it shared, either the pill or the text beside it
+                      // was going to be cut. A cut status token reads as a
+                      // rendering fault, and it is the one thing here that
+                      // cannot be inferred from the rest of the row.
+                      if (statusLabel != null) ...[
+                        const SizedBox(height: 6),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TagPill(statusLabel!,
+                              color: statusColor, dense: true),
+                        ),
+                      ],
                     ],
                   ),
                 ),

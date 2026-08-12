@@ -59,9 +59,17 @@ class PrimaryButton extends StatelessWidget {
                   // nobody controls: "Reserve my seat" at 1.3x on a narrow
                   // phone is wider than the button, and an unflexed Text in a
                   // Row cannot shrink — it overflows past the edge instead.
+                  //
+                  // Scaled down rather than ellipsized. A clipped call to
+                  // action is worse than a small one: `Book now` came out as
+                  // `Book …` on a 320px phone at 1.3x, which reads as a
+                  // broken button, and `Review & co…` said nothing at all.
+                  // A couple of lost points of type still says what it does.
                   Flexible(
-                    child: Text(label,
-                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(label, maxLines: 1),
+                    ),
                   ),
                 ],
               ),
@@ -174,8 +182,15 @@ class MicroAction extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (icon != null) ...[Icon(icon, size: 17), const SizedBox(width: 6)],
+        // Scaled, not clipped — see PrimaryButton. These sit in pairs inside
+        // a card, so each gets half of an already-narrow row: `DECLINE` next
+        // to `APPROVE` on a 320px phone at 1.3x read `DEC…`, which is a
+        // destructive action with its name cut off.
         Flexible(
-          child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(label, maxLines: 1),
+          ),
         ),
       ],
     );

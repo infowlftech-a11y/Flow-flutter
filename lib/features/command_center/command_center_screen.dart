@@ -241,7 +241,9 @@ class _TodayTab extends ConsumerWidget {
                 ),
                 const SizedBox(width: 10),
                 _StatTile(
-                  label: 'Total earned',
+                  // One word, like the two beside it — REQUESTS · UPCOMING ·
+                  // EARNED. The payments icon and the figure carry the rest.
+                  label: 'Earned',
                   value: money(revenue.value ?? 0),
                   icon: Symbols.payments_rounded,
                   // The ledger is a tab now. It was a sheet behind this tile,
@@ -354,14 +356,20 @@ class _StatTile extends StatelessWidget {
                           spacing: -.5)),
                 ),
                 const SizedBox(height: 2),
-                Text(label.toUpperCase(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: microLabel(
-                        emphasized
-                            ? Colors.white.withValues(alpha: .75)
-                            : tones.textFaint,
-                        size: 10)),
+                // Scaled down like the value above it. A third of a 360px row
+                // leaves 72px inside the padding, and a letterspaced caps
+                // label crosses that at 1.3x — `UPCOMING` by a hair, and
+                // `TOTAL EARNED` by enough to read as `TOTAL EA…`.
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(label.toUpperCase(),
+                      maxLines: 1,
+                      style: microLabel(
+                          emphasized
+                              ? Colors.white.withValues(alpha: .75)
+                              : tones.textFaint,
+                          size: 10)),
+                ),
               ],
             ),
           ),

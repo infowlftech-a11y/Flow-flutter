@@ -278,7 +278,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 key: ValueKey(user.email),
                 initialValue: user.email,
                 enabled: false,
+                // helperMaxLines, because the default is one ellipsized line
+                // and this sentence does not fit one on a 360px phone — it
+                // read "…is your sign-in and cannot ch…".
                 decoration: const InputDecoration(
+                    helperMaxLines: 2,
                     helperText: 'Your email is your sign-in and cannot change.'),
               ),
             ),
@@ -347,6 +351,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   initialValue: user.location ?? '',
                   enabled: false,
                   decoration: const InputDecoration(
+                      helperMaxLines: 2,
                       helperText:
                           "Message support if you've moved spots."),
                 ),

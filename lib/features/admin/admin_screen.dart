@@ -18,6 +18,7 @@ import '../../data/models/app_user.dart';
 import '../../data/models/report.dart';
 import '../../data/models/support.dart';
 import '../../providers/providers.dart';
+import '../explore/trainer_profile_screen.dart' show ikoLabel;
 import 'admin_queues.dart';
 
 /// Staff moderation console (§14.2, ported in-app).
@@ -294,7 +295,7 @@ class _ApplicantCardState extends ConsumerState<_ApplicantCard> {
             spacing: 6,
             runSpacing: 6,
             children: [
-              TagPill(t.ikoId == null ? 'NO IKO ID' : 'IKO ${t.ikoId}',
+              TagPill(t.ikoId == null ? 'NO IKO ID' : ikoLabel(t.ikoId!),
                   icon: Symbols.workspace_premium_rounded,
                   color: t.ikoId == null ? tones.danger : null),
               if (t.location != null)

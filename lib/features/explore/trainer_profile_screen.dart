@@ -212,17 +212,29 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
                               ],
                             ),
                           ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(money(trainer.displayRate),
-                                  style: display(24, 760,
-                                      color: tones.azureBrand,
-                                      spacing: -.5)),
-                              Text('per hour',
-                                  style: inter(11.5, 560,
-                                      color: tones.textFaint)),
-                            ],
+                          // Capped and scaled down, so the rate cannot take
+                          // the width the name needs. Unbounded, `EGP 550`
+                          // claims ~100px of a 320px header and pushes the
+                          // surname past the line, where Flutter breaks it
+                          // mid-word — `Bergströ` over a lone `m`.
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 96),
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerRight,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(money(trainer.displayRate),
+                                      style: display(24, 760,
+                                          color: tones.azureBrand,
+                                          spacing: -.5)),
+                                  Text('per hour',
+                                      style: inter(11.5, 560,
+                                          color: tones.textFaint)),
+                                ],
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -520,8 +532,16 @@ class _GalleryHeader extends StatelessWidget {
 String _certLabel(String? ikoId) {
   final id = ikoId?.trim();
   if (id == null || id.isEmpty) return 'VERIFIED TRAINER';
-  return id.toUpperCase().startsWith('IKO') ? id : 'IKO $id';
+  return ikoLabel(id);
 }
+
+/// Prefixes an issuer id that has not already got one.
+///
+/// Public because the admin console shows the same credential on an
+/// applicant card and was building the string by hand — every applicant read
+/// `IKO IKO-4471PQ`, which is the exact defect the badge above documents.
+String ikoLabel(String id) =>
+    id.toUpperCase().startsWith('IKO') ? id : 'IKO $id';
 
 /// The trainer's credential, floated over their photo.
 ///
@@ -731,18 +751,20 @@ class _BottomBar extends ConsumerWidget {
               icon: Symbols.edit_rounded,
               onPressed: () => context.push('/profile/edit'),
             )
-          // Every child is flexed, and the price shrinks rather than pushes.
+          // The price shrinks rather than pushes, and Message is icon-only.
           //
           // `EGP 1,200` is roughly twice as wide as the `€65` this bar was
-          // laid out for, and an unconstrained Column takes what it needs
-          // before the Expanded buttons are measured: at 320px and 1.3x text
-          // the Message button was left 14 logical pixels and overflowed.
-          // The price is the part that can afford to lose size — the two
-          // buttons are tap targets with a 48dp floor.
+          // laid out for. Flexing all three children stopped the overflow but
+          // bought something worse: the Message label wrapped to `Mes/sag/e`,
+          // one glyph on the last line. That is legal layout, so no overflow
+          // assertion could ever see it — only rendering the screen does.
+          // There is no room for a price and two labelled buttons at 360px,
+          // let alone 320px at 1.3x, so the secondary action gives up its
+          // label and keeps its 48dp target and its name for screen readers.
           : Row(
               children: [
-                Flexible(
-                  flex: 3,
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 92),
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.centerLeft,
@@ -758,9 +780,10 @@ class _BottomBar extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                Expanded(
-                  flex: 4,
-                  child: OutlinedButton.icon(
+                SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: IconButton.outlined(
                     onPressed: () {
                       final session = ref.read(sessionProvider);
                       ref.read(chatRepositoryProvider).openThread(
@@ -772,14 +795,13 @@ class _BottomBar extends ConsumerWidget {
                       context.push(
                           '/chat/${trainer.uid}?name=${Uri.encodeComponent(trainer.name)}');
                     },
+                    tooltip: 'Message',
                     icon: const Icon(Symbols.chat_bubble_outline_rounded,
                         size: 20),
-                    label: const Text('Message'),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  flex: 5,
                   child: PrimaryButton(
                     label: 'Book now',
                     expand: true,

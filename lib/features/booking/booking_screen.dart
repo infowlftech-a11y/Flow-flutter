@@ -914,13 +914,14 @@ class _StickyBar extends StatelessWidget {
     final tones = context.tones;
     return StickyBar(
       child: Row(
-        // Both sides flex loosely and the gap goes between them, which looks
-        // identical to an Expanded price + trailing button at 1.0x but caps
-        // each at half the bar when the text grows. Previously the button
-        // took its full intrinsic width first and pushed 36px off the edge.
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        // Both sides flex, but not evenly. Half the bar each looks right at
+        // 1.0x and starves the button everywhere else: `Review & confirm`
+        // needed ~188px of the 154 a half share gives it on a 360px phone and
+        // came out as `Review & co…`. The label is now short enough to fit
+        // regardless, and the 2:3 split keeps it that way at 1.3x.
         children: [
           Flexible(
+            flex: 2,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -928,6 +929,8 @@ class _StickyBar extends StatelessWidget {
                     hours == 0
                         ? 'No hours selected'
                         : '$hours hour${hours == 1 ? '' : 's'}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: inter(12.5, 580, color: tones.textFaint)),
                 const SizedBox(height: 2),
                 AnimatedSwitcher(
@@ -951,9 +954,13 @@ class _StickyBar extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Flexible(
+            flex: 3,
             child: PrimaryButton(
-              label: 'Review & confirm',
-              expand: false,
+              // Not "Review": this app also has star reviews, and a lone
+              // Review button next to a price reads as "rate your trainer".
+              // The sheet it opens is still titled "Review & confirm".
+              label: 'Continue',
+              expand: true,
               onPressed: onReview,
             ),
           ),

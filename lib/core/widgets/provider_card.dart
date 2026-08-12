@@ -111,15 +111,18 @@ class ProviderCard extends StatelessWidget {
                         if (location != null || priceLabel != null) ...[
                           const SizedBox(height: 6),
                           Row(
-                            // Both sides flex loosely with the slack between
-                            // them: identical to Expanded + trailing price at
-                            // normal widths, but on a 320px phone the capped
-                            // price no longer claims 132px of a row that has
-                            // not got it, and ran 30px off the card.
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               if (location != null)
-                                Flexible(
+                                // Three fifths of the row to the price, two to
+                                // the place. An even loose flex — which is what
+                                // `spaceBetween` gave both sides — splits the
+                                // row in half however little either needs, and
+                                // half a 360px card is narrower than `EGP 95 /
+                                // hour`, so the default phone read `EGP 95 /
+                                // h…`. Price is the number the choice turns on;
+                                // a shortened place name still reads.
+                                Expanded(
+                                  flex: 2,
                                   child: Row(
                                     children: [
                                       Icon(Symbols.place_rounded,
@@ -138,21 +141,20 @@ class ProviderCard extends StatelessWidget {
                                   ),
                                 )
                               else
-                                const Spacer(),
+                                const Spacer(flex: 2),
                               if (priceLabel != null) ...[
                                 const SizedBox(width: 10),
-                                // Capped, not flexed. A flex share hands the
-                                // price half the row whatever it needs, and
-                                // the name pays for whitespace it never uses
-                                // — which is how "Konstantinos" came out as
-                                // "Konstanti…" next to "€110 / hour" with
-                                // room to spare. The cap only bites at the
-                                // largest text scales, where dropping the
-                                // unit is the right thing to lose.
-                                Flexible(
-                                  child: ConstrainedBox(
-                                    constraints:
-                                        const BoxConstraints(maxWidth: 132),
+                                // Scaled down rather than ellipsized. A fixed
+                                // pixel cap cannot work here — 160px is wider
+                                // than the whole row on a 320px card at 1.3x,
+                                // so the price simply overflowed it. Shrinking
+                                // the type keeps the figure and the unit; an
+                                // ellipsis would drop whichever mattered.
+                                Expanded(
+                                  flex: 3,
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerRight,
                                     child: Text.rich(
                                       TextSpan(children: [
                                         TextSpan(
@@ -168,7 +170,6 @@ class ProviderCard extends StatelessWidget {
                                       ]),
                                       textAlign: TextAlign.right,
                                       maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                 ),

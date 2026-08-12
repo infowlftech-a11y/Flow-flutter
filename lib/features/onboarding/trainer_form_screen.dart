@@ -541,6 +541,7 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
             keyboardType: TextInputType.url,
             decoration: const InputDecoration(
                 hintText: 'https://maps.app.goo.gl/…',
+                helperMaxLines: 2,
                 helperText:
                     'Optional — riders can jump straight to your beach.'),
           ),
@@ -579,6 +580,7 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
               prefixText: 'EGP ',
               prefixStyle: display(22, 720, color: tones.azureBrand),
               hintText: '400',
+              helperMaxLines: 2,
               helperText: 'Per hour. You can change this any time.',
             ),
             // Unguarded, unlike the other fields: the earnings notice below
