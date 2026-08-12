@@ -45,12 +45,30 @@ const createBookingPayload = (riderUid) => ({
   createdAt: new Date().toISOString(),
 });
 
+// The occupied availability doc createBooking writes in the same batch
+// (§8.5, BUG-017) — _occupiedDoc in booking_repository.dart.
+const occupiedPayload = () => ({
+  instructorId: 'trainer',
+  date: '2099-06-15',
+  startTime: '09:00',
+  endTime: '11:00',
+  status: 'occupied',
+  label: 'Booked',
+  createdAt: new Date().toISOString(),
+});
+
+// createBooking commits the booking and its occupied doc atomically.
+const commitBooking = (db, riderUid) => {
+  const batch = db.batch();
+  batch.set(db.collection('bookings').doc('doc1'), createBookingPayload(riderUid));
+  batch.set(db.collection('availability').doc('doc1'), occupiedPayload());
+  return batch.commit();
+};
+
 describe('the real createBooking payload', () => {
   test('an active rider can write it', async () => {
     const db = await as('rider');
-    await assertSucceeds(
-      db.collection('bookings').doc('doc1').set(createBookingPayload('rider')),
-    );
+    await assertSucceeds(commitBooking(db, 'rider'));
   });
 
   test('a rider whose profile has only the onboarding fields can write it',
@@ -66,27 +84,26 @@ describe('the real createBooking payload', () => {
         });
       });
       const db = await as('sparse');
-      await assertSucceeds(
-        db.collection('bookings').doc('doc1').set(createBookingPayload('sparse')),
-      );
+      await assertSucceeds(commitBooking(db, 'sparse'));
     });
 
   test('a pending trainer can still book a lesson as a rider would', async () => {
     // Not blocked, so nothing stops them buying a lesson from someone else.
     const db = await as('pendingTrainer');
-    await assertSucceeds(
-      db.collection('bookings').doc('doc1')
-        .set(createBookingPayload('pendingTrainer')),
-    );
+    await assertSucceeds(commitBooking(db, 'pendingTrainer'));
   });
 });
 
 // BookingRepository.createWalkIn — same shape, kiterId 'manual_entry',
 // status 'confirmed', and the trainer may record cash taken up front.
 describe('the real createWalkIn payload', () => {
-  test('the trainer can write it', async () => {
+  test('the trainer can write it, occupied doc and all', async () => {
     const db = await as('trainer');
-    await assertSucceeds(db.collection('bookings').doc('doc1').set({
+    const batch = db.batch();
+    batch.set(db.collection('availability').doc('doc1'), {
+      ...occupiedPayload(), startTime: '14:00', endTime: '15:00',
+    });
+    batch.set(db.collection('bookings').doc('doc1'), {
       id: 'doc1',
       instructorId: 'trainer',
       instructorName: 'Anna',
@@ -110,7 +127,8 @@ describe('the real createWalkIn payload', () => {
       currency: 'EUR',
       amountDue: 85,
       createdAt: new Date().toISOString(),
-    }));
+    });
+    await assertSucceeds(batch.commit());
   });
 });
 
@@ -152,21 +170,34 @@ describe('the real approval payload', () => {
 
 // BookingRepository.cancelByRider and NotificationRepository.notify.
 describe('the real rider-cancel and notify payloads', () => {
-  test('cancelByRider', async () => {
-    await seed(async (db) => {
-      await db.collection('bookings').doc('doc1')
-        .set(createBookingPayload('rider'));
+  test('cancelByRider — the _writeIfLive transaction, release included',
+    async () => {
+      await seed(async (db) => {
+        await db.collection('bookings').doc('doc1')
+          .set(createBookingPayload('rider'));
+        await db.collection('availability').doc('doc1').set(occupiedPayload());
+      });
+      const db = await as('rider');
+      await assertSucceeds(db.runTransaction(async (tx) => {
+        await tx.get(db.collection('bookings').doc('doc1'));
+        await tx.get(db.collection('availability').doc('doc1'));
+        tx.update(db.collection('bookings').doc('doc1'), {
+          status: 'cancelled',
+          cancelledAt: new Date().toISOString(),
+          cancelledBy: 'user',
+        });
+        tx.delete(db.collection('availability').doc('doc1'));
+      }));
     });
-    const db = await as('rider');
-    await assertSucceeds(db.collection('bookings').doc('doc1').update({
-      status: 'cancelled',
-      cancelledAt: new Date().toISOString(),
-      cancelledBy: 'user',
-    }));
-  });
 
   test('notify, as the rider notifying the trainer of a new request',
     async () => {
+      // notify() runs after createBooking commits, so the booking it names
+      // exists by the time the rule reads it.
+      await seed(async (db) => {
+        await db.collection('bookings').doc('doc1')
+          .set(createBookingPayload('rider'));
+      });
       const db = await as('rider');
       await assertSucceeds(db.collection('notifications').doc('n1').set({
         targetUserId: 'trainer',

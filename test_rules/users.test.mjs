@@ -116,6 +116,10 @@ describe('users — update, self (lines 61-62)', () => {
     ['blockedAt', '2026-01-01'],
     ['reviewedAt', '2026-01-01'],
     ['reviewNote', 'looks good to me'],
+    // BUG-018: unblockUser RESTORES this field verbatim. A pending trainer
+    // who could pre-write statusBeforeBlock 'active' would come out of any
+    // later suspension approved without review.
+    ['statusBeforeBlock', 'active'],
   ]) {
     test(`DENY a user writing their own ${field}`, async () => {
       const db = await as('rider');

@@ -23,6 +23,9 @@ beforeEach(async () => {
     });
     await db.collection('bookings').doc('b1').set(bookingDoc());
     await db.collection('chats').doc('c1').set({ participants: ['blocked', 'trainer'] });
+    // idFor() sorts the pair, so this is the thread between rider and trainer.
+    await db.collection('chats').doc('rider_trainer')
+      .set({ participants: ['rider', 'trainer'] });
   });
 });
 after(cleanup);
@@ -72,25 +75,110 @@ describe('notifications', () => {
     );
   });
 
-  test('a trainer notifies a rider — the app notifies the other party', async () => {
+  test('a trainer notifies their rider about their shared booking', async () => {
+    // The app's real shape: every booking notification names the booking,
+    // and the rule verifies both people are its parties.
     const db = await as('trainer');
     await assertSucceeds(
       db.collection('notifications').doc('n2').set({
-        targetUserId: 'rider', userId: 'rider', title: 'Booking approved ✅',
+        targetUserId: 'rider', title: 'Booking approved ✅',
         message: 'Confirmed', type: 'booking_confirmed', read: false,
+        bookingId: 'b1',
       }),
     );
   });
 
-  // Pinned, not asserted as a denial: `allow create: if signedIn()` is
-  // deliberate (the comment explains it), but it does mean any account can
-  // write any notification to any user. Logged as BUG-005.
-  test('any signed-in user can write a notification to anyone', async () => {
-    const db = await as('rider2');
+  test('the rider notifies the trainer — the request direction', async () => {
+    const db = await as('rider');
     await assertSucceeds(
       db.collection('notifications').doc('n2').set({
-        targetUserId: 'trainer', userId: 'trainer', title: 'Booking cancelled',
+        targetUserId: 'trainer', title: 'New booking request',
+        message: 'Seif requested an hour.', type: 'booking_request',
+        read: false, bookingId: 'b1',
+      }),
+    );
+  });
+
+  test('a chat message notifies the other participant', async () => {
+    const db = await as('rider');
+    await assertSucceeds(
+      db.collection('notifications').doc('n2').set({
+        targetUserId: 'trainer', title: 'Message from Seif',
+        message: 'hey', type: 'message', read: false,
+      }),
+    );
+  });
+
+  test('staff notify anyone — the approval and suspension paths', async () => {
+    const db = await as('admin');
+    await assertSucceeds(
+      db.collection('notifications').doc('n2').set({
+        targetUserId: 'pendingTrainer', title: "You're live on Flow 🤙",
+        message: 'Approved.', type: 'account_approved', read: false,
+      }),
+    );
+  });
+
+  // BUG-005 — this exact write used to succeed, pinned under "any signed-in
+  // user can write a notification to anyone". A stranger's "Booking
+  // cancelled" rendered identically to a genuine one.
+  test('DENY a stranger spoofing a booking notification', async () => {
+    const db = await as('rider2');
+    await assertFails(
+      db.collection('notifications').doc('n2').set({
+        targetUserId: 'trainer', title: 'Booking cancelled',
         message: 'Spoofed', type: 'booking_cancelled', read: false,
+      }),
+    );
+  });
+
+  test("DENY citing a booking the sender is not a party to", async () => {
+    // b1 is rider ↔ trainer. rider2 cannot ride it into either inbox.
+    const db = await as('rider2');
+    await assertFails(
+      db.collection('notifications').doc('n2').set({
+        targetUserId: 'trainer', title: 'Booking cancelled',
+        message: 'Spoofed', type: 'booking_cancelled', read: false,
+        bookingId: 'b1',
+      }),
+    );
+  });
+
+  test('DENY a message notification with no thread behind it', async () => {
+    const db = await as('rider2');
+    await assertFails(
+      db.collection('notifications').doc('n2').set({
+        targetUserId: 'rider', title: 'Message from X',
+        message: 'spam', type: 'message', read: false,
+      }),
+    );
+  });
+
+  test('DENY writing a notification to yourself', async () => {
+    // No app path does this; a self-write is someone manufacturing evidence.
+    const db = await as('rider');
+    await assertFails(
+      db.collection('notifications').doc('n2').set({
+        targetUserId: 'rider', title: 'Booking approved ✅',
+        message: 'x', type: 'booking_confirmed', read: false,
+        bookingId: 'b1',
+      }),
+    );
+  });
+
+  test('a blocked rider cancelling still warns the trainer', async () => {
+    // Deliberately NOT notBlocked(): the cancel is permitted, so its warning
+    // must be too — otherwise the calendar frees silently.
+    await seed(async (db) => {
+      await db.collection('bookings').doc('b2').set(
+        bookingDoc({ id: 'b2', kiterId: 'blocked', status: 'confirmed' }));
+    });
+    const db = await as('blocked');
+    await assertSucceeds(
+      db.collection('notifications').doc('n2').set({
+        targetUserId: 'trainer', title: 'Rider cancelled ⚠️',
+        message: 'Cancelled.', type: 'booking_cancelled', read: false,
+        bookingId: 'b2',
       }),
     );
   });
@@ -130,6 +218,30 @@ describe('safari_trips', () => {
     );
   });
 
+  test('the last seat flips the trip to full', async () => {
+    await seed(async (db) => {
+      await db.collection('safari_trips').doc('s1')
+        .update({ bookedSeats: 5 });
+    });
+    const db = await as('rider');
+    await assertSucceeds(
+      db.collection('safari_trips').doc('s1')
+        .update({ bookedSeats: 6, status: 'full' }),
+    );
+  });
+
+  test('a cancel releases one seat and reopens the trip', async () => {
+    await seed(async (db) => {
+      await db.collection('safari_trips').doc('s1')
+        .update({ bookedSeats: 6, status: 'full' });
+    });
+    const db = await as('rider');
+    await assertSucceeds(
+      db.collection('safari_trips').doc('s1')
+        .update({ bookedSeats: 5, status: 'open' }),
+    );
+  });
+
   test('the host deletes their trip', async () => {
     const db = await as('trainer');
     await assertSucceeds(db.collection('safari_trips').doc('s1').delete());
@@ -150,13 +262,67 @@ describe('safari_trips', () => {
     await assertFails(db.collection('safari_trips').doc('s1').get());
   });
 
-  // `allow update: if signedIn()` is wide open by necessity — the seat count
-  // lives on this document and the reserving rider must increment it. It also
-  // means any signed-in user can rewrite any field. Logged as BUG-006.
-  test('any signed-in user can rewrite a trips price and capacity', async () => {
+  // BUG-006 — `allow update: if signedIn()` authorised every field, and this
+  // exact write used to succeed. A non-host may now move only the seat count
+  // (one at a time, inside capacity) and the open/full flag.
+  test('DENY a stranger rewriting a trips price and capacity', async () => {
     const db = await as('rider2');
-    await assertSucceeds(
+    await assertFails(
       db.collection('safari_trips').doc('s1').update({ price: 0, capacity: 999 }),
+    );
+  });
+
+  test('DENY a seat increment that smuggles a price change beside it', async () => {
+    const db = await as('rider2');
+    await assertFails(
+      db.collection('safari_trips').doc('s1')
+        .update({ bookedSeats: 1, status: 'open', price: 0 }),
+    );
+  });
+
+  test('DENY taking two seats in one write', async () => {
+    // Every legitimate call — reserve and cancel — moves exactly one seat.
+    const db = await as('rider2');
+    await assertFails(
+      db.collection('safari_trips').doc('s1').update({ bookedSeats: 2 }),
+    );
+  });
+
+  test('DENY incrementing past capacity', async () => {
+    await seed(async (db) => {
+      await db.collection('safari_trips').doc('s1').update({ bookedSeats: 6 });
+    });
+    const db = await as('rider2');
+    await assertFails(
+      db.collection('safari_trips').doc('s1').update({ bookedSeats: 7 }),
+    );
+  });
+
+  test('DENY driving the seat count negative', async () => {
+    const db = await as('rider2');
+    await assertFails(
+      db.collection('safari_trips').doc('s1').update({ bookedSeats: -1 }),
+    );
+  });
+
+  test('DENY a non-host writing a status outside open/full', async () => {
+    const db = await as('rider2');
+    await assertFails(
+      db.collection('safari_trips').doc('s1').update({ status: 'cancelled' }),
+    );
+  });
+
+  test('the host still edits their own trip freely', async () => {
+    const db = await as('trainer');
+    await assertSucceeds(
+      db.collection('safari_trips').doc('s1').update({ price: 350, capacity: 8 }),
+    );
+  });
+
+  test('staff still edit any trip', async () => {
+    const db = await as('admin');
+    await assertSucceeds(
+      db.collection('safari_trips').doc('s1').update({ status: 'cancelled' }),
     );
   });
 });

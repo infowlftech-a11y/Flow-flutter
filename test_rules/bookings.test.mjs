@@ -51,31 +51,29 @@ describe('bookings — read (line 102)', () => {
     );
   });
 
-  // ⚠ These four assert the TEMPORARY state of BUG-017, not the intended one.
-  // While `allow read: if signedIn()` stands, a booking is readable by any
-  // signed-in account. Each one flips back to assertFails when the `occupied`
-  // availability documents land and the rule is restored — they are the
-  // checklist for that revert, which is why they say so out loud rather than
-  // being deleted.
-  test('TEMPORARY (BUG-017): an unrelated rider can read a booking', async () => {
+  // The BUG-017 revert checklist. These four asserted the TEMPORARY
+  // `allow read: if signedIn()` as assertSucceeds while nothing wrote the
+  // occupied availability docs; now that those exist and the rule is
+  // restored, each one flips to the denial it was always meant to be.
+  test('DENY an unrelated rider reading a booking (BUG-017 reverted)', async () => {
     const db = await as('rider2');
-    await assertSucceeds(db.collection('bookings').doc('b1').get());
+    await assertFails(db.collection('bookings').doc('b1').get());
   });
 
-  test('TEMPORARY (BUG-017): an unrelated trainer can read a booking', async () => {
+  test('DENY an unrelated trainer reading a booking (BUG-017 reverted)', async () => {
     const db = await as('trainer2');
-    await assertSucceeds(db.collection('bookings').doc('b1').get());
+    await assertFails(db.collection('bookings').doc('b1').get());
   });
 
-  test('TEMPORARY (BUG-017): the whole collection is listable', async () => {
+  test('DENY listing the whole collection (BUG-017 reverted)', async () => {
     const db = await as('rider');
-    await assertSucceeds(db.collection('bookings').get());
+    await assertFails(db.collection('bookings').get());
   });
 
-  test("TEMPORARY (BUG-017): a rider can filter on another rider's kiterId",
+  test("DENY filtering on another rider's kiterId (BUG-017 reverted)",
     async () => {
       const db = await as('rider');
-      await assertSucceeds(
+      await assertFails(
         db.collection('bookings').where('kiterId', '==', 'rider2').get(),
       );
     });
@@ -166,6 +164,45 @@ describe('bookings — update, the trainer (lines 120-123)', () => {
   test('DENY another trainer touching the booking', async () => {
     const db = await as('trainer2');
     await assertFails(db.collection('bookings').doc('b1').update({ status: 'confirmed' }));
+  });
+
+  // BUG-003 — `isProvider()` used to carry no field restriction at all. The
+  // provider's writable set is now closed the way the rider's is, so the
+  // fields that define *which session this is* cannot move.
+  test('DENY the trainer reassigning the booking to another trainer', async () => {
+    const db = await as('trainer');
+    await assertFails(
+      db.collection('bookings').doc('b1').update({ instructorId: 'trainer2' }),
+    );
+  });
+
+  test('DENY the trainer moving the session to another day', async () => {
+    const db = await as('trainer');
+    await assertFails(
+      db.collection('bookings').doc('b1').update({ date: '2026-09-01' }),
+    );
+  });
+
+  test('DENY the trainer swapping the rider on the booking', async () => {
+    const db = await as('trainer');
+    await assertFails(
+      db.collection('bookings').doc('b1').update({ kiterId: 'rider2' }),
+    );
+  });
+
+  test('DENY the trainer repricing the session after the fact', async () => {
+    const db = await as('trainer');
+    await assertFails(
+      db.collection('bookings').doc('b1').update({ totalPrice: 999 }),
+    );
+  });
+
+  test('DENY the trainer rewriting the hours the rider selected', async () => {
+    const db = await as('trainer');
+    await assertFails(
+      db.collection('bookings').doc('b1')
+        .update({ selectedTimes: ['09:00'], startTime: '09:00' }),
+    );
   });
 });
 

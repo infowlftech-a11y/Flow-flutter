@@ -60,10 +60,14 @@ service cloud.firestore {
     }
 
     // Fields a user must never be able to set on themselves.
+    //
+    // `statusBeforeBlock` is on the list because unblockUser *restores* it:
+    // a pending trainer who could pre-write `statusBeforeBlock: 'active'`
+    // would come out of any later suspension approved without review.
     function privilegedFieldsUnchanged() {
       return !request.resource.data.diff(resource.data).affectedKeys()
         .hasAny(['role', 'status', 'blockedUntil', 'blockedAt', 'reviewedAt',
-                 'reviewNote']);
+                 'reviewNote', 'statusBeforeBlock']);
     }
 
     // ── users ────────────────────────────────────────────────────────────
@@ -146,26 +150,28 @@ service cloud.firestore {
             || request.resource.data.status == 'cancelled';
       }
 
-      // ⚠ TEMPORARY — BUG-017. MUST NOT SHIP. Restore the line below it.
-      //
-      // The booking grid and `_assertSlotsFree` both query
-      // `instructorId == <trainer> && date == <day>`. That is not constrained
-      // to the caller's own bookings, so `isParty()` — which resolves per
-      // document — makes Firestore reject the whole list, and every rider
-      // booking failed with permission-denied at the moment of confirming.
-      // It looked fine to an admin, because `isStaff()` passes the query.
-      //
-      // Rules cannot inspect query filters, so there is no way to permit that
-      // one shape. Any disjunct wide enough to allow it makes the entire
-      // collection listable: every rider's name, message and price.
-      //
-      // Accepted deliberately and briefly, because the only data on this
-      // project is three accounts the owner controls. The real fix is the
-      // `occupied` availability documents §8.5 already specifies and nothing
-      // writes — once those exist, the grid and the clash check read
-      // `availability` instead and this reverts.
-      allow read: if signedIn();
-      // allow read: if signedIn() && (isParty() || isStaff());
+      // The trainer's writable set, closed the same way the rider's is.
+      // Everything the repository writes for a provider: approve/decline/
+      // complete (status, updatedAt), check-in (checkedIn, startedAt),
+      // settlement (the payment fields), and history hiding. What is *not*
+      // here is the point: `instructorId` — so a booking cannot be handed to
+      // a trainer who never accepted it (BUG-003) — and `date`, `kiterId`,
+      // `selectedTimes`, so the session a rider agreed to cannot be quietly
+      // moved under them.
+      function providerFieldsOnly() {
+        return request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'updatedAt', 'checkedIn', 'startedAt',
+                    'paymentStatus', 'paymentMethod', 'paidAt', 'refundedAt',
+                    'paymentRef', 'hiddenByInstructor']);
+      }
+
+      // A booking is its two parties' business, and staff's. The grid and
+      // the clash check — which do need a stranger to see a trainer's booked
+      // hours — read the `occupied` availability docs instead (§8.5), which
+      // carry the hours and none of the rider's name, message or price.
+      // (This line was briefly `signedIn()` while nothing wrote those docs —
+      // BUG-017 — which made the whole collection listable.)
+      allow read: if signedIn() && (isParty() || isStaff());
 
       // On create the rider states what they owe, never that it is settled.
       // A trainer creating a walk-in may record cash taken up front, so the
@@ -184,7 +190,7 @@ service cloud.firestore {
       // Evaluating isStaff() first also threw outright for any signed-in user
       // with no profile document rather than simply denying them.
       allow update: if signedIn()
-        && (isProvider()
+        && ((isProvider() && providerFieldsOnly())
             || (isParty() && paymentFieldsUnchanged()
                 && riderFieldsOnly() && riderStatusIsCancellation())
             || isStaff());
@@ -195,12 +201,37 @@ service cloud.firestore {
     // ── availability & vacations (trainer-owned calendar) ────────────────
     // Readable by everyone signed in: the booking grid needs a trainer's
     // blocks to compute what is actually free.
+    //
+    // Two kinds of document share this collection (§8.5). `host-blocked` is
+    // the trainer's own calendar and only they write it. `occupied` is a
+    // booking's shadow: it carries a live booking's hours — and nothing else,
+    // no name, no message, no price — so that a rider who cannot read the
+    // booking itself can still see the hour is gone. It is keyed by the
+    // booking's id and written in the same atomic commit, which is what lets
+    // these rules authorise the rider's write: `getAfter` reads the sibling
+    // booking as the commit will leave it.
     match /availability/{docId} {
+      function bookingAfter() {
+        return getAfter(
+          /databases/$(database)/documents/bookings/$(docId)).data;
+      }
+
       allow read: if signedIn();
       allow create: if signedIn()
-        && request.resource.data.instructorId == uid();
+        && (request.resource.data.instructorId == uid()
+            || isStaff()
+            || (request.resource.data.status == 'occupied'
+                && bookingAfter().kiterId == uid()
+                && bookingAfter().instructorId
+                    == request.resource.data.instructorId));
+      // The rider may delete exactly one thing: the occupied doc of their
+      // own booking, in the same commit that cancels it.
       allow update, delete: if signedIn()
-        && (resource.data.instructorId == uid() || isStaff());
+        && (resource.data.instructorId == uid()
+            || isStaff()
+            || (resource.data.status == 'occupied'
+                && bookingAfter().kiterId == uid()
+                && bookingAfter().status == 'cancelled'));
     }
 
     match /vacations/{docId} {
@@ -213,15 +244,32 @@ service cloud.firestore {
 
     // ── reviews ──────────────────────────────────────────────────────────
     // Public to read (ratings drive Explore). Authors may delete their own.
-    // Eligibility — a completed, unreviewed booking — is enforced in the
-    // repository; the rules pin authorship and the 1–5 range.
+    //
+    // Eligibility is enforced *here*, not only in the repository: a rating
+    // that drives Explore is only worth what its worst entry, and a direct
+    // Firestore client used to be able to review a trainer it never trained
+    // with, or a booking that never existed (BUG-004). The rule reads the
+    // named booking — one billed get per review write — and requires the
+    // §8.9 facts: it completed, this author was the rider on it, and it was
+    // with this trainer. What it still cannot enforce is one-review-per-
+    // booking: that needs a deterministic review id, which is a document-
+    // shape change. The repository's re-check keeps holding that line.
     match /reviews/{reviewId} {
+      function reviewedBooking() {
+        return get(/databases/$(database)/documents/bookings/
+          $(request.resource.data.bookingId)).data;
+      }
+
       allow read: if signedIn();
       allow create: if signedIn() && notBlocked()
         && request.resource.data.userId == uid()
         && request.resource.data.rating is int
         && request.resource.data.rating >= 1
-        && request.resource.data.rating <= 5;
+        && request.resource.data.rating <= 5
+        && request.resource.data.bookingId is string
+        && reviewedBooking().status == 'completed'
+        && reviewedBooking().kiterId == uid()
+        && reviewedBooking().instructorId == request.resource.data.trainerId;
       allow update: if false;
       allow delete: if signedIn()
         && (resource.data.userId == uid() || isStaff());
@@ -269,14 +317,49 @@ service cloud.firestore {
     }
 
     // ── notifications ────────────────────────────────────────────────────
-    // Recipients read and mark their own read/deleted. Any signed-in user can
-    // create one, because the app notifies the *other* party (a rider's
-    // booking notifies the trainer). The Cloud Function reads these to send
-    // FCM; it runs with admin credentials and bypasses these rules.
+    // Recipients read and mark their own read/deleted. The app notifies the
+    // *other* party (a rider's booking notifies the trainer), so a create is
+    // permitted only across a real relationship: the two parties of the
+    // booking it names, or two people who already share a chat thread.
+    // `allow create: if signedIn()` used to be the whole rule, which let any
+    // account render a convincing "Booking approved ✅" in any stranger's
+    // inbox (BUG-005). The Cloud Function that sends FCM runs with admin
+    // credentials and bypasses these rules.
+    //
+    // Deliberately NOT notBlocked(): a blocked rider may still cancel, and
+    // that cancel must still warn the trainer. The relationship constraint is
+    // what keeps a blocked account from reaching anyone new.
     match /notifications/{notificationId} {
+      function target() {
+        return request.resource.data.targetUserId;
+      }
+
+      // The booking the notification claims to be about — both the sender
+      // and the recipient must be its parties, in either role.
+      function aboutSharedBooking() {
+        let b = get(/databases/$(database)/documents/bookings/
+          $(request.resource.data.bookingId)).data;
+        return (b.kiterId == uid() || b.instructorId == uid())
+            && (b.kiterId == target() || b.instructorId == target());
+      }
+
+      // Chat threads are keyed `idFor(a, b)` — the sorted pair — so the
+      // thread between sender and target has exactly one possible id.
+      function sharesThreadWithTarget() {
+        return exists(/databases/$(database)/documents/chats/
+          $(uid() < target() ? uid() + '_' + target()
+                             : target() + '_' + uid()));
+      }
+
       allow read, update, delete: if signedIn()
         && (resource.data.targetUserId == uid() || isStaff());
-      allow create: if signedIn();
+      allow create: if signedIn()
+        && (isStaff()
+            || (target() != uid()
+                && (('bookingId' in request.resource.data
+                     && aboutSharedBooking())
+                    || (request.resource.data.type == 'message'
+                        && sharesThreadWithTarget()))));
     }
 
     // ── support tickets ──────────────────────────────────────────────────
@@ -334,15 +417,47 @@ service cloud.firestore {
     }
 
     // ── safari trips ─────────────────────────────────────────────────────
-    // Public to read; the host manages them. `bookedSeats` is incremented
-    // inside the reservation transaction by the booking rider, so an update
-    // is allowed for any signed-in user — the transaction re-reads capacity
-    // and rejects overselling (§8.6).
+    // Public to read; the host manages them. The seat count lives on this
+    // document and is moved by the *reserving rider's* transaction, so a
+    // non-host update cannot simply be denied — but `allow update: if
+    // signedIn()` authorised every field, so any account could zero a
+    // competitor's price or set capacity 999 (BUG-006). A non-host may now
+    // move exactly what the reservation and its cancel move: `bookedSeats`
+    // by one seat at a time, inside [0, capacity], and `status` between
+    // open/full. One seat per write is the shape of every legitimate call;
+    // it does still let a signed-in stranger walk a manifest up seat by
+    // seat, which only a server-held ledger could fully prevent.
     match /safari_trips/{tripId} {
+      function seatFieldsOnly() {
+        return request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['bookedSeats', 'status']);
+      }
+
+      function seatMoveOk() {
+        return !request.resource.data.diff(resource.data).affectedKeys()
+                 .hasAny(['bookedSeats'])
+            || (request.resource.data.bookedSeats is int
+                && (request.resource.data.bookedSeats
+                      - resource.data.get('bookedSeats', 0)) in [1, -1]
+                && request.resource.data.bookedSeats >= 0
+                && (resource.data.get('capacity', 0) <= 0
+                    || request.resource.data.bookedSeats
+                        <= resource.data.capacity));
+      }
+
+      function seatStatusOk() {
+        return !request.resource.data.diff(resource.data).affectedKeys()
+                 .hasAny(['status'])
+            || request.resource.data.status in ['open', 'full'];
+      }
+
       allow read: if signedIn();
       allow create: if signedIn()
         && request.resource.data.hostId == uid();
-      allow update: if signedIn();
+      allow update: if signedIn()
+        && (resource.data.hostId == uid()
+            || isStaff()
+            || (seatFieldsOnly() && seatMoveOk() && seatStatusOk()));
       allow delete: if signedIn()
         && (resource.data.hostId == uid() || isStaff());
     }

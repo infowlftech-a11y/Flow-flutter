@@ -1,14 +1,15 @@
 // firestore.rules — match /reviews/{reviewId}
 //
-// The rules pin authorship and the 1-5 range only; the comment above them
-// states plainly that eligibility (§8.9 — a completed, unreviewed booking) is
-// enforced in the repository. These tests assert what the rules do enforce,
-// and pin the shape of what they deliberately do not, so the gap is visible
-// rather than assumed.
+// The rules pin authorship, the 1-5 range, and — since BUG-004 — the §8.9
+// eligibility facts, by reading the named booking: it completed, the author
+// was the rider on it, and it was with this trainer. What they still cannot
+// pin is one-review-per-booking (that needs a deterministic review id, a
+// document-shape change); the repository holds that line, and the last test
+// keeps the gap visible rather than assumed.
 
 import { test, describe, before, beforeEach, after } from 'node:test';
 import { assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
-import { as, anon, reset, seed, cleanup, testEnv } from './helpers.mjs';
+import { as, anon, reset, seed, cleanup, testEnv, bookingDoc } from './helpers.mjs';
 
 const review = (o = {}) => ({
   trainerId: 'trainer', userId: 'rider', userName: 'Rider One',
@@ -19,6 +20,15 @@ before(async () => { await testEnv(); });
 beforeEach(async () => {
   await reset();
   await seed(async (db) => {
+    // The booking that earns the review: completed, rider with trainer.
+    await db.collection('bookings').doc('b1').set(
+      bookingDoc({ id: 'b1', status: 'completed' }));
+    // A second rider's completed booking, for authorship cross-checks.
+    await db.collection('bookings').doc('b2').set(
+      bookingDoc({ id: 'b2', kiterId: 'rider2', status: 'completed' }));
+    // One still pending — training that has not happened yet.
+    await db.collection('bookings').doc('pending1').set(
+      bookingDoc({ id: 'pending1', status: 'pending' }));
     await db.collection('reviews').doc('r1').set(review());
   });
 });
@@ -134,35 +144,73 @@ describe('reviews — update and delete', () => {
   });
 });
 
-describe('reviews — what the rules deliberately do not enforce', () => {
-  // These pass by design: the rules pin authorship and range, and the
-  // repository owns eligibility. Pinned so the boundary is explicit — if any
-  // of these ever starts failing, the enforcement model changed.
-  // Logged as BUG-004; the exposure is that none of this holds for a client
-  // that talks to Firestore directly instead of through the app.
+describe('reviews — eligibility is enforced at the API (BUG-004)', () => {
+  // Each of these used to pass, pinned under "what the rules deliberately do
+  // not enforce". The enforcement model changed on purpose: a rating that
+  // drives Explore has to hold against a direct Firestore client, not only
+  // against the app's own repository.
 
-  test('a review can be written with no booking behind it at all', async () => {
+  test('DENY a review with no booking behind it at all', async () => {
     const db = await as('rider2');
-    await assertSucceeds(
-      db.collection('reviews').doc('n2').set(review({ userId: 'rider2', bookingId: 'does-not-exist' })),
+    await assertFails(
+      db.collection('reviews').doc('n2')
+        .set(review({ userId: 'rider2', bookingId: 'does-not-exist' })),
     );
   });
 
-  test('two reviews can be written for the same bookingId', async () => {
+  test('DENY a review with no bookingId field at all', async () => {
+    const doc = review();
+    delete doc.bookingId;
+    const db = await as('rider');
+    await assertFails(db.collection('reviews').doc('n2').set(doc));
+  });
+
+  test('DENY a trainer reviewing themselves', async () => {
+    const db = await as('trainer');
+    await assertFails(
+      db.collection('reviews').doc('n2')
+        .set(review({ userId: 'trainer', trainerId: 'trainer' })),
+    );
+  });
+
+  test("DENY reviewing on the back of someone else's booking", async () => {
+    // b2 completed, but its rider is rider2 — this author never trained.
+    const db = await as('rider');
+    await assertFails(
+      db.collection('reviews').doc('n2').set(review({ bookingId: 'b2' })),
+    );
+  });
+
+  test('DENY reviewing a session that has not happened (§8.9)', async () => {
+    const db = await as('rider');
+    await assertFails(
+      db.collection('reviews').doc('n2').set(review({ bookingId: 'pending1' })),
+    );
+  });
+
+  test('DENY pointing the review at a trainer the booking does not name',
+    async () => {
+      // A completed booking with `trainer` must not mint a rating for
+      // `trainer2`.
+      const db = await as('rider');
+      await assertFails(
+        db.collection('reviews').doc('n2')
+          .set(review({ trainerId: 'trainer2' })),
+      );
+    });
+
+  // Still open, and pinned so the boundary stays visible: one-review-per-
+  // booking needs a deterministic review id (a shape change). The
+  // repository's re-check is the only guard. If this ever starts failing,
+  // the enforcement model changed again — update BUGS.md BUG-004.
+  test('two reviews for the same bookingId still pass the rules', async () => {
     const db = await as('rider');
     await assertSucceeds(db.collection('reviews').doc('n2').set(review()));
     await assertSucceeds(db.collection('reviews').doc('n3').set(review()));
   });
 
-  test('a trainer can review themselves', async () => {
-    const db = await as('trainer');
-    await assertSucceeds(
-      db.collection('reviews').doc('n2').set(review({ userId: 'trainer', trainerId: 'trainer' })),
-    );
-  });
-
   // "a blocked user can still write a review" used to live here, pinning
-  // BUG-007. It no longer holds: notBlocked() now guards this create, and the
-  // denial is asserted in misc.test.mjs alongside the rest of the suspension
-  // surface. Eligibility is still unenforced — that part of BUG-004 stands.
+  // BUG-007. It no longer holds: notBlocked() guards this create, and the
+  // denial is asserted in misc.test.mjs alongside the rest of the
+  // suspension surface.
 });
