@@ -30,6 +30,20 @@ import 'admin_queues.dart';
 class AdminScreen extends ConsumerWidget {
   const AdminScreen({super.key});
 
+  /// The one way out of the console. The route is the staff root — there is
+  /// nothing under it to pop to — so both the app-bar action and the system
+  /// back gesture land here rather than dropping out of the app.
+  Future<void> _confirmSignOut(BuildContext context, WidgetRef ref) async {
+    final ok = await confirmAction(
+      context,
+      title: 'Sign out?',
+      body: "You'll need your email and password to get back in.",
+      confirmLabel: 'Sign out',
+      cancelLabel: 'Stay',
+    );
+    if (ok) await ref.read(signOutProvider)();
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Defence in depth: the entry point is staff-gated, the route is gated,
@@ -42,7 +56,9 @@ class AdminScreen extends ConsumerWidget {
           title: 'Staff only',
           subtitle: 'This console is limited to admin and support accounts.',
           action: OutlinedButton(
-              onPressed: () => context.pop(), child: const Text('Go back')),
+            onPressed: () => context.pop(),
+            child: const Text('Go back'),
+          ),
         ),
       );
     }
@@ -75,69 +91,71 @@ class AdminScreen extends ConsumerWidget {
     // be able to find that name and see what it has been doing.
     return DefaultTabController(
       length: 8,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Admin console'),
-          automaticallyImplyLeading: false,
-          actions: [
-            IconButton(
-              onPressed: () => context.push('/notifications'),
-              tooltip: 'Notifications',
-              icon: const Icon(Symbols.notifications_rounded),
+      // Back used to fall through to the system and close the app cold —
+      // the console is the staff root, so there was nothing to pop. Catch it
+      // and offer the same sign-out the app bar offers; declining stays put.
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (didPop) return;
+          _confirmSignOut(context, ref);
+        },
+        child: Scaffold(
+          appBar: AppBar(
+            title: const Text('Admin console'),
+            automaticallyImplyLeading: false,
+            actions: [
+              IconButton(
+                onPressed: () => context.push('/notifications'),
+                tooltip: 'Notifications',
+                icon: const Icon(Symbols.notifications_rounded),
+              ),
+              // Staff have no Profile tab to sign out from any more, so the
+              // console carries it.
+              IconButton(
+                onPressed: () => _confirmSignOut(context, ref),
+                tooltip: 'Sign out',
+                icon: const Icon(Symbols.logout_rounded),
+              ),
+              const SizedBox(width: 4),
+            ],
+            bottom: TabBar(
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
+              // Styled here, not in the theme: the inherited tab label is
+              // display-sized shouting caps, and at eight tabs it fit barely
+              // two of them on a 360dp phone — the row read as three giant
+              // words, not as navigation. Sentence case at label size shows
+              // four to five tabs, and the label-width indicator plus even
+              // padding keeps the row visually justified while it scrolls.
+              labelStyle: inter(13.5, 680, spacing: .2),
+              unselectedLabelStyle: inter(13.5, 520, spacing: .2),
+              labelPadding: const EdgeInsets.symmetric(horizontal: 14),
+              indicatorSize: TabBarIndicatorSize.label,
+              tabs: [
+                Tab(text: label('Approvals', pending.length)),
+                Tab(text: label('Tickets', openTickets)),
+                Tab(text: label('Reports', openReports)),
+                Tab(text: label('Appeals', openAppeals)),
+                Tab(text: label('Suspended', blocked.length)),
+                const Tab(text: 'Feedback'),
+                const Tab(text: 'Users'),
+                const Tab(text: 'Sessions'),
+              ],
             ),
-            // Staff have no Profile tab to sign out from any more, so the
-            // console carries it.
-            IconButton(
-              onPressed: () async {
-                final ok = await confirmAction(
-                  context,
-                  title: 'Sign out?',
-                  body: "You'll need your email and password to get back in.",
-                  confirmLabel: 'Sign out',
-                );
-                if (ok) await ref.read(signOutProvider)();
-              },
-              tooltip: 'Sign out',
-              icon: const Icon(Symbols.logout_rounded),
-            ),
-            const SizedBox(width: 4),
-          ],
-          bottom: TabBar(
-            isScrollable: true,
-            tabAlignment: TabAlignment.start,
-            // Styled here, not in the theme: the inherited tab label is
-            // display-sized shouting caps, and at eight tabs it fit barely
-            // two of them on a 360dp phone — the row read as three giant
-            // words, not as navigation. Sentence case at label size shows
-            // four to five tabs, and the label-width indicator plus even
-            // padding keeps the row visually justified while it scrolls.
-            labelStyle: inter(13.5, 680, spacing: .2),
-            unselectedLabelStyle: inter(13.5, 520, spacing: .2),
-            labelPadding: const EdgeInsets.symmetric(horizontal: 14),
-            indicatorSize: TabBarIndicatorSize.label,
-            tabs: [
-              Tab(text: label('Approvals', pending.length)),
-              Tab(text: label('Tickets', openTickets)),
-              Tab(text: label('Reports', openReports)),
-              Tab(text: label('Appeals', openAppeals)),
-              Tab(text: label('Suspended', blocked.length)),
-              const Tab(text: 'Feedback'),
-              const Tab(text: 'Users'),
-              const Tab(text: 'Sessions'),
+          ),
+          body: const TabBarView(
+            children: [
+              _ApprovalsTab(),
+              TicketsTab(),
+              _ReportsTab(),
+              _AppealsTab(),
+              SuspendedTab(),
+              LeaveReasonsTab(),
+              UsersTab(),
+              AllSessionsTab(),
             ],
           ),
-        ),
-        body: const TabBarView(
-          children: [
-            _ApprovalsTab(),
-            TicketsTab(),
-            _ReportsTab(),
-            _AppealsTab(),
-            SuspendedTab(),
-            LeaveReasonsTab(),
-            UsersTab(),
-            AllSessionsTab(),
-          ],
         ),
       ),
     );
@@ -201,7 +219,8 @@ class _ApplicantCardState extends ConsumerState<_ApplicantCard> {
     final sure = await confirmAction(
       context,
       title: 'Approve ${widget.trainer.name}?',
-      body: 'They go live in Explore straight away and riders can book them. '
+      body:
+          'They go live in Explore straight away and riders can book them. '
           'Check the certificate first if you have not.',
       confirmLabel: 'Approve',
       cancelLabel: 'Not yet',
@@ -244,8 +263,9 @@ class _ApplicantCardState extends ConsumerState<_ApplicantCard> {
               maxLines: 3,
               minLines: 2,
               decoration: const InputDecoration(
-                  hintText:
-                      'Reason (optional) — e.g. "Certification ID could not be verified"'),
+                hintText:
+                    'Reason (optional) — e.g. "Certification ID could not be verified"',
+              ),
             ),
             const SizedBox(height: 16),
             PrimaryButton(
@@ -297,17 +317,23 @@ class _ApplicantCardState extends ConsumerState<_ApplicantCard> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(t.name,
-                        style: Theme.of(context).textTheme.titleMedium),
-                    Text(t.email,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: inter(12.5, 480, color: tones.textFaint)),
+                    Text(
+                      t.name,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    Text(
+                      t.email,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: inter(12.5, 480, color: tones.textFaint),
+                    ),
                   ],
                 ),
               ),
-              Text('${money(t.displayRate)}/h',
-                  style: interNum(14, 720, color: tones.azureBrand)),
+              Text(
+                '${money(t.displayRate)}/h',
+                style: interNum(14, 720, color: tones.azureBrand),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -315,9 +341,11 @@ class _ApplicantCardState extends ConsumerState<_ApplicantCard> {
             spacing: 6,
             runSpacing: 6,
             children: [
-              TagPill(t.ikoId == null ? 'NO IKO ID' : ikoLabel(t.ikoId!),
-                  icon: Symbols.workspace_premium_rounded,
-                  color: t.ikoId == null ? tones.danger : null),
+              TagPill(
+                t.ikoId == null ? 'NO IKO ID' : ikoLabel(t.ikoId!),
+                icon: Symbols.workspace_premium_rounded,
+                color: t.ikoId == null ? tones.danger : null,
+              ),
               if (t.location != null)
                 TagPill(t.location!, icon: Symbols.place_rounded),
               for (final lang in t.languages.take(3)) TagPill(lang),
@@ -325,13 +353,14 @@ class _ApplicantCardState extends ConsumerState<_ApplicantCard> {
           ),
           if ((t.bio ?? '').isNotEmpty) ...[
             const SizedBox(height: 10),
-            Text(t.bio!,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyMedium!
-                    .copyWith(height: 1.45)),
+            Text(
+              t.bio!,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium!.copyWith(height: 1.45),
+            ),
           ],
           const SizedBox(height: 12),
           // The whole point of review: look at the certificate.
@@ -434,19 +463,22 @@ class _ReportCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tones = context.tones;
     return FlowCard(
-      borderColor:
-          report.isOpen ? tones.danger.withValues(alpha: .4) : null,
+      borderColor: report.isOpen ? tones.danger.withValues(alpha: .4) : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Expanded(
-                child: Text(report.reason,
-                    style: Theme.of(context).textTheme.titleMedium),
+                child: Text(
+                  report.reason,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
               ),
-              TagPill(report.status.toUpperCase(),
-                  color: report.isOpen ? tones.danger : tones.textFaint),
+              TagPill(
+                report.status.toUpperCase(),
+                color: report.isOpen ? tones.danger : tones.textFaint,
+              ),
             ],
           ),
           const SizedBox(height: 6),
@@ -456,11 +488,13 @@ class _ReportCard extends ConsumerWidget {
           ),
           if ((report.details ?? '').isNotEmpty) ...[
             const SizedBox(height: 10),
-            Text('"${report.details}"',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyMedium!
-                    .copyWith(fontStyle: FontStyle.italic, height: 1.45)),
+            Text(
+              '"${report.details}"',
+              style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                fontStyle: FontStyle.italic,
+                height: 1.45,
+              ),
+            ),
           ],
           if (report.attachments.isNotEmpty) ...[
             const SizedBox(height: 10),
@@ -520,8 +554,9 @@ class _ReportCard extends ConsumerWidget {
             TextField(
               controller: note,
               maxLines: 2,
-              decoration:
-                  const InputDecoration(hintText: 'Internal note (optional)'),
+              decoration: const InputDecoration(
+                hintText: 'Internal note (optional)',
+              ),
             ),
             const SizedBox(height: 16),
             PrimaryButton(
@@ -534,7 +569,8 @@ class _ReportCard extends ConsumerWidget {
                 final sure = await confirmAction(
                   sheetContext,
                   title: 'Suspend ${report.reportedUserName} for 7 days?',
-                  body: 'They lose access immediately and are shown the '
+                  body:
+                      'They lose access immediately and are shown the '
                       'suspension gate. They can appeal, and you can lift it '
                       'from the Suspended tab.',
                   confirmLabel: 'Suspend',
@@ -548,15 +584,21 @@ class _ReportCard extends ConsumerWidget {
                 // 18:00 expired after 6 days and 6 hours — visible now that
                 // the gate actually enforces blockedUntil. `DateTime.tryParse`
                 // reads both forms, and prettyYmd still renders the date part.
-                final until =
-                    DateTime.now().add(const Duration(days: 7)).toIso8601String();
+                final until = DateTime.now()
+                    .add(const Duration(days: 7))
+                    .toIso8601String();
                 await admin.blockUser(report.reportedUserId, until: until);
-                await admin.closeReport(report.id,
-                    upheld: true, note: note.text);
+                await admin.closeReport(
+                  report.id,
+                  upheld: true,
+                  note: note.text,
+                );
                 if (sheetContext.mounted) Navigator.pop(sheetContext);
                 if (context.mounted) {
-                  showFlowToast(context,
-                      '${report.reportedUserName} suspended until ${prettyYmd(until)}');
+                  showFlowToast(
+                    context,
+                    '${report.reportedUserName} suspended until ${prettyYmd(until)}',
+                  );
                 }
               },
             ),
@@ -566,7 +608,8 @@ class _ReportCard extends ConsumerWidget {
                 final sure = await confirmAction(
                   sheetContext,
                   title: 'Dismiss this report?',
-                  body: 'It closes with no action against '
+                  body:
+                      'It closes with no action against '
                       '${report.reportedUserName}. The rider who filed it is '
                       'not told either way.',
                   confirmLabel: 'Dismiss report',
@@ -651,7 +694,9 @@ class _AppealCardState extends ConsumerState<_AppealCard> {
     setState(() => _busy = true);
     final session = ref.read(sessionProvider);
     try {
-      await ref.read(adminRepositoryProvider).replyToAppeal(
+      await ref
+          .read(adminRepositoryProvider)
+          .replyToAppeal(
             widget.appeal.id,
             AppealMessage(
               id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -735,21 +780,26 @@ class _AppealCardState extends ConsumerState<_AppealCard> {
           Row(
             children: [
               Expanded(
-                child: Text(a.userName,
-                    style: Theme.of(context).textTheme.titleMedium),
+                child: Text(
+                  a.userName,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
               ),
               TagPill(a.status.toUpperCase(), color: statusColor),
             ],
           ),
           const SizedBox(height: 4),
-          Text(timeAgo(a.createdAt),
-              style: inter(11.5, 500, color: tones.textFaint)),
+          Text(
+            timeAgo(a.createdAt),
+            style: inter(11.5, 500, color: tones.textFaint),
+          ),
           const SizedBox(height: 10),
-          Text(a.reason,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium!
-                  .copyWith(height: 1.5)),
+          Text(
+            a.reason,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium!.copyWith(height: 1.5),
+          ),
           if (a.attachments.isNotEmpty) ...[
             const SizedBox(height: 10),
             SizedBox(
@@ -784,10 +834,15 @@ class _AppealCardState extends ConsumerState<_AppealCard> {
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text(m.text,
-                          style: inter(14, 460,
-                              color: context.scheme.onSurfaceVariant,
-                              height: 1.45)),
+                      child: Text(
+                        m.text,
+                        style: inter(
+                          14,
+                          460,
+                          color: context.scheme.onSurfaceVariant,
+                          height: 1.45,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -803,8 +858,9 @@ class _AppealCardState extends ConsumerState<_AppealCard> {
                   enabled: !_busy,
                   minLines: 1,
                   maxLines: 3,
-                  decoration:
-                      const InputDecoration(hintText: 'Reply as support…'),
+                  decoration: const InputDecoration(
+                    hintText: 'Reply as support…',
+                  ),
                 ),
               ),
               const SizedBox(width: 8),

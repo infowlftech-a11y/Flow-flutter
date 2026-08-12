@@ -153,6 +153,29 @@ void main() {
     }
   });
 
+  group('system back asks to sign out instead of exiting', () {
+    // The console is the staff root: there is nothing under it to pop to, so
+    // the system back gesture used to fall through and close the app cold.
+    // The PopScope catches it and offers the same sign-out the app bar does.
+    testWidgets('back at the console opens the sign-out confirm',
+        (tester) async {
+      await pumpScreen(tester, const AdminScreen(),
+          db: await staffDb(), as: staff);
+
+      final handled = await tester.binding.handlePopRoute();
+      expect(handled, isTrue,
+          reason: 'the pop fell through to the system — that is the app '
+              'closing on the back gesture');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      expect(find.text('Sign out?'), findsOneWidget);
+      // Declining must be possible — back must never be a forced sign-out.
+      expect(find.text('Stay'), findsOneWidget);
+      expect(find.text('Sign out'), findsOneWidget);
+    });
+  });
+
   group('the ticket thread sheet survives the keyboard', () {
     // The bug this pins: showFlowSheet already pads the sheet by the
     // keyboard inset, and the ticket sheet's builder added the same inset
