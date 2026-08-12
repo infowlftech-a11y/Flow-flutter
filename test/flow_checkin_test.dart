@@ -25,7 +25,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flow/core/utils/date_x.dart';
 import 'package:flow/data/firestore_paths.dart';
 import 'package:flow/data/models/booking.dart';
-import 'package:flow/data/models/catalogue.dart';
 import 'package:flow/data/repositories/booking_repository.dart';
 import 'package:flow/data/repositories/notification_repository.dart';
 import 'package:flow/features/sessions/ticket_screen.dart';
