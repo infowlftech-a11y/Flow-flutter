@@ -87,18 +87,30 @@ class AppShell extends ConsumerWidget {
     final branchOf = branchesFor(isTrainer: isTrainer);
     final selected = branchOf.indexOf(navigationShell.currentIndex);
 
-    // Back at the root of a tab means "leave FLOW", and Android's back
-    // gesture is an edge swipe that a thumb finds by accident. A trainer
-    // mid-session or a rider holding a QR ticket at the water's edge should
-    // not lose the app to a stray swipe.
+    // Native Android back, in two stages — the pattern every launcher-grade
+    // Android app uses:
+    //
+    //   1. Back on any other tab returns to the home tab. No dialog: the
+    //      user is navigating, not leaving.
+    //   2. Back on the home tab means "leave FLOW", and *that* is confirmed,
+    //      because Android's back gesture is an edge swipe a thumb finds by
+    //      accident — a trainer mid-session or a rider holding a QR ticket
+    //      at the water's edge should not lose the app to a stray swipe.
     //
     // `canPop: false` + a confirmed `SystemNavigator.pop()` rather than
     // letting the pop through: the shell is the last route, so allowing it
     // *is* the exit, and there would be nothing left to ask on top of.
+    // Pushed routes above the shell are unaffected — they pop natively,
+    // with the predictive-back animation the manifest opts into.
+    final homeBranch = branchOf.first;
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
+        if (navigationShell.currentIndex != homeBranch) {
+          navigationShell.goBranch(homeBranch);
+          return;
+        }
         final leave = await confirmAction(
           context,
           title: 'Leave FLOW?',

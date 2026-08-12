@@ -409,8 +409,8 @@ class _EmptyToday extends StatelessWidget {
   }
 }
 
-/// Pending request: APPROVE is busy-guarded + haptic + UNDO in the toast;
-/// DECLINE opens a sheet for an optional reason (§3.8, §10.4).
+/// Pending request: APPROVE is confirmed + busy-guarded + haptic + UNDO in
+/// the toast; DECLINE opens a sheet for an optional reason (§3.8, §10.4).
 class _RequestCard extends ConsumerStatefulWidget {
   const _RequestCard({required this.booking});
   final Booking booking;
@@ -424,6 +424,21 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
 
   Future<void> _approve() async {
     if (_busy) return;
+    // Confirmed, with the terms restated: approving commits the hours and
+    // the price, and APPROVE sits one thumb-width from DECLINE on a card
+    // read outdoors. The UNDO toast covers a change of mind for a few
+    // seconds; this covers the tap itself.
+    final b = widget.booking;
+    final ok = await confirmAction(
+      context,
+      title: 'Approve this booking?',
+      body: '${b.studentName} · ${b.startTime}–${b.endTime} · '
+          '${money(b.totalPrice)}. They are notified and the hours are '
+          'committed to your calendar.',
+      confirmLabel: 'Approve',
+      cancelLabel: 'Not yet',
+    );
+    if (!ok || !mounted) return;
     setState(() => _busy = true);
     final repo = ref.read(bookingRepositoryProvider);
     try {

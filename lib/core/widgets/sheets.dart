@@ -61,6 +61,14 @@ Future<T?> showFlowSheet<T>(
 }
 
 /// Destructive/irreversible confirmation dialog (§10.4).
+///
+/// The two choices are twins: same height, same width, same shape — an
+/// outline against a fill. This used to be a bare `TextButton` beside a
+/// `FilledButton`, which put the two answers to the same question in two
+/// different visual languages, one of them barely reading as a button at
+/// all. Labels scale down rather than wrap: these are verb phrases
+/// ('Leave open', 'Close ticket'), and half a verb is worse than a small
+/// one.
 Future<bool> confirmAction(
   BuildContext context, {
   required String title,
@@ -73,23 +81,42 @@ Future<bool> confirmAction(
     context: context,
     builder: (dialogContext) {
       final scheme = Theme.of(dialogContext).colorScheme;
+
+      Widget label(String text) => FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(text, maxLines: 1),
+          );
+
       return AlertDialog(
         title: Text(title),
         content: Text(body),
-        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text(cancelLabel),
-          ),
-          FilledButton(
-            style: destructive
-                ? FilledButton.styleFrom(
-                    backgroundColor: scheme.error,
-                    foregroundColor: scheme.onError)
-                : null,
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: Text(confirmLabel),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 48)),
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: label(cancelLabel),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: FilledButton(
+                  style: destructive
+                      ? FilledButton.styleFrom(
+                          minimumSize: const Size(0, 48),
+                          backgroundColor: scheme.error,
+                          foregroundColor: scheme.onError)
+                      : FilledButton.styleFrom(
+                          minimumSize: const Size(0, 48)),
+                  onPressed: () => Navigator.pop(dialogContext, true),
+                  child: label(confirmLabel),
+                ),
+              ),
+            ],
           ),
         ],
       );

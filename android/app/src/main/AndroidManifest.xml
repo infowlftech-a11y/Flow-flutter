@@ -3,10 +3,14 @@
     <uses-permission android:name="android.permission.CAMERA"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
+    <!-- enableOnBackInvokedCallback: opts into Android 13+ predictive back,
+         so the system back gesture animates natively through Flutter's
+         PopScope instead of using the legacy onBackPressed path. -->
     <application
         android:label="Flow"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:enableOnBackInvokedCallback="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"
