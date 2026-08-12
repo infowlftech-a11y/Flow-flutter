@@ -7,8 +7,27 @@ Every numbered section of §6.2, §6.3, §8, §9, §10 and §11 gets a row.
 
 | Suite | Runs against | Count |
 |---|---|---|
-| `test/` (`flutter test`) | `fake_cloud_firestore` — **rules are not evaluated** | 659 |
-| `test_rules/` (`npm test`) | Firestore emulator — the real `firestore.rules` | 321 |
+| `test/` (`flutter test`) | `fake_cloud_firestore` — **rules are not evaluated** | 694 |
+| `test_rules/` (`npm test`) | Firestore emulator — the real `firestore.rules` | 336 |
+| `test/capture/board_capture.dart` | the same harness, rendering to PNG | asserts nothing |
+
+`board_capture.dart` is not a suite and is deliberately excluded from
+`flutter test` by its filename. It renders all 68 screen/scale combinations
+to `.impeccable/review/*.png` so they can be looked at. It exists because
+nothing else here does: the overlap detector proves no text is painted over
+other text, which is a far weaker claim than "this looks right". Text
+wrapping to four lines, an ellipsis eating a button label and a status token
+cut to `CONFIRM…` are all legal layout and all invisible to every assertion
+in `test/`. Seven such defects were found and fixed by reading its output.
+
+694 = 670 measured green at the start of the UI/UX and logic pass, plus 24
+from it: `support_thread_test.dart` 7 — the ticket thread had no test of any
+kind, and `watchTicketMessages` was still ordering server-side on a
+`serverTimestamp` — and `admin_console_layout_test.dart` 17, the console
+never having been rendered as staff by anything.
+
+The 659 below is the figure this file carried and is understated; the
+product pass that followed it added tests without updating this line.
 
 659 = the 445 that existed before this work, unmodified and still green,
 plus 191 from the verification pass (`flow_approval_test.dart` 30,
@@ -67,7 +86,7 @@ now routed to `test_rules/transactions.test.mjs` and
 | My appeal | `flow_moderation_test` — "the appeal round trip" | pass |
 | Safari trips | `flow_collision_test`; `transactions.test.mjs` | pass |
 | Station sub-collections | `users.test.mjs` — 12 cases | pass |
-| **Client-side sorting is preserved** (no composite indexes) | Not covered | **not covered** — needs a test asserting no query carries an `orderBy` beside an equality filter. Worth adding; a server-side sort would break the screen with `failed-precondition` and nothing would catch it. |
+| **Client-side sorting is preserved** (no composite indexes) | Audited by hand; `support_thread_test` covers the one stream that broke it | **partial** — every `where`/`orderBy` in `lib/` was read. No query pairs an `orderBy` with an equality filter, so no composite index is needed and there is no `firestore.indexes.json` to keep in step. One `orderBy` survives, on `tickets/{id}/messages`, and it needed removing for a different reason: `createdAt` is a `serverTimestamp`, which is null locally until the ack, and Firestore sorts null first — a message sorted to the top of the thread as you sent it. Still no *test* asserting the rule for future queries; it would have to read source, and a composite-index miss fails with `failed-precondition` only against real Firestore. |
 
 ## §6.3 Document writes
 
@@ -188,9 +207,20 @@ grep — the loops expand):
 2. **Widget-level behaviour is largely untested by this work** — §10.4,
    §10.5, §10.9, §10.10, §11.2, and the form gates in §9.6/§9.7.
 3. **§8.11's unread round trip** is not driven end to end.
-4. **§6.2's "sorting stays client-side"** has no guard.
-5. **The QR scanner's own parse branches** (§10.7) are exercised through
+4. **§6.2's "sorting stays client-side"** has no automated guard; audited by
+   hand, and the one violation is fixed. See the row in §6.2.
+5. **Nothing asserts how a screen looks**, only that its text does not
+   overlap. Wrapping, elision and a label scaled to nothing are legal layout
+   and pass every assertion here. `test/capture/board_capture.dart` renders
+   the screens so a person can check; it decides nothing on its own.
+6. **A test can pass while rendering a different screen than it names.**
+   `screen_overlap_test.dart`'s "admin console" case pumps `AdminScreen` as a
+   trainer and has only ever seen the "Staff only" gate.
+   `admin_console_layout_test.dart` covers the real console and proves each
+   tab opened before asserting on it; the older case is now redundant and
+   still misleading, and deleting it is a call about an existing test.
+7. **The QR scanner's own parse branches** (§10.7) are exercised through
    their contract, not directly — the method is private inside a widget that
    builds a live camera.
-6. **Push (§11.3) is untestable here and inert in production** while Cloud
+8. **Push (§11.3) is untestable here and inert in production** while Cloud
    Functions are disabled.
