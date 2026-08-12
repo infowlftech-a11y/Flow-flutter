@@ -6,8 +6,9 @@ name: flow
 description: "Flow — kitesurfing lessons on the Red Sea. Find certified trainers, book hours on the water, check in with a QR ticket."
 publish_to: 'none'
 
-# FLOW 3.0.0 — ground-up UI redesign of v2.6.0 (see APP_LOGIC_BLUEPRINT.md).
-version: 3.0.0+1
+# First public release. `versionName` 1.0.0, `versionCode` 1 — the Android
+# build reads both from here via flutter.versionName / flutter.versionCode.
+version: 1.0.0+1
 
 environment:
   sdk: ^3.12.2
@@ -45,6 +46,27 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^6.0.0
   fake_cloud_firestore: ^4.2.0
+  flutter_launcher_icons: ^0.14.4
+  image: ^4.9.1
+
+# Launcher icon. Regenerate with:
+#   dart run tool/make_icon_foreground.dart   # only if icon.png changes
+#   dart run flutter_launcher_icons
+#
+# Two layers, because Android 8+ masks the icon itself and guarantees only
+# the centre 66 of 108dp. `icon.png` is a finished legacy icon — its own
+# rounded square, its own border ring, artwork out to 97% of the width — so
+# it is used as-is for the legacy mipmaps and stripped down for the adaptive
+# foreground, or the launcher would clip the swoosh and stamp a sticker edge
+# around the square. The background is the source's own mean navy, measured
+# rather than picked, so the foreground's antialiasing blends into it.
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/brand/icon_legacy.png"
+  adaptive_icon_background: "#000C25"
+  adaptive_icon_foreground: "assets/brand/icon_foreground.png"
+  min_sdk_android: 21
 
 flutter:
   uses-material-design: true
