@@ -217,9 +217,12 @@ class _ScheduleTabState extends ConsumerState<ScheduleTab> {
     final blocks = ref.read(dayBlocksProvider(_key)).value ?? const [];
 
     // A blocked hour → release it; a free hour → block it. Booked, past and
-    // away hours are not tappable (enforced by the timeline).
+    // away hours are not tappable (enforced by the timeline). Only the
+    // trainer's own host blocks are releasable from here: an `occupied` doc
+    // belongs to a live booking, and deleting it would re-open hours that a
+    // session still holds.
     final existing = blocks
-        .where((b) => b.blocksCalendar && b.expandBlock().contains(slot))
+        .where((b) => b.status == 'host-blocked' && b.expandBlock().contains(slot))
         .firstOrNull;
     Haptics.select();
     try {

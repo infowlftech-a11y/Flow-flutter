@@ -6,6 +6,7 @@ import '../firestore_paths.dart';
 import '../models/booking.dart';
 import '../models/catalogue.dart';
 import '../models/payment.dart';
+import '../models/schedule.dart';
 import 'notification_repository.dart';
 
 /// Someone else took the hour (or seat) between the rider's tap and the
@@ -117,24 +118,91 @@ class BookingRepository {
 
   // ── Creation ───────────────────────────────────────────────────────────
 
+  /// The `availability` doc a live booking maintains for its hours (§8.5).
+  ///
+  /// Keyed by the booking's own id, so it is addressable without a query:
+  /// the delete in [_writeIfLive] and the rules' `getAfter` both depend on
+  /// that. `status: 'occupied'` is the half of §8.5 nothing wrote — blocks
+  /// were only ever `host-blocked` — and it is what lets the booking grid and
+  /// the clash check run against `availability`, which any signed-in user may
+  /// read, instead of `bookings`, which only the two parties may. The doc
+  /// carries the hours and nothing else: no rider name, no message, no price.
+  DocumentReference<Map<String, dynamic>> _occupiedRef(String bookingId) =>
+      _db.collection(Col.availability).doc(bookingId);
+
+  Map<String, dynamic> _occupiedDoc({
+    required String instructorId,
+    required String date,
+    required Slot start,
+    required Slot end,
+  }) =>
+      {
+        'instructorId': instructorId,
+        'date': date,
+        'startTime': start.value,
+        'endTime': end.value,
+        'status': 'occupied',
+        'label': 'Booked',
+        'createdAt': FieldValue.serverTimestamp(),
+      };
+
   /// Hourly bookings are **checked, not locked**: Firestore transactions
   /// cannot read a query, so we re-query the day right before writing and
   /// throw [SlotTakenFailure] on a clash. Two simultaneous confirms both land
   /// as pending and the trainer declines one (§8.6).
+  ///
+  /// Reads both calendars and lets the more informed one win.
+  ///
+  /// The day's bookings are authoritative — but readable only by their own
+  /// two parties (BUG-017), so for a rider that query is refused wholesale
+  /// and no rider ever completed a booking against live Firestore. The
+  /// `availability` docs are the answer anyone may read: host blocks, plus
+  /// the `occupied` doc every live booking maintains. Where the bookings
+  /// query *was* readable, a booking speaks for itself and its occupied doc
+  /// is ignored — a status written around the repository (staff consoles,
+  /// tests) must still release the hours even if the doc lingers.
+  ///
+  /// Host blocks joining the check is deliberate: one added between the grid
+  /// snapshot and the confirm used to slip through, because the re-check
+  /// only looked at bookings (§8.6).
   Future<void> _assertSlotsFree(
       String instructorId, String date, List<Slot> wanted,
       {String? ignoreBookingId}) async {
-    final qs = await _col
+    final taken = <String>{};
+    final visible = <String>{};
+    try {
+      final qs = await _col
+          .where('instructorId', isEqualTo: instructorId)
+          .where('date', isEqualTo: date)
+          .get();
+      for (final doc in qs.docs) {
+        visible.add(doc.id);
+        if (doc.id == ignoreBookingId) continue;
+        final b = _fromDoc(doc);
+        if (!b.status.isLive) continue;
+        taken.addAll([for (final s in b.occupiedSlots) s.value]);
+      }
+    } on FirebaseException catch (e) {
+      // The rider's case, by design, not an outage — fall through to the
+      // occupied docs. Anything else is a real failure.
+      if (e.code != 'permission-denied') rethrow;
+    }
+
+    final blocksQs = await _db
+        .collection(Col.availability)
         .where('instructorId', isEqualTo: instructorId)
         .where('date', isEqualTo: date)
         .get();
-    final taken = <String>{};
-    for (final doc in qs.docs) {
+    for (final doc in blocksQs.docs) {
       if (doc.id == ignoreBookingId) continue;
-      final b = _fromDoc(doc);
-      if (!b.status.isLive) continue;
-      taken.addAll([for (final s in b.occupiedSlots) s.value]);
+      final block = Availability.fromDoc(doc.id, doc.data());
+      if (!block.blocksCalendar) continue;
+      // An occupied doc is keyed by its booking's id. If that booking was
+      // readable above, its own status has already decided these hours.
+      if (block.status == 'occupied' && visible.contains(doc.id)) continue;
+      taken.addAll([for (final s in block.expandBlock()) s.value]);
     }
+
     final clash = [for (final s in wanted) if (taken.contains(s.value)) s.value];
     if (clash.isNotEmpty) throw SlotTakenFailure(clash);
   }
@@ -160,6 +228,16 @@ class BookingRepository {
       throw ArgumentError('Select at least one hour.');
     }
     final sorted = [...slots]..sort((a, b) => a.minutesOfDay - b.minutesOfDay);
+    // §8.4 — the hours must be one unbroken run. The grid's _tapSlot enforces
+    // this, but a write has to hold its own invariants: ['10:00', '15:00']
+    // used to be accepted and recorded as endTime 12:00, a booking whose
+    // range disagrees with the hours it holds (BUG-015) — and the occupied
+    // availability doc below is a single range, so it *depends* on this.
+    for (var i = 1; i < sorted.length; i++) {
+      if (sorted[i].minutesOfDay - sorted[i - 1].minutesOfDay != 60) {
+        throw ArgumentError('Selected hours must be consecutive.');
+      }
+    }
     final start = sorted.first;
     final hours = sorted.length;
     final window =
@@ -183,7 +261,11 @@ class BookingRepository {
     final title = target.subTarget != null
         ? '${target.title} — ${target.subTarget}'
         : target.title;
-    await doc.set({
+    // One atomic commit: the booking and its occupied doc must never exist
+    // without each other, and the rules authorise the rider's occupied-doc
+    // write by reading the booking in the same commit (getAfter).
+    final batch = _db.batch();
+    batch.set(doc, {
       'id': doc.id,
       'instructorId': target.providerId,
       'instructorName': target.title,
@@ -209,6 +291,15 @@ class BookingRepository {
       ...PaymentInfo.initialFields(amount: total),
       'createdAt': FieldValue.serverTimestamp(),
     });
+    batch.set(
+        _occupiedRef(doc.id),
+        _occupiedDoc(
+          instructorId: target.providerId,
+          date: date,
+          start: start,
+          end: window.end,
+        ));
+    await batch.commit();
 
     await _notifications.notify(
       targetUserId: target.providerId,
@@ -245,7 +336,8 @@ class BookingRepository {
     await _assertSlotsFree(instructorId, date, slots);
 
     final doc = _col.doc();
-    await doc.set({
+    final batch = _db.batch();
+    batch.set(doc, {
       'id': doc.id,
       'instructorId': instructorId,
       'instructorName': instructorName,
@@ -267,6 +359,17 @@ class BookingRepository {
       ...PaymentInfo.initialFields(amount: totalPrice),
       'createdAt': FieldValue.serverTimestamp(),
     });
+    // A walk-in holds hours like any other booking, and with bookings private
+    // the occupied doc is the only way another rider's grid can see them.
+    batch.set(
+        _occupiedRef(doc.id),
+        _occupiedDoc(
+          instructorId: instructorId,
+          date: date,
+          start: start,
+          end: window.end,
+        ));
+    await batch.commit();
   }
 
   /// Safari seats ARE transactional — the seat count lives on one known
@@ -364,6 +467,13 @@ class BookingRepository {
         if (!snap.exists) {
           throw const StatusConflictFailure('That booking no longer exists.');
         }
+        // A terminal transition releases the booking's occupied doc (§8.5).
+        // Read before any write — a transaction demands that order — and only
+        // delete what exists: bookings written before the occupied docs did
+        // have none, and their cancel must still land.
+        final occupied = _terminal.contains(target)
+            ? await tx.get(_occupiedRef(bookingId))
+            : null;
         final current = BookingStatus.parse(snap.data()?.str('status'));
         // Asking for the state it is already in is a retry, not a conflict:
         // a cancel issued from two screens, or one that had actually landed.
@@ -379,6 +489,9 @@ class BookingRepository {
           });
         }
         tx.update(ref, data);
+        if (occupied != null && occupied.exists) {
+          tx.delete(_occupiedRef(bookingId));
+        }
         return true;
       });
 

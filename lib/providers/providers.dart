@@ -526,7 +526,21 @@ final dayAvailabilityProvider =
     bookings.watchDayBookings(key.instructorId, key.date).listen((v) {
       dayBookings = v;
       emit();
-    }, onError: controller.addError),
+    }, onError: (Object e, StackTrace st) {
+      // Bookings are readable only by their own two parties (BUG-017), so
+      // for anyone who is not this trainer (or staff) this stream is refused
+      // wholesale. That is not an error for the grid: the same hours arrive
+      // as `occupied` availability docs in the blocks stream, which is what
+      // they exist for. A denial therefore reports "no bookings visible"
+      // rather than killing the composed stream — but only a denial;
+      // anything else is still a failure the grid must show.
+      if (e is FirebaseException && e.code == 'permission-denied') {
+        dayBookings = const [];
+        emit();
+      } else {
+        controller.addError(e, st);
+      }
+    }),
     schedule.watchVacations(key.instructorId).listen((v) {
       vacations = v;
       emit();

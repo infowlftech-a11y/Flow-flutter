@@ -104,11 +104,18 @@ class DayAvailability {
       date: date,
       blocked: {
         for (final b in blocks)
-          if (b.blocksCalendar) ...b.expandBlock(),
+          if (b.status == 'host-blocked') ...b.expandBlock(),
       },
+      // Occupied docs are bookings seen from outside (§8.5): a viewer who is
+      // not the trainer cannot read the booking documents themselves, so the
+      // occupied block is all their grid gets. It must read 'Booked' — and it
+      // must not be tappable in the schedule tab, which offers to release
+      // anything in `blocked`.
       booked: {
         for (final b in bookings)
           if (b.status.isLive) ...b.occupiedSlots,
+        for (final b in blocks)
+          if (b.status == 'occupied') ...b.expandBlock(),
       },
       onVacation: vacations.any((v) => v.covers(date)),
       past: BookingMath.pastSlots(date, now: now),

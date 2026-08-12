@@ -268,19 +268,17 @@ void main() {
       expect(doc['durationHours'], 3);
     });
 
-    test('a non-contiguous selection is priced and windowed as its span',
+    test('a non-contiguous selection is refused, and writes nothing',
         () async {
-      // 10:00 and 15:00 with nothing between. The window runs start->start+2h
-      // because duration is the *count* of hours, so the booking claims 10:00
-      // and 15:00 but reads as 10:00-12:00. Pinned as current behaviour: the
-      // grid's §8.4 rule prevents this selection, so it is unreachable from
-      // the UI — but createBooking itself does not refuse it (BUG-015).
-      final id = await book(['10:00', '15:00']);
-      final doc = (await db.collection(Col.bookings).doc(id).get()).data()!;
-
-      expect(doc['selectedTimes'], ['10:00', '15:00']);
-      expect(doc['endTime'], '12:00');
-      expect(doc['durationHours'], 2);
+      // 10:00 and 15:00 with nothing between. This used to be accepted and
+      // windowed as 10:00-12:00 — a booking whose range disagreed with the
+      // hours it claimed, pinned here as current behaviour while BUG-015 was
+      // open. §8.4 now holds at the write as well as in the grid, and the
+      // occupied availability doc depends on it: that doc is one
+      // [start, end) range and cannot represent a gap.
+      await expectLater(
+          book(['10:00', '15:00']), throwsA(isA<ArgumentError>()));
+      expect((await db.collection(Col.bookings).get()).docs, isEmpty);
     });
   });
 
