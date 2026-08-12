@@ -508,3 +508,74 @@ them and the thread appears dead from both ends.
 
 Whether the fix is "refuse a second appeal while one is pending" or "show
 them all" is a product decision.
+
+---
+
+## BUG-017 — A rider cannot read a trainer's day, so no rider can ever book
+
+**Severity:** critical (total blocker on live Firestore)
+**Found:** reported from the device; reproduced in `test_rules/booking_reads.test.mjs`
+**File:** [firestore.rules](firestore.rules) — `match /bookings`, `allow read`
+**Status:** REPRODUCED, not fixed — the fix is a design decision, see below
+
+### What
+
+```
+allow read: if signedIn() && (isParty() || isStaff());
+```
+
+`isParty()` resolves per document. `_assertSlotsFree` and `watchDayBookings`
+both query:
+
+```
+bookings where instructorId == <trainer> && date == <day>
+```
+
+That query is not constrained to documents the rider is a party to, so
+Firestore rejects the whole list. Two tests fail against the deployed rules:
+
+- `bookings: a rider reads the trainers booked hours for the day`
+- `the clash re-check — a rider can run it`
+
+### The chain to the toast
+
+1. rider taps **Confirm** → `createBooking`
+2. `createBooking` → `_assertSlotsFree` → `.get()` on the query above
+3. rules deny it → `FirebaseException(permission-denied)`
+4. the `on SlotTakenFailure` catch does not match, so the generic `catch (e)`
+   in [booking_screen.dart:387](lib/features/booking/booking_screen.dart#L387)
+   runs
+5. → "Couldn't send your request. You don't have access to this yet."
+
+Staff pass via `isStaff()`, which is why the same screen works when signed in
+as an admin and fails as a rider — and why it was not caught by hand.
+
+**Pre-existing.** The rule is byte-identical at `90ca448`, before this work.
+No rider has ever completed a booking against live Firestore.
+
+### Why my rules suite missed it
+
+`bookings.test.mjs` tested per-document reads and the two *authorised* filter
+shapes (`kiterId == self`, `instructorId == self`). It never ran the
+`instructorId + date` shape the app actually uses. COVERAGE.md named this
+class of gap — "a rule can be correct and still reject the app" — and then
+the suite demonstrated it.
+
+### The fix is a choice, not a one-liner
+
+The rider needs the *occupied hours*. The booking document also carries the
+other rider's name, message and price, and rules cannot project fields.
+
+- **A — widen the read rule.** One line, unblocks immediately. But rules
+  cannot see query filters, so any third disjunct that is true for a signed-in
+  user makes the whole collection listable: every rider's name, message and
+  price, platform-wide. A real privacy regression.
+- **B — write `availability` docs for booked hours.** §8.5 already specifies
+  blocks as `status: 'host-blocked' | 'occupied'` — the `occupied` half is
+  designed and never written. The grid and the clash check would read
+  `availability`, which is already world-readable to signed-in users, and
+  bookings stay private. Correct, and matches the existing schema; needs
+  `createBooking`, `setStatus` and `cancelByRider` to maintain it, plus a
+  backfill.
+- **C — a Cloud Function** maintaining a public busy-slots document. Blocked:
+  Functions are disabled on this project.
