@@ -1,3 +1,5 @@
+import '../../core/constants.dart';
+
 /// Field rules shared by rider onboarding, trainer onboarding and profile
 /// editing (§9.2).
 ///
@@ -67,13 +69,19 @@ abstract final class OnboardingValidators {
     return null;
   }
 
-  /// Trainer hourly rate, bounded by the platform band (§13).
-  static String? rate(String raw, {required int min, required int max}) {
+  /// Trainer hourly rate.
+  ///
+  /// No platform band — trainers price themselves (§13). The bounds that
+  /// remain catch a mistyped field, not a policy: zero is an unfinished form
+  /// rather than a free lesson, and [FlowConst.maxSaneHourlyRate] is a
+  /// slipped keypad.
+  static String? rate(String raw, {int max = FlowConst.maxSaneHourlyRate}) {
     final value = raw.trim();
     if (value.isEmpty) return 'Required';
     final rate = int.tryParse(value);
     if (rate == null) return 'Numbers only';
-    if (rate < min || rate > max) return '€$min–€$max';
+    if (rate <= 0) return 'Set your hourly rate';
+    if (rate > max) return 'That looks like a typo';
     return null;
   }
 

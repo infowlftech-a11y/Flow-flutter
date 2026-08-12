@@ -143,7 +143,7 @@ class EmptyView extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.action,
-    this.topGap = 60,
+    this.topGap = 0,
   })  : onScrim = false,
         _scrollable = true;
 
@@ -160,8 +160,10 @@ class EmptyView extends StatelessWidget {
 
   final bool _scrollable;
 
-  /// Pushes the state down off the top edge. Only read by
-  /// [EmptyView.scrollable].
+  /// Nudges the centred state off true centre. Only read by
+  /// [EmptyView.scrollable], and only where something else already occupies
+  /// the top of the viewport — a filter bar the list scrolls under, say —
+  /// so that "centred" means centred in the space the user can actually see.
   final double topGap;
 
   @override
@@ -200,9 +202,33 @@ class EmptyView extends StatelessWidget {
     );
 
     if (!_scrollable) return Center(child: content);
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      children: [SizedBox(height: topGap), content],
+
+    // Centred in the viewport, not pinned near the top.
+    //
+    // This used to be `ListView(children: [SizedBox(height: 60), content])`,
+    // which left every empty state hanging under the app bar with the whole
+    // lower half of the screen blank beneath it — the emptiness read as a
+    // rendering failure rather than as an answer.
+    //
+    // The scroll view stays, and stays `AlwaysScrollableScrollPhysics`: an
+    // empty state is shorter than its viewport, so without it the drag is
+    // refused outright and the enclosing RefreshIndicator never fires. The
+    // minHeight constraint is what lets `Center` have something to centre
+    // within — a bare SingleChildScrollView shrink-wraps its child and
+    // centring inside it would be a no-op.
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: Center(
+            child: Padding(
+              padding: EdgeInsets.only(top: topGap),
+              child: content,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

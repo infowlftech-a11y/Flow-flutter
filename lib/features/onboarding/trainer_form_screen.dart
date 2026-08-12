@@ -17,6 +17,7 @@ import '../../core/widgets/buttons.dart';
 import '../../core/widgets/feedback.dart';
 import '../../core/widgets/media.dart';
 import '../../core/widgets/picker_field.dart';
+import '../../core/widgets/sheets.dart';
 import '../../core/widgets/surfaces.dart';
 import '../../data/firestore_paths.dart';
 import '../../providers/providers.dart';
@@ -30,8 +31,19 @@ import 'onboarding_widgets.dart';
 /// The Next button is **always tappable**; tapping on an incomplete step
 /// marks it "attempted", reveals the inline hints (quiet until then) and
 /// scrolls to the first problem. Steps slide in the direction of travel.
+///
+/// With [reapply] the same four steps become the correction form a declined
+/// trainer fixes their application in: every field arrives filled with what
+/// they submitted last time, the photo, gallery and certificate they already
+/// uploaded stay uploaded unless they replace them, and submitting puts the
+/// application back in the queue rather than creating a profile. Written as
+/// a mode on this screen rather than a second screen because the fields, the
+/// gating and the validation are the same — a copy would drift, and it is
+/// the *declined* form that would be the stale one.
 class TrainerFormScreen extends ConsumerStatefulWidget {
-  const TrainerFormScreen({super.key});
+  const TrainerFormScreen({super.key, this.reapply = false});
+
+  final bool reapply;
 
   @override
   ConsumerState<TrainerFormScreen> createState() => _TrainerFormScreenState();
@@ -61,6 +73,13 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
   final _ikoId = TextEditingController();
   XFile? _certificate;
 
+  // What is already on the profile, in re-application mode. A trainer who
+  // does not re-pick their photo keeps the one they have; without these the
+  // form would demand a fresh upload of every image to fix a typo in a bio.
+  String? _existingPhotoUrl;
+  String? _existingCertificateUrl;
+  List<String> _existingGallery = const [];
+
   final _scroll = ScrollController();
 
   @override
@@ -68,7 +87,26 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
     super.initState();
     // knownName, not displayName — an empty field is honest, "Rider" is not.
     _name.text = ref.read(sessionProvider).knownName;
+    if (widget.reapply) _prefillFromProfile();
   }
+
+  void _prefillFromProfile() {
+    final user = ref.read(sessionProvider).user;
+    if (user == null) return;
+    _name.text = user.name;
+    _bio.text = user.bio ?? '';
+    _languages = [...user.languages];
+    _spot = user.location;
+    _mapsLink.text = user.mapsLink ?? '';
+    final rate = user.hourlyRate;
+    if (rate != null) _rate.text = '${rate.round()}';
+    _ikoId.text = user.ikoId ?? '';
+    _existingPhotoUrl = user.photoUrl;
+    _existingCertificateUrl = user.certificateUrl;
+    _existingGallery = [...user.gallery];
+  }
+
+  bool get _hasPhoto => _photo != null || (_existingPhotoUrl ?? '').isNotEmpty;
 
   @override
   void dispose() {
@@ -87,11 +125,7 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
   String? get _bioError => _bio.text.trim().isEmpty
       ? 'Riders read this first — say something'
       : OnboardingValidators.bio(_bio.text);
-  String? get _rateError => OnboardingValidators.rate(
-        _rate.text,
-        min: FlowConst.minHourlyRate,
-        max: FlowConst.maxHourlyRate,
-      );
+  String? get _rateError => OnboardingValidators.rate(_rate.text);
   String? get _ikoError {
     final value = _ikoId.text.trim();
     if (value.isEmpty) return 'Required';
@@ -100,7 +134,7 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
   }
 
   bool get _step1Ok =>
-      _photo != null &&
+      _hasPhoto &&
       _nameError == null &&
       _bioError == null &&
       _languages.isNotEmpty;
@@ -142,18 +176,46 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
   }
 
   Future<void> _submit() async {
+    // Submitting hands the application to a human and locks the trainer
+    // behind the review gate until someone answers. Worth a beat either way,
+    // and the wording differs because the two situations do.
+    final ok = await confirmAction(
+      context,
+      title: widget.reapply
+          ? 'Send for review again?'
+          : 'Submit your application?',
+      body: widget.reapply
+          ? 'Your corrected application goes back into our review queue.'
+          : 'Our team checks your certification by hand. You will be live '
+              'for riders the moment it is approved.',
+      confirmLabel: widget.reapply ? 'Send for review' : 'Submit',
+      cancelLabel: 'Keep editing',
+    );
+    if (!ok || !mounted) return;
     setState(() => _busy = true);
     try {
       final session = ref.read(sessionProvider);
       final storage = ref.read(storageRepositoryProvider);
+      final repo = ref.read(userRepositoryProvider);
 
-      final photoUrl = await storage.upload(
-          folder: StorageFolder.profiles, file: _photo!, ownerId: session.uid);
-      final galleryUrls = await storage.uploadAll(
-          folder: StorageFolder.galleries,
-          files: _gallery,
-          ownerId: session.uid);
-      String? certificateUrl;
+      // Only newly picked files are uploaded. On a re-application the images
+      // already on the profile are kept as they are — re-uploading a photo
+      // that has not changed costs the trainer their data allowance to
+      // produce a byte-identical file.
+      final photoUrl = _photo != null
+          ? await storage.upload(
+              folder: StorageFolder.profiles,
+              file: _photo!,
+              ownerId: session.uid)
+          : _existingPhotoUrl!;
+      final galleryUrls = [
+        ..._existingGallery,
+        ...await storage.uploadAll(
+            folder: StorageFolder.galleries,
+            files: _gallery,
+            ownerId: session.uid),
+      ];
+      String? certificateUrl = _existingCertificateUrl;
       if (_certificate != null) {
         certificateUrl = await storage.upload(
             folder: StorageFolder.certificates,
@@ -161,22 +223,41 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
             ownerId: session.uid);
       }
 
-      await ref.read(userRepositoryProvider).createTrainerProfile(
-            uid: session.uid,
-            name: _name.text.trim(),
-            email: session.firebaseUser?.email ?? '',
-            bio: _bio.text.trim(),
-            languages: _languages,
-            trainingSpot: _spot!,
-            mapsLink: _mapsLink.text.trim().isEmpty
-                ? null
-                : _mapsLink.text.trim(),
-            hourlyRate: int.parse(_rate.text.trim()),
-            ikoId: _ikoId.text.trim(),
-            certificateUrl: certificateUrl,
-            photoUrl: photoUrl,
-            gallery: galleryUrls,
-          );
+      final spot = _spot!;
+      final rate = int.parse(_rate.text.trim());
+      final mapsLink =
+          _mapsLink.text.trim().isEmpty ? null : _mapsLink.text.trim();
+
+      if (widget.reapply) {
+        await repo.resubmitTrainerApplication(
+          session.uid,
+          name: _name.text.trim(),
+          bio: _bio.text.trim(),
+          languages: _languages,
+          trainingSpot: spot,
+          mapsLink: mapsLink,
+          hourlyRate: rate,
+          ikoId: _ikoId.text.trim(),
+          certificateUrl: certificateUrl,
+          photoUrl: photoUrl,
+          gallery: galleryUrls,
+        );
+      } else {
+        await repo.createTrainerProfile(
+          uid: session.uid,
+          name: _name.text.trim(),
+          email: session.firebaseUser?.email ?? '',
+          bio: _bio.text.trim(),
+          languages: _languages,
+          trainingSpot: spot,
+          mapsLink: mapsLink,
+          hourlyRate: rate,
+          ikoId: _ikoId.text.trim(),
+          certificateUrl: certificateUrl,
+          photoUrl: photoUrl,
+          gallery: galleryUrls,
+        );
+      }
       Haptics.medium();
       // Session flips to awaitingApproval; the router shows the gate.
     } catch (e) {
@@ -320,11 +401,12 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
         Center(
           child: AvatarPicker(
             file: _photo,
+            existingUrl: _existingPhotoUrl,
             enabled: !_busy,
             onPicked: (f) => setState(() => _photo = f),
           ),
         ),
-        if (attempted && _photo == null)
+        if (attempted && !_hasPhoto)
           Center(
             child: Padding(
               padding: const EdgeInsets.only(top: 8),
@@ -383,7 +465,7 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
             options: FlowConst.languages,
             sheetTitle: 'Languages',
             sheetSubtitle: 'Riders filter by these. Add any that are missing.',
-            hintText: 'Languages you teach in',
+            hintText: 'Add a language',
             multiSelect: true,
             allowCustom: true,
             enabled: !_busy,
@@ -473,13 +555,13 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _header('Your rate',
-            'One hourly price, settled in person at the centre. '
-                'FLOW takes nothing.'),
+            'You set the price. One hourly rate, settled in person at the '
+                'centre. FLOW takes nothing.'),
         FormGroup(
           label: 'Hourly rate',
           required: true,
-          errorText: attempted && !_step3Ok
-              ? 'Between €${FlowConst.minHourlyRate} and €${FlowConst.maxHourlyRate}'
+          errorText: attempted
+              ? OnboardingValidators.rate(_rate.text)
               : null,
           child: TextField(
             controller: _rate,
@@ -487,15 +569,17 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
             keyboardType: TextInputType.number,
             inputFormatters: [
               FilteringTextInputFormatter.digitsOnly,
-              LengthLimitingTextInputFormatter(3),
+              // Six digits, not three: the band is gone and EGP prices run to
+              // four figures, so a three-character limit would have silently
+              // truncated every real rate to a tenth of itself.
+              LengthLimitingTextInputFormatter(6),
             ],
             style: display(32, 720, color: context.scheme.onSurface),
             decoration: InputDecoration(
-              prefixText: '€ ',
-              prefixStyle: display(32, 720, color: tones.azureBrand),
-              hintText: '80',
-              helperText:
-                  'Platform range: €${FlowConst.minHourlyRate}–€${FlowConst.maxHourlyRate}/h',
+              prefixText: 'EGP ',
+              prefixStyle: display(22, 720, color: tones.azureBrand),
+              hintText: '400',
+              helperText: 'Per hour. You can change this any time.',
             ),
             // Unguarded, unlike the other fields: the earnings notice below
             // reads `_rate.text` live, so this one really does have to
@@ -503,11 +587,31 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
             onChanged: (_) => setState(() {}),
           ),
         ),
+        const SizedBox(height: 12),
+        // Suggestions, not limits — a starting point for a trainer who has
+        // never had to name a number before.
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final suggestion in FlowConst.rateSuggestions)
+              ActionChip(
+                label: Text(money(suggestion)),
+                onPressed: _busy
+                    ? null
+                    : () => setState(() {
+                          _rate.text = '$suggestion';
+                          _rate.selection = TextSelection.collapsed(
+                              offset: _rate.text.length);
+                        }),
+              ),
+          ],
+        ),
         if (_step3Ok)
           FlowNotice(
             icon: Symbols.payments_rounded,
             title:
-                'A 3-hour session earns you ${euro(int.parse(_rate.text) * 3)}.',
+                'A 3-hour session earns you ${money(int.parse(_rate.text) * 3)}.',
             tone: tones.success,
           ),
       ],

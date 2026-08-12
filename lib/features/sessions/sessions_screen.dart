@@ -163,7 +163,7 @@ class _SessionsScreenState extends ConsumerState<SessionsScreen>
               highlight: _highlight,
               empty: const EmptyView.scrollable(
                 icon: Symbols.surfing_rounded,
-                title: 'No live session',
+                title: 'No live sessions',
                 subtitle:
                     'When your trainer scans you in, your session shows here.',
               ),
@@ -437,7 +437,7 @@ class _SessionTile extends StatelessWidget {
       when: dayAndTime(b, prettyYmd(b.date)),
       who: b.instructorName,
       location: b.title,
-      priceLabel: euro(b.totalPrice),
+      priceLabel: money(b.totalPrice),
       statusLabel: b.status.label.toUpperCase(),
       statusColor: statusColorFor(context, b.status),
       onTap: () => openSessionSheet(context, b),
@@ -660,7 +660,7 @@ class _SessionSheet extends ConsumerWidget {
               children: [
                 _DetailRow(label: 'WHEN', value: longYmd(b.date)),
                 _DetailRow(label: 'TIME', value: b.timeRange),
-                _DetailRow(label: 'TOTAL', value: euro(b.totalPrice)),
+                _DetailRow(label: 'TOTAL', value: money(b.totalPrice)),
                 _DetailRow(label: 'STATUS', value: b.subLabel, last: true),
               ],
             ),

@@ -165,11 +165,26 @@ void main() {
     });
   });
 
-  group('euro', () {
+  group('money', () {
     test('whole vs fractional display', () {
-      expect(euro(120), '€120');
-      expect(euro(72.5), '€72.50');
-      expect(euro(null), '—');
+      expect(money(120), 'EGP 120');
+      expect(money(72.5), 'EGP 72.50');
+      expect(money(null), '—');
+    });
+
+    test('thousands are grouped — EGP prices have four figures', () {
+      // The reason this exists: the currency switch multiplied every number
+      // by ~50, and `EGP 12000` is a price nobody reads correctly at a glance.
+      expect(money(1200), 'EGP 1,200');
+      expect(money(12000), 'EGP 12,000');
+      expect(money(1234567), 'EGP 1,234,567');
+      expect(money(999), 'EGP 999');
+      expect(money(1200.5), 'EGP 1,200.50');
+    });
+
+    test('a refund reads as negative, with the sign before the digits', () {
+      expect(money(-350), 'EGP -350');
+      expect(money(-1200.25), 'EGP -1,200.25');
     });
   });
 
@@ -272,14 +287,22 @@ void main() {
       expect(OnboardingValidators.phone('123'), isNotNull);
     });
 
-    test('rate: held inside the platform band', () {
-      String? check(String v) => OnboardingValidators.rate(v,
-          min: FlowConst.minHourlyRate, max: FlowConst.maxHourlyRate);
-      expect(check('${FlowConst.minHourlyRate}'), isNull);
-      expect(check('${FlowConst.maxHourlyRate}'), isNull);
-      expect(check('${FlowConst.minHourlyRate - 1}'), isNotNull);
-      expect(check('${FlowConst.maxHourlyRate + 1}'), isNotNull);
+    test('rate: trainers price themselves, within a typo guard', () {
+      // The €60–€110 platform band is gone: a marketplace that refuses a
+      // trainer's real rate loses that trainer. What is left catches a
+      // mistyped field, not a policy.
+      String? check(String v) => OnboardingValidators.rate(v);
+      expect(check('250'), isNull);
+      expect(check('1200'), isNull, reason: 'four figures is an ordinary EGP rate');
+      expect(check('40'), isNull, reason: 'a cheap rate is still a real rate');
+      expect(check('${FlowConst.maxSaneHourlyRate}'), isNull);
+
       expect(check(''), isNotNull);
+      expect(check('0'), isNotNull, reason: 'an unfinished form, not a gift');
+      expect(check('-100'), isNotNull);
+      expect(check('abc'), isNotNull);
+      expect(check('${FlowConst.maxSaneHourlyRate + 1}'), isNotNull,
+          reason: 'a slipped keypad');
     });
   });
 
@@ -361,18 +384,21 @@ void main() {
       }
     });
 
-    test('rates stay inside the platform band', () {
+    test('every seeded rate is one a trainer could really have set', () {
+      // The platform band this used to assert is gone — trainers price
+      // themselves. What still has to hold is that the seed data would pass
+      // the form's own validator, so a seeded trainer is indistinguishable
+      // from one who signed up.
       for (final a in seedAccounts.where((a) => a.isBusiness)) {
-        expect(a.rate,
-            inInclusiveRange(FlowConst.minHourlyRate, FlowConst.maxHourlyRate),
+        expect(OnboardingValidators.rate('${a.rate}'), isNull,
             reason: a.email);
       }
-      // And both ends are actually exercised.
-      final rates = [
+      // And the seeded prices are not all the same number, or the Explore
+      // sort by price would be untested by construction.
+      final rates = {
         for (final a in seedAccounts.where((a) => a.isBusiness)) a.rate,
-      ];
-      expect(rates, contains(FlowConst.minHourlyRate));
-      expect(rates, contains(FlowConst.maxHourlyRate));
+      };
+      expect(rates.length, greaterThan(1));
     });
 
     test('all three operator kinds are represented', () {
@@ -508,7 +534,7 @@ void main() {
       final fields = PaymentInfo.initialFields(amount: 160);
       expect(fields['paymentStatus'], 'unpaid');
       expect(fields['paymentMethod'], 'cash');
-      expect(fields['currency'], 'EUR');
+      expect(fields['currency'], 'EGP');
       expect(fields['amountDue'], 160);
       // No paidAt on creation — nothing has been collected yet.
       expect(fields.containsKey('paidAt'), isFalse);

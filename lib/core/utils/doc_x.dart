@@ -47,13 +47,29 @@ extension DocX on Map<String, dynamic> {
     return null;
   }
 
-  /// Money parser — strips `€`, `EUR` and spaces before parsing.
+  /// Money parser — strips currency marks and spaces before parsing.
+  ///
+  /// The comma is the hard part, and it changed meaning when the app moved
+  /// from euro to Egyptian pounds. `"72,50"` is a European decimal comma;
+  /// `"1,200"` is an EGP thousands separator, and blindly mapping `,` to `.`
+  /// turned twelve hundred pounds into one pound twenty. Both spellings can
+  /// sit in the same collection, so the separator is resolved by position:
+  /// a comma with exactly three digits after it and nothing else punctuating
+  /// the number groups thousands; anything else decimalises.
   double? money(String key) {
     final v = this[key];
     if (v is num) return v.toDouble();
     if (v is String) {
-      final cleaned = v.replaceAll('€', '').replaceAll(RegExp('EUR', caseSensitive: false), '').replaceAll(' ', '').replaceAll(',', '.').trim();
-      return double.tryParse(cleaned);
+      var s = v
+          .replaceAll(RegExp(r'[€£]|EGP|EUR|E£|ج\.م', caseSensitive: false), '')
+          .replaceAll(' ', '')
+          .trim();
+      if (s.contains('.') || RegExp(r',\d{3}(?:\D|$)').hasMatch(s)) {
+        s = s.replaceAll(',', '');
+      } else {
+        s = s.replaceAll(',', '.');
+      }
+      return double.tryParse(s);
     }
     return null;
   }

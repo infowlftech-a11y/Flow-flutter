@@ -1,6 +1,6 @@
 /// Fixed platform lists and numeric constants (APP_LOGIC_BLUEPRINT.md §13).
 abstract final class FlowConst {
-  static const appVersionLabel = 'FLOW 3.0.0';
+  static const appVersionLabel = 'FLOW 1.0.0';
 
   /// The fixed, closed list of Egyptian kite spots — filters + onboarding.
   static const kiteSpots = [
@@ -107,9 +107,19 @@ abstract final class FlowConst {
     '7m', '9m', '10m', '12m', '14m', '17m', 'Twin tip', 'Surfboard', 'Foil',
   ];
 
-  static const minHourlyRate = 60;
-  static const maxHourlyRate = 110;
-  static const defaultDisplayRate = 50.0;
+  /// Trainers set their own price. There is no platform band: the old
+  /// €60–€110 window was a euro-market assumption, and a marketplace that
+  /// refuses a trainer's real rate simply loses that trainer.
+  ///
+  /// What remains is a typo guard. A rate of 0 is not a free lesson, it is an
+  /// unfinished form; six figures an hour is a slipped keypad. Both are
+  /// refused with a message about the number, not about a policy.
+  static const maxSaneHourlyRate = 100000;
+
+  /// Quick-pick chips under the rate field — a starting point, not a limit.
+  static const rateSuggestions = [250, 400, 600, 850, 1200];
+
+  static const defaultDisplayRate = 400.0;
   static const defaultBufferMinutes = 60;
   static const bookingDayStripLength = 21;
   static const walkInDurations = [1, 2, 3, 4];
@@ -123,6 +133,7 @@ abstract final class FlowConst {
   static const maxTextScale = 1.3;
 
   // Persisted local keys.
-  static const themeModeKey = 'themeMode';
+  // `themeMode` used to live here. It is gone with dark mode; any value an
+  // existing install still has under that key is simply never read.
   static String trainerTourDoneKey(String uid) => 'trainerTourDone_$uid';
 }

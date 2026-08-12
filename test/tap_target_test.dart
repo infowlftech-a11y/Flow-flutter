@@ -55,7 +55,7 @@ final _cases = <String, Widget Function()>{
         rating: 4.9,
         reviewCount: 128,
         location: 'El Gouna',
-        priceLabel: '€65',
+        priceLabel: 'EGP 650',
         onTap: _noop,
       ),
   'MicroAction.filled': () => MicroAction(label: 'APPROVE', onPressed: _noop),
@@ -96,7 +96,7 @@ void main() {
       addTearDown(tester.view.reset);
 
       await tester.pumpWidget(MaterialApp(
-        theme: FlowTheme.dark(),
+        theme: FlowTheme.light(),
         home: Scaffold(
           body: Center(
             child: Padding(

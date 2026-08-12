@@ -1,4 +1,5 @@
-// Rendered text contrast, both themes.
+// Rendered text contrast. Ran every case in both themes until dark mode was
+// removed.
 //
 // This complements test/theme_contrast_test.dart rather than repeating it.
 // That one does arithmetic on the design tokens and catches a token tuned for
@@ -50,7 +51,7 @@ final _cases = <String, Widget Function()>{
         rating: 4.8,
         reviewCount: 96,
         location: 'Soma Bay',
-        priceLabel: '€60',
+        priceLabel: 'EGP 600',
         onTap: () {},
       ),
   'ConditionsStrip': () => const ConditionsStrip(
@@ -109,12 +110,10 @@ final _cases = <String, Widget Function()>{
 };
 
 void main() {
-  for (final (themeName, theme) in [
-    ('dark', FlowTheme.dark()),
-    ('light', FlowTheme.light()),
-  ]) {
+  {
+    final theme = FlowTheme.light();
     for (final entry in _cases.entries) {
-      testWidgets('${entry.key} — $themeName', (tester) async {
+      testWidgets(entry.key, (tester) async {
         final handle = tester.ensureSemantics();
         tester.view.physicalSize = const Size(400, 800);
         tester.view.devicePixelRatio = 1.0;

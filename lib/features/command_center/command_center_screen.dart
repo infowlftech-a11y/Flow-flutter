@@ -242,7 +242,7 @@ class _TodayTab extends ConsumerWidget {
                 const SizedBox(width: 10),
                 _StatTile(
                   label: 'Total earned',
-                  value: euro(revenue.value ?? 0),
+                  value: money(revenue.value ?? 0),
                   icon: Symbols.payments_rounded,
                   // The ledger is a tab now. It was a sheet behind this tile,
                   // which made "how am I doing" a thing you had to already
@@ -513,7 +513,7 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
           name: b.studentName,
           location: [
             if (b.studentLevel != null) b.studentLevel!,
-            euro(b.totalPrice),
+            money(b.totalPrice),
           ].join(' · '),
           busy: _busy,
           onApprove: _approve,
@@ -548,7 +548,7 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
                   ],
                 ),
               ),
-              Text(euro(b.totalPrice),
+              Text(money(b.totalPrice),
                   style: interNum(17, 760, color: tones.azureBrand)),
             ],
           ),
@@ -658,7 +658,7 @@ class _ManifestCard extends ConsumerWidget {
                         ],
                       ),
                     ),
-                    Text(euro(b.totalPrice),
+                    Text(money(b.totalPrice),
                         style:
                             interNum(15, 760, color: tones.azureBrand)),
                   ],
@@ -741,8 +741,8 @@ class _ManifestCard extends ConsumerWidget {
       showFlowToast(
           context,
           paid
-              ? '${euro(booking.amountDue)} collected 💶'
-              : '${euro(booking.amountDue)} still owing — '
+              ? '${money(booking.amountDue)} collected 💶'
+              : '${money(booking.amountDue)} still owing — '
                   'settle it from your earnings.');
     }
   }
@@ -750,7 +750,7 @@ class _ManifestCard extends ConsumerWidget {
   /// Finish + settle in one sheet. `true` = paid, `false` = still owing,
   /// `null` = cancelled.
   Future<bool?> _askSettlement(BuildContext context, WidgetRef ref) {
-    final amount = euro(booking.amountDue);
+    final amount = money(booking.amountDue);
     return showFlowSheet<bool>(
       context,
       title: 'Finish this session?',
@@ -819,7 +819,7 @@ void openManifestDetails(BuildContext context, WidgetRef ref, Booking b) {
                   const TagPill('NEEDS GEAR'),
                 ],
                 const Spacer(),
-                Text(euro(b.totalPrice),
+                Text(money(b.totalPrice),
                     style: interNum(17, 760,
                         color: sheetContext.tones.azureBrand)),
               ],
@@ -891,7 +891,7 @@ class _ComingUpRow extends StatelessWidget {
           ),
           StatusPill(status: booking.status),
           const SizedBox(width: 10),
-          Text(euro(booking.totalPrice),
+          Text(money(booking.totalPrice),
               style: interNum(14, 720, color: tones.azureBrand)),
         ],
       ),

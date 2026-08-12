@@ -1,11 +1,13 @@
-// Every shared component, in both themes, at both ends of the text-scale
-// clamp, on a 320px phone — failing on any layout overflow.
+// Every shared component at both ends of the text-scale clamp, on a 320px
+// phone — failing on any layout overflow.
 //
-// This is the cheapest guard the component library has. Text scale and theme
-// are exactly the two axes that nobody checks by hand, and a component that
-// overflows at 1.3x looks fine to whoever wrote it at 1.0x. It caught nothing
-// when the spacing scale was normalised, which is the point: it is the reason
-// that change could be made across 250 call sites without opening the app.
+// This is the cheapest guard the component library has. Text scale is exactly
+// the axis nobody checks by hand, and a component that overflows at 1.3x looks
+// fine to whoever wrote it at 1.0x. It caught nothing when the spacing scale
+// was normalised, which is the point: it is the reason that change could be
+// made across 250 call sites without opening the app.
+//
+// It ran the same matrix in both themes until dark mode was removed.
 //
 // Add a case here whenever a component is added to lib/core/widgets/.
 import 'package:flutter/material.dart';
@@ -65,7 +67,7 @@ final _cases = <String, Widget Function()>{
         rating: 4.9,
         reviewCount: 128,
         location: 'El Gouna, Red Sea',
-        priceLabel: '€65',
+        priceLabel: 'EGP 650',
         onTap: () {},
       ),
   'ProviderCard.bare': () =>
@@ -90,15 +92,15 @@ final _cases = <String, Widget Function()>{
           WeekBar(
               label: d,
               value: d == 'Wed' ? 320 : 90,
-              semanticValue: d == 'Wed' ? '€320' : '€90',
+              semanticValue: d == 'Wed' ? 'EGP 3,200' : 'EGP 900',
               highlighted: d == 'Wed'),
       ]),
   // A week of zeroes is a real state, not an error — it must not render as
   // seven flat stubs.
   'WeekBars.empty': () => const WeekBars(bars: [
-        WeekBar(label: 'Mon', value: 0, semanticValue: '€0'),
-        WeekBar(label: 'Tue', value: 0, semanticValue: '€0'),
-        WeekBar(label: 'Wed', value: 0, semanticValue: '€0'),
+        WeekBar(label: 'Mon', value: 0, semanticValue: 'EGP 0'),
+        WeekBar(label: 'Tue', value: 0, semanticValue: 'EGP 0'),
+        WeekBar(label: 'Wed', value: 0, semanticValue: 'EGP 0'),
       ]),
   'AgendaRow.live': () => AgendaRow(
       time: '10:00', name: 'Annelies van der Berg-Hoekstra', live: true, onTap: () {}),
@@ -136,7 +138,7 @@ final _cases = <String, Widget Function()>{
         when: 'Tue, 13 May · 12:00 – 13:00',
         who: 'Konstantinos Papadopoulos',
         location: 'El Gouna',
-        priceLabel: '€65',
+        priceLabel: 'EGP 650',
         statusLabel: 'UPCOMING',
         onTap: () {},
       ),
@@ -241,8 +243,10 @@ void main() {
   // 320x640 is the smallest phone the app realistically meets; 1.3 on top of
   // that is the worst case a rider actually hits.
   for (final scale in [0.9, 1.3]) {
-    for (final dark in [false, true]) {
-      final label = '${dark ? 'dark' : 'light'} @${scale}x';
+    {
+      // This loop ran each case in both themes. There is one theme now, so the
+      // brightness axis is gone and the text-scale axis is the whole matrix.
+      final label = '@${scale}x';
 
       _cases.forEach((name, build) {
         testWidgets('$name — $label', (tester) async {
@@ -252,7 +256,7 @@ void main() {
 
           await tester.pumpWidget(
             MaterialApp(
-              theme: dark ? FlowTheme.dark() : FlowTheme.light(),
+              theme: FlowTheme.light(),
               home: MediaQuery(
                 data: MediaQueryData(textScaler: TextScaler.linear(scale)),
                 child: Scaffold(
@@ -278,7 +282,7 @@ void main() {
 
         await tester.pumpWidget(
           MaterialApp(
-            theme: dark ? FlowTheme.dark() : FlowTheme.light(),
+            theme: FlowTheme.light(),
             home: MediaQuery(
               data: MediaQueryData(textScaler: TextScaler.linear(scale)),
               child: GateScaffold(

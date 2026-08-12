@@ -56,12 +56,39 @@ String timeAgo(DateTime? t) {
   return '${t.day} ${monthsLong[t.month - 1].substring(0, 3)}';
 }
 
-/// EUR display — `€120`, or `€72.50` when fractional.
-String euro(num? amount) {
+/// Money display — `EGP 1,200`, or `EGP 72.50` when fractional.
+///
+/// Egyptian pounds, because the app launches in Egypt only. This used to be
+/// `money()` and printed `€120`: the Red Sea trade quotes euro to European
+/// riders, but the market being served is domestic, and a price a rider
+/// cannot pay in the currency they hold is worse than no price.
+///
+/// Thousands separators are not decoration here — the numbers grew by two
+/// orders of magnitude when the currency changed, and `EGP 12000` is a price
+/// nobody can read at a glance.
+///
+/// `EGP` rather than `E£`: the symbol is easy to misread as a pound sterling
+/// sign, and the ISO code is what every Egyptian bank app and receipt uses.
+String money(num? amount) {
   if (amount == null) return '—';
   final a = amount.toDouble();
-  if (a == a.roundToDouble()) return '€${a.round()}';
-  return '€${a.toStringAsFixed(2)}';
+  final whole = a == a.roundToDouble();
+  final digits = whole ? a.round().abs().toString() : a.abs().truncate().toString();
+  final grouped = _group(digits);
+  final sign = a < 0 ? '-' : '';
+  if (whole) return 'EGP $sign$grouped';
+  final fraction = a.abs().toStringAsFixed(2).split('.').last;
+  return 'EGP $sign$grouped.$fraction';
+}
+
+/// `1234567` → `1,234,567`.
+String _group(String digits) {
+  final buffer = StringBuffer();
+  for (var i = 0; i < digits.length; i++) {
+    if (i > 0 && (digits.length - i) % 3 == 0) buffer.write(',');
+    buffer.write(digits[i]);
+  }
+  return buffer.toString();
 }
 
 /// An `HH:mm` time-of-day string with slot arithmetic.

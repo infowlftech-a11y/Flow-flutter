@@ -253,7 +253,6 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                 data: (list) {
                   if (list.isEmpty) {
                     return EmptyView.scrollable(
-                      topGap: 40,
                       icon: filter.favouritesOnly
                           ? Symbols.favorite_rounded
                           : Symbols.kitesurfing_rounded,
@@ -319,7 +318,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                               location: t.location ?? t.homeSpot,
                               priceLabel: t.hourlyRate == null
                                   ? null
-                                  : euro(t.hourlyRate!),
+                                  : money(t.hourlyRate!),
                               badge: t.isStation || t.isSafariOperator
                                   ? const _KindBadge(icon: Symbols.storefront_rounded)
                                   : null,

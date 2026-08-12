@@ -60,7 +60,7 @@ class EarningsScreen extends ConsumerWidget {
                           label: _weekdays[i],
                           value: week.value?.byWeekday[i] ?? 0,
                           semanticValue:
-                              euro(week.value?.byWeekday[i] ?? 0),
+                              money(week.value?.byWeekday[i] ?? 0),
                           highlighted: week.value?.todayIndex == i,
                         ),
                     ],
@@ -74,14 +74,14 @@ class EarningsScreen extends ConsumerWidget {
                 Expanded(
                   child: _Stat(
                     label: 'ALL TIME',
-                    value: euro(allTime.value ?? 0),
+                    value: money(allTime.value ?? 0),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: _Stat(
                     label: 'STILL TO COLLECT',
-                    value: euro(outstanding.value ?? 0),
+                    value: money(outstanding.value ?? 0),
                     tone: (outstanding.value ?? 0) > 0
                         ? context.tones.warning
                         : null,
@@ -105,7 +105,7 @@ class EarningsScreen extends ConsumerWidget {
                   child: SessionRow(
                     when: dayAndTime(b, prettyYmd(b.date)),
                     who: b.studentName,
-                    priceLabel: euro(b.amountDue),
+                    priceLabel: money(b.amountDue),
                     statusLabel: b.payment.isOutstanding ? 'UNPAID' : null,
                     statusColor: context.tones.warning,
                     // Settled rows do nothing, and say so by not rippling.
@@ -134,7 +134,7 @@ Future<void> _settle(
     context,
     title: 'Mark as paid?',
     body: 'Records that ${booking.studentName} paid '
-        '${euro(booking.amountDue)} for ${prettyYmd(booking.date)}.',
+        '${money(booking.amountDue)} for ${prettyYmd(booking.date)}.',
     confirmLabel: 'Mark paid',
   );
   if (!ok) return;
@@ -145,7 +145,7 @@ Future<void> _settle(
           trainerId: booking.instructorId,
         );
     if (context.mounted) {
-      showFlowToast(context, '${euro(booking.amountDue)} collected 💶');
+      showFlowToast(context, '${money(booking.amountDue)} collected 💶');
     }
   } on PaymentFailure catch (e) {
     if (context.mounted) showFlowToast(context, e.message);
@@ -169,7 +169,7 @@ class _Headline extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        Text(euro(amount),
+        Text(money(amount),
             style: interNum(30, 780, color: context.scheme.onSurface)),
         const SizedBox(width: 10),
         // Nothing at all when there is no previous week to compare with —

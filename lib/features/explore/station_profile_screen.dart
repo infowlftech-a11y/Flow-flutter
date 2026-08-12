@@ -229,7 +229,7 @@ class _LessonsTab extends StatelessWidget {
                     Text(
                       [
                         if (ins.level != null) ins.level!,
-                        '${euro(ins.displayRate)}/h',
+                        '${money(ins.displayRate)}/h',
                       ].join(' · '),
                       style: inter(12.5, 500, color: tones.textFaint),
                     ),
@@ -305,7 +305,7 @@ class _ServicesTab extends StatelessWidget {
                     ],
                     const SizedBox(height: 8),
                     Text(
-                      '${euro(s.price)}${s.unit != null ? ' / ${s.unit}' : ''}',
+                      '${money(s.price)}${s.unit != null ? ' / ${s.unit}' : ''}',
                       style: interNum(15, 760, color: tones.azureBrand),
                     ),
                   ],
@@ -380,7 +380,7 @@ class _TripCardState extends ConsumerState<_TripCard> {
       context,
       title: 'Reserve your seat?',
       body:
-          '${trip.title} · departs ${prettyYmd(trip.startDate)} · ${euro(trip.price)} per seat, settled in person.',
+          '${trip.title} · departs ${prettyYmd(trip.startDate)} · ${money(trip.price)} per seat, settled in person.',
       confirmLabel: 'Reserve',
       cancelLabel: 'Not yet',
     );
@@ -445,7 +445,7 @@ class _TripCardState extends ConsumerState<_TripCard> {
                     style: inter(14, 540, color: tones.textFaint)),
               ),
               const SizedBox(width: 8),
-              Text(euro(trip.price),
+              Text(money(trip.price),
                   style: interNum(17, 760, color: tones.azureBrand)),
               Text(' / seat', style: inter(12.5, 540, color: tones.textFaint)),
             ],

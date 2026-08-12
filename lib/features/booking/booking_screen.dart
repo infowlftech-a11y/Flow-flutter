@@ -303,11 +303,11 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                            '${euro(target.rate)} × ${slots.length}h',
+                            '${money(target.rate)} × ${slots.length}h',
                             style: inter(14, 540,
                                 color:
                                     sheetContext.scheme.onSurfaceVariant)),
-                        Text(euro(_total),
+                        Text(money(_total),
                             style: display(22, 760,
                                 color: sheetContext.tones.azureBrand)),
                       ],
@@ -512,7 +512,7 @@ class _ProviderCard extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(euro(target.rate),
+              Text(money(target.rate),
                   style: interNum(17, 760, color: tones.azureBrand)),
               Text('/ ${target.unit}',
                   style: inter(11.5, 540, color: tones.textFaint)),
@@ -889,7 +889,7 @@ class _SummaryCard extends StatelessWidget {
               ],
             ),
           ),
-          Text(euro(total), style: display(20, 760, color: tones.azureBrand)),
+          Text(money(total), style: display(20, 760, color: tones.azureBrand)),
         ],
       ),
     );
@@ -941,7 +941,7 @@ class _StickyBar extends StatelessWidget {
                     child: FadeTransition(opacity: anim, child: child),
                   ),
                   child: Text(
-                    total == null ? '—' : euro(total),
+                    total == null ? '—' : money(total),
                     key: ValueKey(total),
                     style: display(22, 780, color: context.scheme.onSurface),
                   ),

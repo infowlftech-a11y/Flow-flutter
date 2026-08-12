@@ -52,7 +52,7 @@ class TicketScreen extends ConsumerWidget {
           if (tickets.isEmpty) {
             return const EmptyView.scrollable(
               icon: Symbols.confirmation_number_rounded,
-              title: 'No ticket yet',
+              title: 'No tickets yet',
               subtitle:
                   'Once a trainer approves your booking, your check-in code '
                   'appears here.',

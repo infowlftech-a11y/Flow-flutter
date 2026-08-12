@@ -215,7 +215,7 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              Text(euro(trainer.displayRate),
+                              Text(money(trainer.displayRate),
                                   style: display(24, 760,
                                       color: tones.azureBrand,
                                       spacing: -.5)),
@@ -731,19 +731,35 @@ class _BottomBar extends ConsumerWidget {
               icon: Symbols.edit_rounded,
               onPressed: () => context.push('/profile/edit'),
             )
+          // Every child is flexed, and the price shrinks rather than pushes.
+          //
+          // `EGP 1,200` is roughly twice as wide as the `€65` this bar was
+          // laid out for, and an unconstrained Column takes what it needs
+          // before the Expanded buttons are measured: at 320px and 1.3x text
+          // the Message button was left 14 logical pixels and overflowed.
+          // The price is the part that can afford to lose size — the two
+          // buttons are tap targets with a 48dp floor.
           : Row(
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(euro(trainer.displayRate),
-                        style: display(20, 760, color: tones.azureBrand)),
-                    Text('per hour',
-                        style: inter(11.5, 540, color: tones.textFaint)),
-                  ],
+                Flexible(
+                  flex: 3,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(money(trainer.displayRate),
+                            style: display(20, 760, color: tones.azureBrand)),
+                        Text('per hour',
+                            style: inter(11.5, 540, color: tones.textFaint)),
+                      ],
+                    ),
+                  ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 12),
                 Expanded(
+                  flex: 4,
                   child: OutlinedButton.icon(
                     onPressed: () {
                       final session = ref.read(sessionProvider);
@@ -761,8 +777,9 @@ class _BottomBar extends ConsumerWidget {
                     label: const Text('Message'),
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 Expanded(
+                  flex: 5,
                   child: PrimaryButton(
                     label: 'Book now',
                     expand: true,
