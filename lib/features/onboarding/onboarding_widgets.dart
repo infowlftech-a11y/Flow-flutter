@@ -27,6 +27,9 @@ class AvatarPicker extends StatelessWidget {
   final double size;
   final bool enabled;
 
+  bool get _hasPhoto =>
+      file != null || (existingUrl != null && existingUrl!.isNotEmpty);
+
   @override
   Widget build(BuildContext context) {
     final tones = context.tones;
@@ -56,13 +59,23 @@ class AvatarPicker extends StatelessWidget {
             : null,
         child: Stack(
           children: [
+            // The ring is drawn only while there is no photo, where it reads
+            // as an affordance — "something goes here". Over a real photo the
+            // same 2px azure ring read as a blue edge *on the picture the
+            // user had just cropped*, because a bordered Container clips its
+            // child to the outer circle and then paints the border on top of
+            // it. A cropped photo now shows its own edge and nothing else;
+            // the camera puck below is affordance enough.
             Container(
               width: size,
               height: size,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(
-                    color: tones.azureBrand.withValues(alpha: .5), width: 2),
+                border: _hasPhoto
+                    ? null
+                    : Border.all(
+                        color: tones.azureBrand.withValues(alpha: .5),
+                        width: 2),
               ),
               clipBehavior: Clip.antiAlias,
               child: content,

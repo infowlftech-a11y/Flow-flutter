@@ -261,12 +261,23 @@ class _CropScreenState extends State<CropScreen> {
               }
               final window = Size(w, h);
               if (window != _window) {
+                final first = _window.isEmpty;
                 _window = window;
-                // First layout: start fully zoomed out and centred.
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   if (!mounted) return;
                   setState(() {
-                    _scale = math.max(_scale, _minScale);
+                    // First layout starts at _minScale — the whole photo, as
+                    // far out as the crop allows.
+                    //
+                    // This was `math.max(_scale, _minScale)` with `_scale`
+                    // still at its initial 1, and 1 means *one image pixel per
+                    // logical pixel*: a 3000px photo opened at roughly 8x in a
+                    // 350px window, so every user landed on a close-up of the
+                    // middle of their picture and had to pinch their way back
+                    // out. The `max` was reading as "no smaller than the
+                    // minimum" when what it needed to say was "exactly the
+                    // minimum".
+                    _scale = first ? _minScale : math.max(_scale, _minScale);
                     _offset = _clamp(_offset, _scale);
                   });
                 });
@@ -338,12 +349,20 @@ class _CropPainter extends CustomPainter {
       Paint()..filterQuality = FilterQuality.medium,
     );
 
-    // Rim + rule-of-thirds guides, drawn over the photo so the framing is
-    // legible against a busy beach shot.
+    // Rule-of-thirds guides, drawn over the photo so the framing is legible
+    // against a busy beach shot.
+    //
+    // The 2px azure rim that used to sit on the crop boundary is gone. It
+    // read as part of the result rather than as chrome — a blue edge around
+    // the photo you had just cropped — and on the circle it traced exactly
+    // the line the output is masked to, so the eye could not tell whether the
+    // colour was in the picture or on top of it. A white hairline at low
+    // opacity says "this is the edge of the frame" without claiming to be
+    // part of the image.
     final rim = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2
-      ..color = FlowColors.azure;
+      ..strokeWidth = 1.5
+      ..color = Colors.white.withValues(alpha: .7);
     final guide = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = .6
