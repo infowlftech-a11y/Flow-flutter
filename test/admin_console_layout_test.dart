@@ -55,7 +55,7 @@ Future<FakeFirebaseFirestore> staffDb() async {
     'location': 'Ras Sudr',
     'bio': 'IKO Level 2. Teaching since 2019, mostly beginners and freestyle.',
     'ikoId': 'IKO-4471PQ',
-    'hourlyRate': 550,
+    'hourlyRate': 55,
     'languages': ['Arabic', 'English', 'German'],
   });
 
@@ -147,6 +147,47 @@ void main() {
         });
       }
     }
+  });
+
+  group('the ticket thread sheet survives the keyboard', () {
+    // The bug this pins: showFlowSheet already pads the sheet by the
+    // keyboard inset, and the ticket sheet's builder added the same inset
+    // again. With the keyboard up that was ~2x the keyboard in blank
+    // padding — the thread, the reply field and the buttons were squeezed
+    // out of the sheet entirely, and the reporter's description was
+    // "everything turns white and disappears".
+    testWidgets('the reply field stays visible above the keyboard',
+        (tester) async {
+      await pumpScreen(tester, const AdminScreen(),
+          db: await staffDb(), as: staff);
+      await _openTab(tester, 'TICKETS', marker: _tabs['TICKETS']!);
+
+      await tester.tap(
+          find.textContaining('Refund for a cancelled session').first);
+      for (var i = 0; i < 6; i++) {
+        await tester.pump(const Duration(milliseconds: 120));
+      }
+      expect(find.byType(TextField), findsOneWidget,
+          reason: 'the thread sheet did not open');
+
+      // Keyboard up: 300 logical px of viewInsets at DPR 1.0.
+      tester.view.viewInsets = const FakeViewPadding(
+          left: 0, top: 0, right: 0, bottom: 300);
+      for (var i = 0; i < 6; i++) {
+        await tester.pump(const Duration(milliseconds: 120));
+      }
+
+      // The field and the send button sit above the keyboard. With the
+      // double inset the field's rect ended up beyond the keyboard edge;
+      // the RenderFlex overflow the squeeze causes would fail the test on
+      // its own as well.
+      final field = tester.getRect(find.byType(TextField));
+      expect(field.bottom, lessThanOrEqualTo(780 - 300 + 0.1),
+          reason: 'the reply field is under the keyboard');
+      expect(find.text('Send reply'), findsOneWidget);
+      expect(find.text('Close ticket'), findsOneWidget,
+          reason: 'the close action names what it closes');
+    });
   });
 
   group('at 320px', () {

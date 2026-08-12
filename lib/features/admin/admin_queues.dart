@@ -112,36 +112,47 @@ class _TicketCard extends ConsumerWidget {
       context,
       title: ticket.subject,
       subtitle: '${ticket.userName} · ${ticket.isOpen ? 'open' : 'closed'}',
+      // No viewInsets here: showFlowSheet already pads the sheet by the
+      // keyboard inset. Adding it again doubled the padding — with the
+      // keyboard up that was ~600px of blank sheet, the content squeezed to
+      // nothing, and "everything turns white" is exactly how that looks.
       builder: (sheetContext) => Padding(
-        padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 20,
-        ),
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ConstrainedBox(
-              constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(sheetContext).size.height * .4),
-              child: Consumer(
-                builder: (context, ref, _) {
-                  final messages = ref.watch(ticketMessagesProvider(ticket.id));
-                  return switch (messages) {
-                    AsyncData(:final value) when value.isEmpty => Text(
-                        'No messages on this ticket.',
-                        style: inter(14, 460, color: context.tones.textFaint)),
-                    AsyncData(:final value) => ListView.separated(
-                        shrinkWrap: true,
-                        itemCount: value.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 10),
-                        itemBuilder: (context, i) =>
-                            _TicketBubble(message: value[i]),
-                      ),
-                    AsyncError() => const Text('Could not load the thread.'),
-                    _ => const Center(child: CircularProgressIndicator()),
-                  };
-                },
+            // Flexible, so when the keyboard takes the height it is the
+            // thread that gives way and scrolls — never the reply field or
+            // the buttons, which are what the keyboard was opened for.
+            Flexible(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(sheetContext).size.height * .4),
+                child: Consumer(
+                  builder: (context, ref, _) {
+                    final messages =
+                        ref.watch(ticketMessagesProvider(ticket.id));
+                    return switch (messages) {
+                      AsyncData(:final value) when value.isEmpty => Text(
+                          'No messages on this ticket.',
+                          style:
+                              inter(14, 460, color: context.tones.textFaint)),
+                      // Reversed, so it opens showing the newest message —
+                      // the one being replied to.
+                      AsyncData(:final value) => ListView.separated(
+                          shrinkWrap: true,
+                          reverse: true,
+                          itemCount: value.length,
+                          separatorBuilder: (_, _) =>
+                              const SizedBox(height: 10),
+                          itemBuilder: (context, i) => _TicketBubble(
+                              message: value[value.length - 1 - i]),
+                        ),
+                      AsyncError() => const Text('Could not load the thread.'),
+                      _ => const Center(child: CircularProgressIndicator()),
+                    };
+                  },
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -174,12 +185,17 @@ class _TicketCard extends ConsumerWidget {
                           Navigator.pop(sheetContext);
                         }
                       },
-                      child: const Text('Close'),
+                      // Not 'Close': next to a text field, a bare Close
+                      // reads as "dismiss this sheet", and what it actually
+                      // does is resolve the customer's ticket.
+                      child: const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text('Close ticket', maxLines: 1),
+                      ),
                     ),
                   ),
                 if (ticket.isOpen) const SizedBox(width: 12),
                 Expanded(
-                  flex: 2,
                   child: PrimaryButton(
                     label: 'Send reply',
                     onPressed: () async {
