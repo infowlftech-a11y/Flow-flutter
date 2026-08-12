@@ -55,7 +55,7 @@ final _cases = <String, Widget Function()>{
         rating: 4.9,
         reviewCount: 128,
         location: 'El Gouna',
-        priceLabel: 'EGP 650',
+        priceLabel: '€110',
         onTap: _noop,
       ),
   'MicroAction.filled': () => MicroAction(label: 'APPROVE', onPressed: _noop),

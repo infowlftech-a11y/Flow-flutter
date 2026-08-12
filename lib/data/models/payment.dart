@@ -136,11 +136,11 @@ class PaymentInfo {
     this.reference,
   });
 
-  /// Egypt-only launch, so prices are Egyptian pounds and `money()` in the UI
-  /// assumes it. Stored per booking anyway, so a second market does not need
-  /// a migration — and bookings written while the app quoted euro keep their
-  /// own `EUR` and stay honest about what was agreed.
-  static const defaultCurrency = 'EGP';
+  /// Euro, matching `money()` in the UI. Stored per booking anyway, so a
+  /// currency change never needs a migration — bookings written while the
+  /// app briefly quoted EGP keep their own `EGP` and stay honest about what
+  /// was agreed.
+  static const defaultCurrency = 'EUR';
 
   final PaymentStatus status;
   final PaymentMethod method;

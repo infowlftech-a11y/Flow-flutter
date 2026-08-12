@@ -108,18 +108,18 @@ abstract final class FlowConst {
   ];
 
   /// Trainers set their own price. There is no platform band: the old
-  /// €60–€110 window was a euro-market assumption, and a marketplace that
+  /// €60–€110 window refused real rates at both ends, and a marketplace that
   /// refuses a trainer's real rate simply loses that trainer.
   ///
   /// What remains is a typo guard. A rate of 0 is not a free lesson, it is an
-  /// unfinished form; six figures an hour is a slipped keypad. Both are
+  /// unfinished form; five figures an hour is a slipped keypad. Both are
   /// refused with a message about the number, not about a policy.
-  static const maxSaneHourlyRate = 100000;
+  static const maxSaneHourlyRate = 10000;
 
   /// Quick-pick chips under the rate field — a starting point, not a limit.
-  static const rateSuggestions = [250, 400, 600, 850, 1200];
+  static const rateSuggestions = [45, 60, 75, 95, 120];
 
-  static const defaultDisplayRate = 400.0;
+  static const defaultDisplayRate = 60.0;
   static const defaultBufferMinutes = 60;
   static const bookingDayStripLength = 21;
   static const walkInDurations = [1, 2, 3, 4];

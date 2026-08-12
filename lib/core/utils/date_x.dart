@@ -56,19 +56,17 @@ String timeAgo(DateTime? t) {
   return '${t.day} ${monthsLong[t.month - 1].substring(0, 3)}';
 }
 
-/// Money display — `EGP 1,200`, or `EGP 72.50` when fractional.
+/// Money display — `€1,200`, or `€72.50` when fractional.
 ///
-/// Egyptian pounds, because the app launches in Egypt only. This used to be
-/// `money()` and printed `€120`: the Red Sea trade quotes euro to European
-/// riders, but the market being served is domestic, and a price a rider
-/// cannot pay in the currency they hold is worse than no price.
+/// Euro, by decision (2026-08-12): the Red Sea kite trade quotes euro, and
+/// that is the price list this marketplace mirrors. This spent a day as
+/// `EGP` for a domestic-market launch before being reversed — the currency
+/// lives in this one function and in `PaymentInfo.defaultCurrency`, and each
+/// booking stores the currency it was agreed in, so the flip is safe both
+/// ways: an old booking keeps saying what was actually agreed.
 ///
-/// Thousands separators are not decoration here — the numbers grew by two
-/// orders of magnitude when the currency changed, and `EGP 12000` is a price
-/// nobody can read at a glance.
-///
-/// `EGP` rather than `E£`: the symbol is easy to misread as a pound sterling
-/// sign, and the ISO code is what every Egyptian bank app and receipt uses.
+/// Thousands separators stay. They were added when prices briefly had four
+/// figures, and they cost nothing when prices have two.
 String money(num? amount) {
   if (amount == null) return '—';
   final a = amount.toDouble();
@@ -76,9 +74,9 @@ String money(num? amount) {
   final digits = whole ? a.round().abs().toString() : a.abs().truncate().toString();
   final grouped = _group(digits);
   final sign = a < 0 ? '-' : '';
-  if (whole) return 'EGP $sign$grouped';
+  if (whole) return '€$sign$grouped';
   final fraction = a.abs().toStringAsFixed(2).split('.').last;
-  return 'EGP $sign$grouped.$fraction';
+  return '€$sign$grouped.$fraction';
 }
 
 /// `1234567` → `1,234,567`.

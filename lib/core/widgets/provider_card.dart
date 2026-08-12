@@ -113,16 +113,15 @@ class ProviderCard extends StatelessWidget {
                           Row(
                             children: [
                               if (location != null)
-                                // Three fifths of the row to the price, two to
-                                // the place. An even loose flex — which is what
-                                // `spaceBetween` gave both sides — splits the
-                                // row in half however little either needs, and
-                                // half a 360px card is narrower than `EGP 95 /
-                                // hour`, so the default phone read `EGP 95 /
-                                // h…`. Price is the number the choice turns on;
-                                // a shortened place name still reads.
+                                // Three fifths of the row to the place, two
+                                // to the price — `€95 / hour` fits its two
+                                // fifths at 360px, and the FittedBox below
+                                // absorbs the squeeze at 320px/1.3x. (The
+                                // split ran the other way while prices were
+                                // EGP-wide, which cut `Soma Bay` to `Soma …`
+                                // beside a price with room to spare.)
                                 Expanded(
-                                  flex: 2,
+                                  flex: 3,
                                   child: Row(
                                     children: [
                                       Icon(Symbols.place_rounded,
@@ -141,7 +140,7 @@ class ProviderCard extends StatelessWidget {
                                   ),
                                 )
                               else
-                                const Spacer(flex: 2),
+                                const Spacer(flex: 3),
                               if (priceLabel != null) ...[
                                 const SizedBox(width: 10),
                                 // Scaled down rather than ellipsized. A fixed
@@ -151,7 +150,7 @@ class ProviderCard extends StatelessWidget {
                                 // the type keeps the figure and the unit; an
                                 // ellipsis would drop whichever mattered.
                                 Expanded(
-                                  flex: 3,
+                                  flex: 2,
                                   child: FittedBox(
                                     fit: BoxFit.scaleDown,
                                     alignment: Alignment.centerRight,

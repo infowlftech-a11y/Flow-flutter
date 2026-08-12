@@ -51,7 +51,7 @@ final _cases = <String, Widget Function()>{
         rating: 4.8,
         reviewCount: 96,
         location: 'Soma Bay',
-        priceLabel: 'EGP 600',
+        priceLabel: '€95',
         onTap: () {},
       ),
   'ConditionsStrip': () => const ConditionsStrip(

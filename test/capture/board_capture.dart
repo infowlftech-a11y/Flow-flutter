@@ -96,7 +96,7 @@ void main() {
       target: BookingTarget(
         providerId: 'u_trainer',
         title: 'Anna Bergström',
-        rate: 400,
+        rate: 95,
         subtitle: 'Soma Bay',
       ),
     ),
@@ -153,7 +153,7 @@ void main() {
             target: BookingTarget(
               providerId: 'u_trainer',
               title: 'Anna Bergström',
-              rate: 400,
+              rate: 95,
               subtitle: 'Soma Bay',
             ),
           ),
@@ -210,7 +210,7 @@ Future<FakeFirebaseFirestore> _staffDb() async {
     'location': 'Ras Sudr',
     'bio': 'IKO Level 2. Teaching since 2019, mostly beginners and freestyle.',
     'ikoId': 'IKO-4471PQ',
-    'hourlyRate': 550,
+    'hourlyRate': 55,
   });
   await db.collection(Col.users).doc('u_suspended').set({
     'name': 'Karim Adel', 'email': 'karim@example.com',

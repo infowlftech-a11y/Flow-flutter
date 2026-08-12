@@ -67,7 +67,7 @@ final _cases = <String, Widget Function()>{
         rating: 4.9,
         reviewCount: 128,
         location: 'El Gouna, Red Sea',
-        priceLabel: 'EGP 650',
+        priceLabel: '€110',
         onTap: () {},
       ),
   'ProviderCard.bare': () =>
@@ -92,15 +92,15 @@ final _cases = <String, Widget Function()>{
           WeekBar(
               label: d,
               value: d == 'Wed' ? 320 : 90,
-              semanticValue: d == 'Wed' ? 'EGP 3,200' : 'EGP 900',
+              semanticValue: d == 'Wed' ? '€3,200' : '€900',
               highlighted: d == 'Wed'),
       ]),
   // A week of zeroes is a real state, not an error — it must not render as
   // seven flat stubs.
   'WeekBars.empty': () => const WeekBars(bars: [
-        WeekBar(label: 'Mon', value: 0, semanticValue: 'EGP 0'),
-        WeekBar(label: 'Tue', value: 0, semanticValue: 'EGP 0'),
-        WeekBar(label: 'Wed', value: 0, semanticValue: 'EGP 0'),
+        WeekBar(label: 'Mon', value: 0, semanticValue: '€0'),
+        WeekBar(label: 'Tue', value: 0, semanticValue: '€0'),
+        WeekBar(label: 'Wed', value: 0, semanticValue: '€0'),
       ]),
   'AgendaRow.live': () => AgendaRow(
       time: '10:00', name: 'Annelies van der Berg-Hoekstra', live: true, onTap: () {}),
@@ -138,7 +138,7 @@ final _cases = <String, Widget Function()>{
         when: 'Tue, 13 May · 12:00 – 13:00',
         who: 'Konstantinos Papadopoulos',
         location: 'El Gouna',
-        priceLabel: 'EGP 650',
+        priceLabel: '€110',
         statusLabel: 'UPCOMING',
         onTap: () {},
       ),

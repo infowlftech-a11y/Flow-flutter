@@ -570,16 +570,16 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
             keyboardType: TextInputType.number,
             inputFormatters: [
               FilteringTextInputFormatter.digitsOnly,
-              // Six digits, not three: the band is gone and EGP prices run to
-              // four figures, so a three-character limit would have silently
-              // truncated every real rate to a tenth of itself.
-              LengthLimitingTextInputFormatter(6),
+              // Five digits: the typo guard tops out at €10,000, and a limit
+              // below the guard would silently truncate what the validator
+              // was written to refuse out loud.
+              LengthLimitingTextInputFormatter(5),
             ],
             style: display(32, 720, color: context.scheme.onSurface),
             decoration: InputDecoration(
-              prefixText: 'EGP ',
+              prefixText: '€ ',
               prefixStyle: display(22, 720, color: tones.azureBrand),
-              hintText: '400',
+              hintText: '60',
               helperMaxLines: 2,
               helperText: 'Per hour. You can change this any time.',
             ),

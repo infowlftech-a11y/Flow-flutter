@@ -167,24 +167,24 @@ void main() {
 
   group('money', () {
     test('whole vs fractional display', () {
-      expect(money(120), 'EGP 120');
-      expect(money(72.5), 'EGP 72.50');
+      expect(money(120), '€120');
+      expect(money(72.5), '€72.50');
       expect(money(null), '—');
     });
 
-    test('thousands are grouped — EGP prices have four figures', () {
-      // The reason this exists: the currency switch multiplied every number
-      // by ~50, and `EGP 12000` is a price nobody reads correctly at a glance.
-      expect(money(1200), 'EGP 1,200');
-      expect(money(12000), 'EGP 12,000');
-      expect(money(1234567), 'EGP 1,234,567');
-      expect(money(999), 'EGP 999');
-      expect(money(1200.5), 'EGP 1,200.50');
+    test('thousands are grouped', () {
+      // Added while prices briefly had four figures (the EGP day); kept
+      // because grouping costs nothing when they have two.
+      expect(money(1200), '€1,200');
+      expect(money(12000), '€12,000');
+      expect(money(1234567), '€1,234,567');
+      expect(money(999), '€999');
+      expect(money(1200.5), '€1,200.50');
     });
 
     test('a refund reads as negative, with the sign before the digits', () {
-      expect(money(-350), 'EGP -350');
-      expect(money(-1200.25), 'EGP -1,200.25');
+      expect(money(-350), '€-350');
+      expect(money(-1200.25), '€-1,200.25');
     });
   });
 
@@ -293,7 +293,8 @@ void main() {
       // mistyped field, not a policy.
       String? check(String v) => OnboardingValidators.rate(v);
       expect(check('250'), isNull);
-      expect(check('1200'), isNull, reason: 'four figures is an ordinary EGP rate');
+      expect(check('1200'), isNull,
+          reason: 'above the old band, but a real rate is a real rate');
       expect(check('40'), isNull, reason: 'a cheap rate is still a real rate');
       expect(check('${FlowConst.maxSaneHourlyRate}'), isNull);
 
@@ -534,7 +535,7 @@ void main() {
       final fields = PaymentInfo.initialFields(amount: 160);
       expect(fields['paymentStatus'], 'unpaid');
       expect(fields['paymentMethod'], 'cash');
-      expect(fields['currency'], 'EGP');
+      expect(fields['currency'], 'EUR');
       expect(fields['amountDue'], 160);
       // No paidAt on creation — nothing has been collected yet.
       expect(fields.containsKey('paidAt'), isFalse);
