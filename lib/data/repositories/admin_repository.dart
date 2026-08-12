@@ -49,12 +49,24 @@ class AdminRepository {
       .map((qs) =>
           [for (final doc in qs.docs) AppUser.fromDoc(doc.id, doc.data())]);
 
+  /// A review decision is an explicit statement of what the account now IS,
+  /// so it supersedes any suspension in force: the block markers are cleared
+  /// rather than left stale on the document. Leaving them was BUG-012 — the
+  /// gate kept counting down a `blockedUntil` that no longer applied, and a
+  /// later [unblockUser] restored `statusBeforeBlock`, pulling an approved,
+  /// bookable trainer back to `pending` and out of Explore.
+  static Map<String, dynamic> get _clearBlockMarkers => {
+        'blockedUntil': FieldValue.delete(),
+        'statusBeforeBlock': FieldValue.delete(),
+      };
+
   /// Approve a trainer — this is what makes them visible in Explore, which
   /// queries `role == 'business' && status == 'active'`.
   Future<void> approveTrainer(AppUser trainer) async {
     await _users.doc(trainer.uid).update({
       'status': 'active',
       'reviewedAt': FieldValue.serverTimestamp(),
+      ..._clearBlockMarkers,
     });
     await _notifications.notify(
       targetUserId: trainer.uid,
@@ -72,6 +84,7 @@ class AdminRepository {
       'status': 'rejected',
       'reviewedAt': FieldValue.serverTimestamp(),
       if ((reason ?? '').trim().isNotEmpty) 'reviewNote': reason!.trim(),
+      ..._clearBlockMarkers,
     });
     final note = (reason ?? '').trim();
     await _notifications.notify(
@@ -84,8 +97,10 @@ class AdminRepository {
   }
 
   /// Return a previously reviewed account to the pending queue.
-  Future<void> restoreToPending(String uid) =>
-      _users.doc(uid).update({'status': 'pending'});
+  Future<void> restoreToPending(String uid) => _users.doc(uid).update({
+        'status': 'pending',
+        ..._clearBlockMarkers,
+      });
 
   // ── Suspensions ────────────────────────────────────────────────────────
 
@@ -125,9 +140,16 @@ class AdminRepository {
   /// goes back through approvals rather than going live unreviewed.
   Future<void> unblockUser(String uid) async {
     final ref = _users.doc(uid);
-    await _db.runTransaction((tx) async {
+    final lifted = await _db.runTransaction((tx) async {
       final snap = await tx.get(ref);
       final data = snap.data();
+      // The blocked-users list is a live stream, so a row can be tapped
+      // moments after a colleague lifted the block — or after an approval
+      // superseded it. An account that is not blocked has nothing to
+      // restore; writing the business-account fallback here would demote an
+      // approved trainer to pending (BUG-012). A retry, not an error — the
+      // same reading _writeIfLive and markPaid take of a stale copy.
+      if (data?['status'] != 'blocked') return false;
       final recorded = data?['statusBeforeBlock'];
       final restored = (recorded is String && recorded.isNotEmpty)
           ? recorded
@@ -139,7 +161,9 @@ class AdminRepository {
         'blockedUntil': FieldValue.delete(),
         'statusBeforeBlock': FieldValue.delete(),
       });
+      return true;
     });
+    if (!lifted) return;
     await _notifications.notify(
       targetUserId: uid,
       title: 'Your account is active again',

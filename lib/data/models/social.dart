@@ -152,6 +152,13 @@ enum NotificationKind {
   review,
   message,
   broadcast,
+
+  /// A staff decision about the account itself: approved, rejected,
+  /// suspension lifted (§11.1). Previously these three fell through to
+  /// [system] because no case matched — the right destination by accident
+  /// rather than by choice (BUG-011). Modelled so the tile can carry its own
+  /// icon and the routing switch names the case it is handling.
+  account,
   system;
 
   static NotificationKind parse(String? raw) => switch (raw) {
@@ -163,6 +170,8 @@ enum NotificationKind {
         'review' => review,
         'message' => message,
         'global_broadcast' => broadcast,
+        'account_approved' || 'account_rejected' || 'account_restored' =>
+          account,
         _ => system,
       };
 }

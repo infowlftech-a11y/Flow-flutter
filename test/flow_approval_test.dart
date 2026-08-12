@@ -156,13 +156,25 @@ void main() {
       expect(theirs.single.read, isFalse);
       expect(await notifications.watchFor('someone-else').first, isEmpty);
 
-      // The stored type is `account_approved`, which NotificationKind.parse
-      // has no case for, so it degrades to `system` — routed to a plain text
-      // sheet (§11.2). Pinned because it is a real gap between the admin
-      // repository and the notification model, logged as BUG-011.
-      expect(theirs.single.kind, NotificationKind.system);
+      // `account_approved` used to have no case in NotificationKind.parse
+      // and degraded to `system` by fall-through (BUG-011). It is modelled
+      // now: the tile carries an account icon and the sheet routing is
+      // chosen, not accidental.
+      expect(theirs.single.kind, NotificationKind.account);
       final raw = await db.collection(Col.notifications).get();
       expect(raw.docs.single.data()['type'], 'account_approved');
+    });
+
+    test('all three account_* types resolve to the account kind (BUG-011)',
+        () {
+      expect(NotificationKind.parse('account_approved'),
+          NotificationKind.account);
+      expect(NotificationKind.parse('account_rejected'),
+          NotificationKind.account);
+      expect(NotificationKind.parse('account_restored'),
+          NotificationKind.account);
+      // The fall-through still exists for genuinely unknown types.
+      expect(NotificationKind.parse('account_zzz'), NotificationKind.system);
     });
 
     test('approving twice is harmless but does notify twice', () async {
@@ -358,31 +370,34 @@ void main() {
       expect(await exploreUids(), ['coach']);
     });
 
-    test('approving a blocked trainer lifts the suspension as a side effect',
+    test('approving a blocked trainer lifts the suspension cleanly (BUG-012)',
         () async {
       // Not reachable from the console today — the queue only shows
-      // status == 'pending', so a blocked account never appears in it. Pinned
-      // because it becomes reachable the moment the blocked-users list gets a
-      // UI (BUG-012).
+      // status == 'pending', so a blocked account never appears in it — but
+      // it becomes reachable the moment the blocked-users list gets a UI.
+      // An approval is an explicit staff decision about what the account IS,
+      // so it supersedes the block and clears its markers rather than
+      // leaving them stale on the document.
       await applyAsTrainer();
       await admin.blockUser('coach', until: 'forever');
       await admin.approveTrainer(await pending('coach'));
 
       expect((await pending('coach')).status, AccountStatus.active);
-      expect(await exploreUids(), ['coach'],
-          reason: 'they are bookable again with no explicit unblock');
+      expect(await exploreUids(), ['coach']);
 
       final doc = (await db.collection(Col.users).doc('coach').get()).data()!;
-      expect(doc['blockedUntil'], 'forever',
-          reason: 'the block marker survives the approval, stale');
+      expect(doc.containsKey('blockedUntil'), isFalse,
+          reason: 'a stale marker here keeps the gate countdown alive');
+      expect(doc.containsKey('statusBeforeBlock'), isFalse,
+          reason: 'a stale value here is what a later unblock would restore');
     });
 
-    test('a stale statusBeforeBlock demotes a live trainer on a later unblock',
-        () async {
-      // The consequence of the previous test. blockedUntil and
-      // statusBeforeBlock outlive the approval, so an unblock issued
-      // afterwards restores the status the account had *before* it was ever
-      // reviewed — pulling an approved, bookable trainer out of Explore.
+    test('an unblock after an approval no longer demotes the trainer '
+        '(BUG-012)', () async {
+      // The write-up scenario: block → approve → unblock used to restore the
+      // pre-block status and pull an approved, bookable trainer out of
+      // Explore. Two guards now hold: the approval clears statusBeforeBlock,
+      // and unblockUser refuses to touch an account that is not blocked.
       await applyAsTrainer();
       await admin.blockUser('coach', until: 'forever');
       await admin.approveTrainer(await pending('coach'));
@@ -390,10 +405,45 @@ void main() {
 
       await admin.unblockUser('coach');
 
-      expect((await pending('coach')).status, AccountStatus.pending,
-          reason: 'BUG-012: restored to the pre-block status, undoing the '
-              'approval that happened in between');
-      expect(await exploreUids(), isEmpty);
+      expect((await pending('coach')).status, AccountStatus.active,
+          reason: 'the approval that happened in between must survive');
+      expect(await exploreUids(), ['coach']);
+    });
+
+    test('unblocking an account that was never blocked is a no-op', () async {
+      // The blocked-users list is a live stream; a row can be tapped moments
+      // after a colleague already lifted the block. The same stale-copy
+      // reading _writeIfLive takes: acting on the state it is already in is
+      // a retry, not a demotion.
+      await applyAsTrainer();
+      await admin.approveTrainer(await pending('coach'));
+      await admin.unblockUser('coach');
+
+      expect((await pending('coach')).status, AccountStatus.active);
+      expect(await exploreUids(), ['coach']);
+    });
+
+    test('rejecting a blocked trainer also clears the block markers',
+        () async {
+      await applyAsTrainer();
+      await admin.blockUser('coach', until: 'forever');
+      await admin.rejectTrainer(await pending('coach'), reason: 'No IKO id');
+
+      final doc = (await db.collection(Col.users).doc('coach').get()).data()!;
+      expect(doc['status'], 'rejected');
+      expect(doc.containsKey('blockedUntil'), isFalse);
+      expect(doc.containsKey('statusBeforeBlock'), isFalse);
+    });
+
+    test('restoring to pending clears the block markers too', () async {
+      await applyAsTrainer();
+      await admin.blockUser('coach', until: 'forever');
+      await admin.restoreToPending('coach');
+
+      final doc = (await db.collection(Col.users).doc('coach').get()).data()!;
+      expect(doc['status'], 'pending');
+      expect(doc.containsKey('blockedUntil'), isFalse);
+      expect(doc.containsKey('statusBeforeBlock'), isFalse);
     });
   });
 

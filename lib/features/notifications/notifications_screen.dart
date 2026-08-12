@@ -92,6 +92,7 @@ class _NotificationTile extends ConsumerWidget {
         NotificationKind.reminder => Symbols.alarm_rounded,
         NotificationKind.review => Symbols.star_rounded,
         NotificationKind.message => Symbols.chat_bubble_rounded,
+        NotificationKind.account => Symbols.verified_user_rounded,
         _ => Symbols.campaign_rounded,
       };
 
@@ -127,6 +128,10 @@ class _NotificationTile extends ConsumerWidget {
         leaveTo('/inbox');
       case NotificationKind.review:
         leaveTo('/sessions');
+      case NotificationKind.account:
+        // Deliberately the sheet, not a screen: the message *is* the payload
+        // — a rejection carries its reason in full — and the account state
+        // it announces is already wherever the gate routed the user.
       case NotificationKind.broadcast:
       case NotificationKind.system:
         // No destination — full untruncated text in a sheet (§3.12).
