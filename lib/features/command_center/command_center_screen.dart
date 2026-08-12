@@ -430,6 +430,10 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
               repo.setStatus(widget.booking, BookingStatus.pending).ignore(),
         );
       }
+    } on StatusConflictFailure catch (e) {
+      // The row went stale under the tap — the rider cancelled, or another
+      // device already decided. Say which; "try again" would be a lie.
+      if (mounted) showFlowToast(context, e.message);
     } catch (_) {
       if (mounted) showFlowToast(context, "Couldn't approve. Try again.");
     } finally {
@@ -481,6 +485,8 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
           widget.booking, BookingStatus.rejected,
           declineReason: reason.text);
       if (mounted) showFlowToast(context, 'Request declined');
+    } on StatusConflictFailure catch (e) {
+      if (mounted) showFlowToast(context, e.message);
     } catch (_) {
       if (mounted) showFlowToast(context, "Couldn't decline. Try again.");
     } finally {
@@ -698,6 +704,9 @@ class _ManifestCard extends ConsumerWidget {
       await ref
           .read(bookingRepositoryProvider)
           .setStatus(booking, BookingStatus.completed);
+    } on StatusConflictFailure catch (e) {
+      if (context.mounted) showFlowToast(context, e.message);
+      return;
     } catch (_) {
       if (context.mounted) {
         showFlowToast(context, "Couldn't finish the session. Try again.");

@@ -18,6 +18,7 @@ import '../../core/widgets/session_card.dart';
 import '../../core/widgets/sheets.dart';
 import '../../core/widgets/surfaces.dart';
 import '../../data/models/booking.dart';
+import '../../data/repositories/booking_repository.dart';
 import '../../providers/providers.dart';
 import 'review_composer.dart';
 
@@ -574,6 +575,11 @@ class _ActionButton extends ConsumerWidget {
       if (!context.mounted) return;
       onDone?.call();
       showFlowToast(context, 'Session cancelled');
+    } on StatusConflictFailure catch (e) {
+      // The list is a live stream; this row moved on before the tap landed.
+      // The specific reason ("already finished") matters more here than
+      // anywhere: it is the difference between shrugging and not showing up.
+      if (context.mounted) showFlowToast(context, e.message);
     } catch (e) {
       // The rider was told their trainer would be notified. If the write
       // failed they must not be left assuming it went through — they would
