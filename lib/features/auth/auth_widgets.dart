@@ -67,7 +67,14 @@ class AuthScaffold extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const SizedBox(height: 8),
+                      // Twin spacers centre the form in the room the keyboard
+                      // leaves. Sign-in and Reset are short, and pinned to the
+                      // top they left the lower two thirds of the screen
+                      // blank; Sign-up is taller than any viewport, so its
+                      // spacers collapse to zero and nothing moves. When the
+                      // keyboard takes the spare height both flatten out and
+                      // the column scrolls as one piece, exactly as before.
+                      const Spacer(),
                       Text(title,
                           style: display(32, 780,
                               color: scheme.onSurface,
@@ -79,11 +86,9 @@ class AuthScaffold extends StatelessWidget {
                               color: scheme.onSurfaceVariant, height: 1.45)),
                       const SizedBox(height: 28),
                       ...children,
-                      if (footer != null) ...[
-                        const SizedBox(height: 24),
-                        const Spacer(),
-                        footer!,
-                      ],
+                      const SizedBox(height: 24),
+                      const Spacer(),
+                      ?footer,
                     ],
                   ),
                 ),
