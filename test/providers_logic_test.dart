@@ -166,7 +166,39 @@ void main() {
               auth: Stream.value(user),
               profile: Stream.value(appUser(
                   role: UserRole.admin, status: AccountStatus.pending))),
-          AppStage.ready);
+          AppStage.staff,
+          reason: 'staff never wait for approval — they grant it');
+    });
+
+    test('6b. every staff role lands in the console, not the marketplace',
+        () async {
+      // An admin account is a console account. It has no rider level, no
+      // trainer calendar and no bookings, so `ready` gave it a bottom bar of
+      // destinations that were empty by construction — and, worse, an
+      // Explore tab whose "book this trainer" button wrote a booking under a
+      // staff uid.
+      for (final role in [UserRole.admin, UserRole.support]) {
+        expect(
+            await stageWith(
+                auth: Stream.value(user),
+                profile: Stream.value(appUser(role: role))),
+            AppStage.staff,
+            reason: '$role');
+      }
+    });
+
+    test('6c. a suspended admin is still suspended', () async {
+      // Order matters: the block gate is evaluated before the staff gate, so
+      // a compromised or misbehaving staff account can be shut out the same
+      // way anyone else can.
+      expect(
+          await stageWith(
+              auth: Stream.value(user),
+              profile: Stream.value(appUser(
+                  role: UserRole.admin,
+                  status: AccountStatus.blocked,
+                  blockedUntil: 'forever'))),
+          AppStage.blocked);
     });
 
     test('7. rejected trainer gets a real gate, not a ghost Command Center',

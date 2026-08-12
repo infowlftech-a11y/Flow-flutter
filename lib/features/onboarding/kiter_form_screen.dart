@@ -253,7 +253,7 @@ class _KiterFormScreenState extends ConsumerState<KiterFormScreen> {
                   options: FlowConst.languages,
                   sheetTitle: 'Languages',
                   sheetSubtitle: 'Search, or add one that is not listed.',
-                  hintText: 'Add the languages you speak',
+                  hintText: 'Add a language',
                   multiSelect: true,
                   allowCustom: true,
                   enabled: !_busy,

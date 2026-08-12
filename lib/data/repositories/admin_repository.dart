@@ -172,6 +172,23 @@ class AdminRepository {
     );
   }
 
+  // ── Leave reasons (§3.13) ──────────────────────────────────────────────
+
+  /// The exit interviews, newest first.
+  ///
+  /// Written on account deletion and, until now, read by nobody — the sheet
+  /// asked "why are you leaving? it genuinely helps" and then filed the
+  /// answer where no one on the team could reach it.
+  Stream<List<LeaveReason>> watchLeaveReasons() =>
+      _db.collection(Col.leaveReasons).snapshots().map((qs) {
+        final list = [
+          for (final doc in qs.docs) LeaveReason.fromDoc(doc.id, doc.data()),
+        ];
+        list.sort((a, b) => (b.createdAt ?? DateTime(0))
+            .compareTo(a.createdAt ?? DateTime(0)));
+        return list;
+      });
+
   // ── Reports ────────────────────────────────────────────────────────────
 
   /// Newest first, client-side (§6.2).

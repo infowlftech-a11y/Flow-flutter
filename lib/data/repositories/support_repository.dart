@@ -40,6 +40,47 @@ class SupportRepository {
         return list;
       });
 
+  /// Every ticket, for the staff queue — open ones first, then by recency.
+  ///
+  /// The rider side of support has existed since §3.14; the staff side of it
+  /// never had a screen, so a ticket a user opened went into a collection
+  /// nobody could read and was answered by nobody. Sorted client-side like
+  /// every other list (§6.2), and unfiltered because staff need the answered
+  /// ones too — "what did we tell them last time" is most of support.
+  Stream<List<SupportTicket>> watchAllTickets() =>
+      _tickets.snapshots().map((qs) {
+        final list = [
+          for (final d in qs.docs) SupportTicket.fromDoc(d.id, d.data()),
+        ];
+        list.sort((a, b) {
+          if (a.isOpen != b.isOpen) return a.isOpen ? -1 : 1;
+          return (b.lastMessageAt ?? DateTime(0))
+              .compareTo(a.lastMessageAt ?? DateTime(0));
+        });
+        return list;
+      });
+
+  /// Staff reply on a ticket. `isAdmin` is what renders it on the other side
+  /// as coming from support rather than from the user themselves.
+  Future<void> replyAsStaff({
+    required String ticketId,
+    required String staffId,
+    required String text,
+  }) async {
+    await _tickets.doc(ticketId).collection(Col.messages).add({
+      'text': text,
+      'senderId': staffId,
+      'isAdmin': true,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    await _tickets
+        .doc(ticketId)
+        .update({'lastMessageAt': FieldValue.serverTimestamp()});
+  }
+
+  Future<void> closeTicket(String ticketId) =>
+      _tickets.doc(ticketId).update({'status': 'closed'});
+
   Stream<SupportTicket?> watchTicket(String id) => _tickets
       .doc(id)
       .snapshots()

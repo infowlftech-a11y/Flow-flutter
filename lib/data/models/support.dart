@@ -129,3 +129,45 @@ class AppealMessage {
         'timestamp': (timestamp ?? DateTime.now()).toIso8601String(),
       };
 }
+
+/// Why someone deleted their account (§3.13).
+///
+/// The exit interview. `recordLeaveReason` has written these since account
+/// deletion existed, into a collection only staff may read — and nothing
+/// read it, so every answer to "why are you leaving? it genuinely helps"
+/// went straight into a drawer nobody could open. The console reads them
+/// now, which is the only thing that makes the question honest.
+///
+/// The profile is gone by the time this is read, so the name and email are
+/// denormalised onto the document: without them a leave reason is an opinion
+/// from nobody.
+class LeaveReason {
+  const LeaveReason({
+    required this.id,
+    required this.userId,
+    required this.userName,
+    required this.userEmail,
+    required this.reason,
+    this.createdAt,
+  });
+
+  final String id;
+  final String userId;
+  final String userName;
+  final String userEmail;
+  final String reason;
+  final DateTime? createdAt;
+
+  factory LeaveReason.fromDoc(String id, Map<String, dynamic> d) => LeaveReason(
+        id: id,
+        userId: d.str('userId') ?? '',
+        userName: d.str('userName') ?? 'Someone',
+        userEmail: d.str('userEmail') ?? '',
+        reason: d.str('reason') ?? '',
+        createdAt: d.date('createdAt'),
+      );
+
+  /// The sheet's placeholder is `'No reason given'` when they skipped it —
+  /// worth distinguishing in the queue from an answer someone actually typed.
+  bool get isBlank => reason.trim().isEmpty || reason == 'No reason given';
+}

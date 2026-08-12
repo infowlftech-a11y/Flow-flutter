@@ -97,6 +97,35 @@ describe('tickets', () => {
     const db = await as('rider2');
     await assertFails(db.collection('tickets').where('userId', '==', 'rider').get());
   });
+
+  // The staff queue — `watchAllTickets()`. An unfiltered list is authorised
+  // because `isStaff()` is document-independent and true for every returned
+  // doc; a rider's identical query is refused by the same rule, which is
+  // what makes the console's read safe to open up.
+  test('staff list every ticket, unfiltered', async () => {
+    const db = await as('support');
+    await assertSucceeds(db.collection('tickets').get());
+  });
+
+  test('DENY a rider listing every ticket', async () => {
+    const db = await as('rider');
+    await assertFails(db.collection('tickets').get());
+  });
+
+  test('staff answer as FLOW support (isAdmin: true)', async () => {
+    const db = await as('support');
+    await assertSucceeds(
+      db.collection('tickets').doc('t1').collection('messages').doc('m9')
+        .set({ senderId: 'support', text: 'On it', isAdmin: true }),
+    );
+  });
+
+  test('staff close a ticket', async () => {
+    const db = await as('admin');
+    await assertSucceeds(
+      db.collection('tickets').doc('t1').update({ status: 'closed' }),
+    );
+  });
 });
 
 describe('tickets/messages', () => {
@@ -293,6 +322,32 @@ describe('leave_reasons', () => {
     const db = await as('admin');
     await assertSucceeds(db.collection('leave_reasons').doc('l1').get());
   });
+
+  // `watchLeaveReasons()` — the console's Feedback tab. Until it existed,
+  // every answer to "why are you leaving?" was written into a collection
+  // that was readable in principle and read by nobody in practice.
+  test('staff list the whole collection', async () => {
+    const db = await as('admin');
+    await assertSucceeds(db.collection('leave_reasons').get());
+  });
+
+  test('DENY a rider listing them', async () => {
+    const db = await as('rider');
+    await assertFails(db.collection('leave_reasons').get());
+  });
+
+  test('a departing user records one with their name and email attached',
+    async () => {
+      // The console cannot look the author up afterwards — the profile is
+      // deleted moments later — so the document has to carry who it was.
+      const db = await as('rider');
+      await assertSucceeds(
+        db.collection('leave_reasons').doc('l3').set({
+          userId: 'rider', userName: 'Rider One', userEmail: 'rider@test.dev',
+          reason: 'Moving to another spot',
+        }),
+      );
+    });
 
   test('DENY editing a leave reason, even as staff', async () => {
     const db = await as('admin');

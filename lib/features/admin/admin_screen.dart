@@ -18,6 +18,7 @@ import '../../data/models/app_user.dart';
 import '../../data/models/report.dart';
 import '../../data/models/support.dart';
 import '../../providers/providers.dart';
+import 'admin_queues.dart';
 
 /// Staff moderation console (§14.2, ported in-app).
 ///
@@ -47,26 +48,75 @@ class AdminScreen extends ConsumerWidget {
     final pending = ref.watch(pendingTrainersProvider).value ?? const [];
     final reports = ref.watch(reportsProvider).value ?? const [];
     final appeals = ref.watch(appealsProvider).value ?? const [];
+    final tickets = ref.watch(allTicketsProvider).value ?? const [];
+    final blocked = ref.watch(blockedUsersProvider).value ?? const [];
     final openReports = reports.where((r) => r.isOpen).length;
     final openAppeals = appeals.where((a) => a.status == 'pending').length;
+    final openTickets = tickets.where((t) => t.isOpen).length;
 
+    String label(String name, int count) =>
+        count == 0 ? name : '$name ($count)';
+
+    // Six tabs, because six things are staff-only.
+    //
+    // Support tickets and suspensions had repositories, rules and providers
+    // and no screen at all: a ticket a rider opened was answered by nobody,
+    // and `unblockUser` had no caller, so every suspension was permanent in
+    // practice. Leave reasons were written on every account deletion into a
+    // collection only staff could read, and nobody read it. If the console
+    // is the whole of the staff app, then anything a rider or trainer cannot
+    // do has to live here — otherwise it does not live anywhere.
     return DefaultTabController(
-      length: 3,
+      length: 6,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Admin console'),
+          automaticallyImplyLeading: false,
+          actions: [
+            IconButton(
+              onPressed: () => context.push('/notifications'),
+              tooltip: 'Notifications',
+              icon: const Icon(Symbols.notifications_rounded),
+            ),
+            // Staff have no Profile tab to sign out from any more, so the
+            // console carries it.
+            IconButton(
+              onPressed: () async {
+                final ok = await confirmAction(
+                  context,
+                  title: 'Sign out?',
+                  body: "You'll need your email and password to get back in.",
+                  confirmLabel: 'Sign out',
+                );
+                if (ok) await ref.read(signOutProvider)();
+              },
+              tooltip: 'Sign out',
+              icon: const Icon(Symbols.logout_rounded),
+            ),
+            const SizedBox(width: 4),
+          ],
           bottom: TabBar(
             isScrollable: true,
             tabAlignment: TabAlignment.start,
             tabs: [
-              Tab(text: 'APPROVALS${pending.isEmpty ? '' : ' (${pending.length})'}'),
-              Tab(text: 'REPORTS${openReports == 0 ? '' : ' ($openReports)'}'),
-              Tab(text: 'APPEALS${openAppeals == 0 ? '' : ' ($openAppeals)'}'),
+              Tab(text: label('APPROVALS', pending.length)),
+              Tab(text: label('TICKETS', openTickets)),
+              Tab(text: label('REPORTS', openReports)),
+              Tab(text: label('APPEALS', openAppeals)),
+              Tab(text: label('SUSPENDED', blocked.length)),
+              const Tab(text: 'FEEDBACK'),
             ],
           ),
         ),
         body: const TabBarView(
-          children: [_ApprovalsTab(), _ReportsTab(), _AppealsTab()],
+          children: [
+            _ApprovalsTab(),
+            TicketsTab(),
+            _ReportsTab(),
+            _AppealsTab(),
+            SuspendedTab(),
+            LeaveReasonsTab(),
+          ],
         ),
       ),
     );
@@ -124,6 +174,18 @@ class _ApplicantCardState extends ConsumerState<_ApplicantCard> {
 
   Future<void> _approve() async {
     if (_busy) return;
+    // Approving is what puts a trainer in front of riders with FLOW vouching
+    // for their certification. The UNDO toast below covers a slip for a few
+    // seconds; this covers the tap itself, which sits next to DECLINE.
+    final sure = await confirmAction(
+      context,
+      title: 'Approve ${widget.trainer.name}?',
+      body: 'They go live in Explore straight away and riders can book them. '
+          'Check the certificate first if you have not.',
+      confirmLabel: 'Approve',
+      cancelLabel: 'Not yet',
+    );
+    if (!sure || !mounted) return;
     setState(() => _busy = true);
     final repo = ref.read(adminRepositoryProvider);
     try {
@@ -223,7 +285,7 @@ class _ApplicantCardState extends ConsumerState<_ApplicantCard> {
                   ],
                 ),
               ),
-              Text('${euro(t.displayRate)}/h',
+              Text('${money(t.displayRate)}/h',
                   style: interNum(14, 720, color: tones.azureBrand)),
             ],
           ),
@@ -327,7 +389,7 @@ class _ReportsTab extends ConsumerWidget {
         if (list.isEmpty) {
           return const EmptyView.scrollable(
             icon: Symbols.flag_rounded,
-            title: 'No reports',
+            title: 'No reports yet',
             subtitle: 'Rider reports about trainers appear here.',
           );
         }
@@ -445,6 +507,20 @@ class _ReportCard extends ConsumerWidget {
               label: 'Uphold & suspend 7 days',
               destructive: true,
               onPressed: () async {
+                // Suspending someone shuts them out of the app: a trainer
+                // stops being bookable and a rider cannot reach anyone. It is
+                // reversible, but not by them.
+                final sure = await confirmAction(
+                  sheetContext,
+                  title: 'Suspend ${report.reportedUserName} for 7 days?',
+                  body: 'They lose access immediately and are shown the '
+                      'suspension gate. They can appeal, and you can lift it '
+                      'from the Suspended tab.',
+                  confirmLabel: 'Suspend',
+                  cancelLabel: 'Not yet',
+                  destructive: true,
+                );
+                if (!sure) return;
                 final admin = ref.read(adminRepositoryProvider);
                 // Full timestamp, not a bare `ymd`. A date-only value parses
                 // to midnight *starting* that day, so a suspension issued at
@@ -466,6 +542,16 @@ class _ReportCard extends ConsumerWidget {
             const SizedBox(height: 8),
             OutlinedButton(
               onPressed: () async {
+                final sure = await confirmAction(
+                  sheetContext,
+                  title: 'Dismiss this report?',
+                  body: 'It closes with no action against '
+                      '${report.reportedUserName}. The rider who filed it is '
+                      'not told either way.',
+                  confirmLabel: 'Dismiss report',
+                  cancelLabel: 'Keep open',
+                );
+                if (!sure) return;
                 await ref
                     .read(adminRepositoryProvider)
                     .closeReport(report.id, upheld: false, note: note.text);
@@ -504,7 +590,7 @@ class _AppealsTab extends ConsumerWidget {
         if (list.isEmpty) {
           return const EmptyView.scrollable(
             icon: Symbols.gavel_rounded,
-            title: 'No appeals',
+            title: 'No appeals yet',
             subtitle: 'Suspended users can appeal, and it lands here.',
           );
         }

@@ -99,6 +99,18 @@ enum AppStage {
   blocked,
   awaitingApproval,
   rejected,
+
+  /// An admin, owner or support account: the console, and nothing else.
+  ///
+  /// Staff used to resolve to [ready] and got the rider's app with an extra
+  /// row in Settings. That is not a smaller problem than it sounds: the shell
+  /// gave them Explore, Sessions and a Ticket tab that were empty by
+  /// construction — a staff account has no bookings — and Explore's booking
+  /// button would happily write a booking under a staff uid, creating a
+  /// rider who does not exist and a session nobody will teach. The console is
+  /// the whole app for these accounts.
+  staff,
+
   ready,
 }
 
@@ -179,31 +191,37 @@ final sessionProvider = Provider<Session>((ref) {
         stage: AppStage.blocked, user: user, firebaseUser: firebaseUser);
   }
 
-  // 6. trainer pending approval (staff bypass)
-  if (!user.isStaff &&
-      user.isTrainer &&
-      user.status == AccountStatus.pending) {
+  // 6. staff — the console is their entire app.
+  //
+  // Placed after the block gate so a suspended staff account is still
+  // suspended, and before the approval gates so a staff member is never held
+  // in a queue they are the one who empties.
+  if (user.isStaff) {
+    return Session(
+        stage: AppStage.staff, user: user, firebaseUser: firebaseUser);
+  }
+
+  // 7. trainer pending approval
+  if (user.isTrainer && user.status == AccountStatus.pending) {
     return Session(
         stage: AppStage.awaitingApproval,
         user: user,
         firebaseUser: firebaseUser);
   }
 
-  // 7. trainer whose application was declined.
+  // 8. trainer whose application was declined.
   //
   // v2.6 let `rejected` fall through to `ready` (§2.4/§14.3): the trainer got
   // a full Command Center while being invisible in Explore, so they could
   // manage a calendar nobody could book. That was latent because nothing in
   // the app could set the status — now the admin console can, so it is a
   // real state and gets a real gate.
-  if (!user.isStaff &&
-      user.isTrainer &&
-      user.status == AccountStatus.rejected) {
+  if (user.isTrainer && user.status == AccountStatus.rejected) {
     return Session(
         stage: AppStage.rejected, user: user, firebaseUser: firebaseUser);
   }
 
-  // 8. ready
+  // 9. ready
   return Session(stage: AppStage.ready, user: user, firebaseUser: firebaseUser);
 });
 
@@ -685,7 +703,19 @@ final appealsProvider = StreamProvider.autoDispose<List<Appeal>>((ref) {
   return ref.watch(adminRepositoryProvider).watchAppeals();
 });
 
-/// Badge for the Profile entry point: work waiting on staff.
+final allTicketsProvider =
+    StreamProvider.autoDispose<List<SupportTicket>>((ref) {
+  if (!ref.watch(sessionProvider).isStaff) return Stream.value(const []);
+  return ref.watch(supportRepositoryProvider).watchAllTickets();
+});
+
+final leaveReasonsProvider =
+    StreamProvider.autoDispose<List<LeaveReason>>((ref) {
+  if (!ref.watch(sessionProvider).isStaff) return Stream.value(const []);
+  return ref.watch(adminRepositoryProvider).watchLeaveReasons();
+});
+
+/// Work waiting on staff, across every queue the console owns.
 final adminQueueCountProvider = Provider.autoDispose<int>((ref) {
   final trainers = ref.watch(pendingTrainersProvider).value?.length ?? 0;
   final reports = ref.watch(reportsProvider).value?.where((r) => r.isOpen).length ?? 0;
@@ -695,5 +725,7 @@ final adminQueueCountProvider = Provider.autoDispose<int>((ref) {
           ?.where((a) => a.status == 'pending')
           .length ??
       0;
-  return trainers + reports + appeals;
+  final tickets =
+      ref.watch(allTicketsProvider).value?.where((t) => t.isOpen).length ?? 0;
+  return trainers + reports + appeals + tickets;
 });

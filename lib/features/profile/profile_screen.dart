@@ -14,10 +14,8 @@ import '../../core/widgets/flow_image.dart';
 import '../../core/widgets/misc.dart';
 import '../../core/widgets/sheets.dart';
 import '../../core/widgets/surfaces.dart';
-import '../../core/widgets/theme_swap.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../providers/providers.dart';
-import '../../providers/settings_provider.dart';
 
 /// Profile & settings (§3.13).
 class ProfileScreen extends ConsumerWidget {
@@ -27,7 +25,6 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionProvider);
     final user = session.user;
-    final themeMode = ref.watch(themeModeProvider);
     final tones = context.tones;
 
     return Scaffold(
@@ -100,96 +97,63 @@ class ProfileScreen extends ConsumerWidget {
               ),
             ],
           ),
-          if (session.isStaff) ...[
-            const SizedBox(height: 28),
-            const SectionHeader('Staff'),
-            _SettingsCard(children: [
-              Builder(builder: (context) {
-                final queue = ref.watch(adminQueueCountProvider);
-                return ListTile(
-                  leading: Icon(Symbols.shield_moon_rounded,
-                      size: 22, color: tones.azureBrand),
-                  title: Text('Admin console',
-                      style: inter(15, 620, color: context.scheme.onSurface)),
-                  subtitle: const Text('Approvals, reports and appeals'),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (queue > 0)
-                        Badge.count(count: queue)
-                      else
-                        const SizedBox.shrink(),
-                      Icon(Symbols.chevron_right_rounded,
-                          size: 20, color: tones.textFaint),
-                    ],
-                  ),
-                  onTap: () => context.push('/admin'),
-                );
-              }),
-            ]),
-          ],
+          // The Staff section stood here. Staff accounts now resolve to
+          // AppStage.staff and never reach this screen — the console is their
+          // whole app — so a row pointing at it would be unreachable code
+          // pretending to be a feature.
           const SizedBox(height: 28),
           const SectionHeader('Account'),
           _SettingsCard(children: [
             _row(context, Symbols.badge_rounded, 'Personal details',
+                subtitle: 'Name, photo, languages and level',
                 onTap: () => context.push('/profile/edit')),
             if (session.isTrainer)
               _row(context, Symbols.visibility_rounded,
                   'View my public profile',
+                  subtitle: 'Exactly what riders see before they book',
                   onTap: () => context.push('/trainer/${session.uid}')),
-            _row(context, Symbols.notifications_rounded, 'Notifications',
-                onTap: () => context.push('/notifications')),
-            _row(context, Symbols.support_agent_rounded, 'Help & support',
-                onTap: () => context.push('/support')),
+            _row(context, Symbols.mail_rounded, 'Email address',
+                subtitle: user?.email ?? '—',
+                onTap: () => _openEmailSheet(context, user?.email ?? '')),
           ]),
           const SizedBox(height: 20),
-          const SectionHeader('Appearance'),
+          const SectionHeader('Notifications'),
           _SettingsCard(children: [
-            Padding(
-              padding: const EdgeInsets.all(6),
-              child: SegmentedButton<ThemeMode>(
-                segments: const [
-                  ButtonSegment(
-                      value: ThemeMode.system,
-                      icon: Icon(Symbols.brightness_auto_rounded, size: 17),
-                      label: Text('Auto')),
-                  ButtonSegment(
-                      value: ThemeMode.light,
-                      icon: Icon(Symbols.light_mode_rounded, size: 17),
-                      label: Text('Light')),
-                  ButtonSegment(
-                      value: ThemeMode.dark,
-                      icon: Icon(Symbols.dark_mode_rounded, size: 17),
-                      label: Text('Dark')),
-                ],
-                selected: {themeMode},
-                // Material 3 replaces the leading icon with a tick on the
-                // selected segment, and segments size to their content — so
-                // every selection change re-flowed the row and the fill sat
-                // over a different span than the label under it. Keeping the
-                // brightness icons holds all three widths constant.
-                showSelectedIcon: false,
-                onSelectionChanged: (s) {
-                  Haptics.select();
-                  // Through ThemeSwap: the old frame fades out over the new
-                  // theme instead of the whole tree lerping per tick.
-                  ThemeSwap.of(context)
-                      .run(() => ref.read(themeModeProvider.notifier).set(s.first));
-                },
-                style: ButtonStyle(
-                  side: WidgetStatePropertyAll(
-                      BorderSide(color: tones.line)),
-                ),
-              ),
-            ),
+            _row(context, Symbols.inbox_rounded, 'Notification inbox',
+                subtitle: 'Everything the app has told you',
+                onTap: () => context.push('/notifications')),
+            _row(context, Symbols.tune_rounded, 'Push notifications',
+                subtitle: 'Managed in your phone settings',
+                onTap: () => _openPushSheet(context)),
           ]),
           const SizedBox(height: 20),
-          const SectionHeader('Privacy'),
+          const SectionHeader('Support'),
+          _SettingsCard(children: [
+            _row(context, Symbols.support_agent_rounded, 'Help & support',
+                subtitle: 'Open a ticket — we answer in the app',
+                onTap: () => context.push('/support')),
+            _row(context, Symbols.menu_book_rounded, 'How FLOW works',
+                subtitle: 'Booking, check-in and payment, explained',
+                onTap: () => _openHowItWorksSheet(context, session.isTrainer)),
+          ]),
+          const SizedBox(height: 20),
+          const SectionHeader('Privacy & data'),
           _SettingsCard(children: [
             _row(context, Symbols.shield_rounded, 'Security & data',
+                subtitle: 'What we store, and who can see it',
                 onTap: () => _openPrivacySheet(context)),
+            _row(context, Symbols.gavel_rounded, 'Terms & conditions',
+                onTap: () => _openTermsSheet(context)),
+            _row(context, Symbols.manage_accounts_rounded, 'Manage my account',
+                subtitle: 'Export or delete everything',
+                onTap: () => _openAccountSheet(context, ref)),
           ]),
           const SizedBox(height: 20),
+          // Sign out sits alone, and Delete lives one level down inside
+          // "Manage my account". They used to be adjacent rows in adjacent
+          // cards, ~60dp apart, with the destructive one *below* the one
+          // people tap daily — and the tap that costs you your account was
+          // the easier one to hit by accident.
           _SettingsCard(children: [
             _row(context, Symbols.logout_rounded, 'Sign out', onTap: () async {
               final ok = await confirmAction(
@@ -200,13 +164,6 @@ class ProfileScreen extends ConsumerWidget {
               );
               if (ok) await ref.read(signOutProvider)();
             }),
-          ]),
-          const SizedBox(height: 28),
-          const SectionHeader('Danger zone'),
-          _SettingsCard(children: [
-            _row(context, Symbols.delete_forever_rounded, 'Delete my account',
-                color: tones.danger,
-                onTap: () => _deleteAccountFlow(context, ref)),
           ]),
           const SizedBox(height: 24),
           Center(
@@ -220,14 +177,258 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   Widget _row(BuildContext context, IconData icon, String label,
-      {required VoidCallback onTap, Color? color}) {
+      {required VoidCallback onTap, Color? color, String? subtitle}) {
     return ListTile(
       leading: Icon(icon, size: 22, color: color),
       title: Text(label,
           style: inter(15, 560, color: color ?? context.scheme.onSurface)),
+      subtitle: subtitle == null
+          ? null
+          : Text(subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: inter(12.5, 460, color: context.tones.textFaint)),
       trailing: Icon(Symbols.chevron_right_rounded,
           size: 20, color: context.tones.textFaint),
       onTap: onTap,
+    );
+  }
+
+  /// Email is identity here — it is the sign-in credential — so this explains
+  /// rather than edits. Changing it means re-authenticating, which is a
+  /// support conversation, not a text field.
+  void _openEmailSheet(BuildContext context, String email) {
+    showFlowSheet<void>(
+      context,
+      title: 'Email address',
+      subtitle: email.isEmpty ? null : email,
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'This is the address you sign in with, and where we send '
+              'anything that has to reach you outside the app.',
+              style: Theme.of(sheetContext)
+                  .textTheme
+                  .bodyMedium!
+                  .copyWith(height: 1.55),
+            ),
+            const SizedBox(height: 20),
+            PrimaryButton(
+              label: 'Ask support to change it',
+              icon: Symbols.support_agent_rounded,
+              onPressed: () {
+                Navigator.pop(sheetContext);
+                context.push('/support');
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Honest about where the switch actually lives.
+  ///
+  /// An in-app toggle here would be a lie in one direction or the other: the
+  /// OS owns the permission, so a switch turned "on" while Android has push
+  /// denied would silently promise notifications that never arrive.
+  void _openPushSheet(BuildContext context) {
+    showFlowSheet<void>(
+      context,
+      title: 'Push notifications',
+      subtitle: 'Booking updates, messages and reminders',
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Android owns this permission, so it is switched on and off in '
+              'your phone settings — Settings → Apps → FLOW → Notifications. '
+              'Turning them off there does not affect the notification inbox '
+              'in the app; nothing is lost, it just waits for you.',
+              style: Theme.of(sheetContext)
+                  .textTheme
+                  .bodyMedium!
+                  .copyWith(height: 1.55),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openHowItWorksSheet(BuildContext context, bool isTrainer) {
+    showFlowSheet<void>(
+      context,
+      title: 'How FLOW works',
+      builder: (sheetContext) => ListView(
+        shrinkWrap: true,
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
+        children: isTrainer
+            ? const [
+                _PrivacyItem(
+                  icon: Symbols.pending_actions_rounded,
+                  title: 'Requests come to you',
+                  body:
+                      'Every booking arrives as a request. Nothing lands on '
+                      'your calendar until you approve it, and declining is '
+                      'always allowed — with a reason if you want to give one.',
+                ),
+                _PrivacyItem(
+                  icon: Symbols.qr_code_scanner_rounded,
+                  title: 'Scan them in',
+                  body:
+                      'Your rider shows a QR ticket on the beach. Scanning it '
+                      'starts the session — that is what proves they turned '
+                      'up, and it is the only way a session becomes billable.',
+                ),
+                _PrivacyItem(
+                  icon: Symbols.payments_rounded,
+                  title: 'You are paid in person',
+                  body:
+                      'FLOW takes nothing and handles no money. You mark a '
+                      'session settled once the rider has paid you directly, '
+                      'and your earnings sum exactly those sessions.',
+                ),
+              ]
+            : const [
+                _PrivacyItem(
+                  icon: Symbols.event_available_rounded,
+                  title: 'Request, then confirm',
+                  body:
+                      'You pick hours and send a request. Your trainer '
+                      'approves it — you are notified either way, and nothing '
+                      'is owed until a session actually happens.',
+                ),
+                _PrivacyItem(
+                  icon: Symbols.confirmation_number_rounded,
+                  title: 'Your ticket is your check-in',
+                  body:
+                      'Confirmed sessions get a QR ticket in the Ticket tab. '
+                      'Your trainer scans it on the beach to start the '
+                      'session. No signal needed on your side.',
+                ),
+                _PrivacyItem(
+                  icon: Symbols.payments_rounded,
+                  title: 'Pay your trainer directly',
+                  body:
+                      'Prices are in Egyptian pounds and settled in person at '
+                      'the centre. FLOW never takes a cut and never holds '
+                      'your money.',
+                ),
+              ],
+      ),
+    );
+  }
+
+  void _openTermsSheet(BuildContext context) {
+    showFlowSheet<void>(
+      context,
+      title: 'Terms & conditions',
+      builder: (sheetContext) => ListView(
+        shrinkWrap: true,
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
+        children: const [
+          _PrivacyItem(
+            icon: Symbols.handshake_rounded,
+            title: 'FLOW introduces, it does not instruct',
+            body:
+                'Every lesson is an agreement between you and your trainer. '
+                'FLOW lists certified trainers and handles the booking; the '
+                'session itself, and the money for it, are between the two '
+                'of you.',
+          ),
+          _PrivacyItem(
+            icon: Symbols.verified_user_rounded,
+            title: 'Certification is checked by hand',
+            body:
+                'Every trainer on FLOW has had their IKO or VDWS credential '
+                'reviewed by a person before appearing in Explore. Report '
+                'anyone whose conduct does not match that standard.',
+          ),
+          _PrivacyItem(
+            icon: Symbols.waves_rounded,
+            title: 'The sea decides',
+            body:
+                'Wind forecasts are indicative. A trainer may cancel for '
+                'safety, and should — conditions on the Red Sea change '
+                'faster than any forecast does.',
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Where account deletion now lives.
+  ///
+  /// It used to be a top-level "Danger zone" row directly under Sign out —
+  /// the two most different actions on the screen, adjacent, with the
+  /// irreversible one second. This puts a sheet between the list and the
+  /// deed, so reaching it is deliberate rather than a mis-tap.
+  void _openAccountSheet(BuildContext context, WidgetRef ref) {
+    showFlowSheet<void>(
+      context,
+      title: 'Manage my account',
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _PrivacyItem(
+              icon: Symbols.download_rounded,
+              title: 'A copy of your data',
+              body:
+                  'Ask support for everything FLOW holds about you and we '
+                  'send it to your sign-in address.',
+            ),
+            OutlinedButton.icon(
+              onPressed: () {
+                Navigator.pop(sheetContext);
+                context.push('/support');
+              },
+              icon: const Icon(Symbols.download_rounded, size: 18),
+              label: const Text('Request my data'),
+            ),
+            const SizedBox(height: 28),
+            Text('Delete my account',
+                style: inter(15, 700, color: context.tones.danger)),
+            const SizedBox(height: 6),
+            Text(
+              'Permanently removes your profile, favourites and history. '
+              'Your past sessions stay on your trainers’ records, because '
+              'they are their books too. This cannot be undone.',
+              style: Theme.of(sheetContext)
+                  .textTheme
+                  .bodyMedium!
+                  .copyWith(height: 1.55),
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: context.tones.danger,
+                  side: BorderSide(
+                      color: context.tones.danger.withValues(alpha: .5)),
+                ),
+                onPressed: () {
+                  Navigator.pop(sheetContext);
+                  _deleteAccountFlow(context, ref);
+                },
+                icon: const Icon(Symbols.delete_forever_rounded, size: 18),
+                label: const Text('Delete my account'),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

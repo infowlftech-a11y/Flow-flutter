@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/widgets/sheets.dart';
 import '../../providers/providers.dart';
 
 /// Six-branch tab shell showing four destinations per role.
@@ -85,6 +87,34 @@ class AppShell extends ConsumerWidget {
     final branchOf = branchesFor(isTrainer: isTrainer);
     final selected = branchOf.indexOf(navigationShell.currentIndex);
 
+    // Back at the root of a tab means "leave FLOW", and Android's back
+    // gesture is an edge swipe that a thumb finds by accident. A trainer
+    // mid-session or a rider holding a QR ticket at the water's edge should
+    // not lose the app to a stray swipe.
+    //
+    // `canPop: false` + a confirmed `SystemNavigator.pop()` rather than
+    // letting the pop through: the shell is the last route, so allowing it
+    // *is* the exit, and there would be nothing left to ask on top of.
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final leave = await confirmAction(
+          context,
+          title: 'Leave FLOW?',
+          body: 'Your session, bookings and messages are saved — you can '
+              'come straight back.',
+          confirmLabel: 'Leave',
+          cancelLabel: 'Stay',
+        );
+        if (leave) await SystemNavigator.pop();
+      },
+      child: _buildShell(context, branchOf, selected, isTrainer),
+    );
+  }
+
+  Widget _buildShell(BuildContext context, List<int> branchOf, int selected,
+      bool isTrainer) {
     return Scaffold(
       body: navigationShell,
       bottomNavigationBar: NavigationBar(
