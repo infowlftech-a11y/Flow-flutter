@@ -7,7 +7,7 @@
 
 import { test, describe, before, beforeEach, after } from 'node:test';
 import { assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
-import { as, reset, seed, cleanup, testEnv, bookingDoc } from './helpers.mjs';
+import { as, anon, reset, seed, cleanup, testEnv, bookingDoc } from './helpers.mjs';
 
 before(async () => { await testEnv(); });
 beforeEach(async () => {
@@ -83,8 +83,16 @@ describe('the clash re-check — _assertSlotsFree, immediately before the write'
       );
     });
 
-    test('a rider still cannot read the whole bookings collection', async () => {
-      const db = await as('rider');
-      await assertFails(db.collection('bookings').get());
+    test('DENY a signed-out visitor running it', async () => {
+      // The one limit the temporary BUG-017 widening keeps: it is
+      // `signedIn()`, not open. The collection-listable consequence is
+      // asserted in bookings.test.mjs under its TEMPORARY heading.
+      const db = await anon();
+      await assertFails(
+        db.collection('bookings')
+          .where('instructorId', '==', 'trainer')
+          .where('date', '==', '2099-06-15')
+          .get(),
+      );
     });
   });

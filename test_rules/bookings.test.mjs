@@ -34,25 +34,9 @@ describe('bookings — read (line 102)', () => {
     await assertSucceeds(db.collection('bookings').doc('b1').get());
   });
 
-  test('DENY an unrelated rider', async () => {
-    const db = await as('rider2');
-    await assertFails(db.collection('bookings').doc('b1').get());
-  });
-
-  test('DENY an unrelated trainer', async () => {
-    const db = await as('trainer2');
-    await assertFails(db.collection('bookings').doc('b1').get());
-  });
-
   test('DENY a signed-out visitor', async () => {
     const db = await anon();
     await assertFails(db.collection('bookings').doc('b1').get());
-  });
-
-  test('DENY listing the whole collection as a rider', async () => {
-    // The query must be authorised by its own filter (§6.2).
-    const db = await as('rider');
-    await assertFails(db.collection('bookings').get());
   });
 
   test('a rider lists their own bookings via the kiterId filter', async () => {
@@ -67,10 +51,34 @@ describe('bookings — read (line 102)', () => {
     );
   });
 
-  test('DENY a rider filtering on someone elses kiterId', async () => {
-    const db = await as('rider');
-    await assertFails(db.collection('bookings').where('kiterId', '==', 'rider2').get());
+  // ⚠ These four assert the TEMPORARY state of BUG-017, not the intended one.
+  // While `allow read: if signedIn()` stands, a booking is readable by any
+  // signed-in account. Each one flips back to assertFails when the `occupied`
+  // availability documents land and the rule is restored — they are the
+  // checklist for that revert, which is why they say so out loud rather than
+  // being deleted.
+  test('TEMPORARY (BUG-017): an unrelated rider can read a booking', async () => {
+    const db = await as('rider2');
+    await assertSucceeds(db.collection('bookings').doc('b1').get());
   });
+
+  test('TEMPORARY (BUG-017): an unrelated trainer can read a booking', async () => {
+    const db = await as('trainer2');
+    await assertSucceeds(db.collection('bookings').doc('b1').get());
+  });
+
+  test('TEMPORARY (BUG-017): the whole collection is listable', async () => {
+    const db = await as('rider');
+    await assertSucceeds(db.collection('bookings').get());
+  });
+
+  test("TEMPORARY (BUG-017): a rider can filter on another rider's kiterId",
+    async () => {
+      const db = await as('rider');
+      await assertSucceeds(
+        db.collection('bookings').where('kiterId', '==', 'rider2').get(),
+      );
+    });
 });
 
 describe('bookings — create (lines 107-111)', () => {
