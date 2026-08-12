@@ -86,13 +86,40 @@ class SupportRepository {
       .snapshots()
       .map((d) => d.exists ? SupportTicket.fromDoc(d.id, d.data()!) : null);
 
+  /// Oldest-first, sorted **client-side** — the same fix, and for the same
+  /// reason, as `ChatRepository.watchMessages`.
+  ///
+  /// This carried `orderBy('createdAt')`, and `createdAt` is a
+  /// `serverTimestamp()`: it reads as `null` in the local snapshot until the
+  /// server acknowledges the write, and Firestore sorts null *first*. So the
+  /// message a user had just sent to support was painted instantly — at the
+  /// very top of the thread, above the complaint it was answering — and then
+  /// jumped to the bottom when the ack landed. The console's staff replies
+  /// did the same thing, through this same stream.
+  ///
+  /// Treating a pending timestamp as what it is, the newest message, keeps
+  /// the bubble where it was typed.
   Stream<List<TicketMessage>> watchTicketMessages(String ticketId) => _tickets
       .doc(ticketId)
       .collection(Col.messages)
-      .orderBy('createdAt')
       .snapshots()
-      .map((qs) =>
-          [for (final d in qs.docs) TicketMessage.fromDoc(d.id, d.data())]);
+      .map((qs) {
+        final list = [
+          for (final d in qs.docs) TicketMessage.fromDoc(d.id, d.data()),
+        ];
+        list.sort((a, b) {
+          final at = a.createdAt;
+          final bt = b.createdAt;
+          // Both pending: adjacent and stable, rather than letting the
+          // comparator reorder them between frames.
+          if (at == null && bt == null) return 0;
+          // A pending write is the message being sent right now — newest.
+          if (at == null) return 1;
+          if (bt == null) return -1;
+          return at.compareTo(bt);
+        });
+        return list;
+      });
 
   Future<String> openTicket({
     required String userId,
