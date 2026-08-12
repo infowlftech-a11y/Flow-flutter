@@ -9,6 +9,7 @@ import '../theme/radii.dart';
 import '../theme/typography.dart';
 import '../utils/error_copy.dart';
 import '../utils/haptics.dart';
+import 'loader.dart';
 import 'surfaces.dart';
 
 /// The single place async state is rendered (APP_LOGIC_BLUEPRINT.md §10.1).
@@ -47,7 +48,7 @@ class AsyncView<T> extends StatelessWidget {
     } else if (value.hasError) {
       child = ErrorView(error: value.error!, onRetry: onRetry);
     } else {
-      child = skeleton ?? const Center(child: CircularProgressIndicator());
+      child = skeleton ?? const Center(child: FlowLoader());
     }
     return AnimatedSwitcher(
       duration: FlowMotion.base,
@@ -441,9 +442,7 @@ Future<T> withBusyOverlay<T>(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const SizedBox(
-                  width: 34, height: 34,
-                  child: CircularProgressIndicator(strokeWidth: 3)),
+              const FlowLoader(size: 34),
               const SizedBox(height: 18),
               Material(
                 color: Colors.transparent,

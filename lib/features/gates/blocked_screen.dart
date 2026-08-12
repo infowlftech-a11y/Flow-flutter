@@ -11,6 +11,7 @@ import '../../core/theme/typography.dart';
 import '../../core/utils/date_x.dart';
 import '../../core/utils/haptics.dart';
 import '../../core/widgets/gate.dart';
+import '../../core/widgets/loader.dart';
 import '../../core/widgets/misc.dart';
 import '../../core/widgets/media.dart';
 import '../../core/widgets/surfaces.dart';
@@ -145,7 +146,7 @@ class _BlockedScreenState extends ConsumerState<BlockedScreen> {
                 _ => const Center(
                     child: Padding(
                       padding: EdgeInsets.all(24),
-                      child: CircularProgressIndicator(),
+                      child: FlowLoader(),
                     ),
                   ),
               },

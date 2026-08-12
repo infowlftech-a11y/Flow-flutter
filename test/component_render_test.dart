@@ -26,6 +26,7 @@ import 'package:flow/core/widgets/session_card.dart';
 import 'package:flow/core/widgets/ticket.dart';
 import 'package:flow/data/models/wind.dart';
 import 'package:flow/core/widgets/gate.dart';
+import 'package:flow/core/widgets/loader.dart';
 import 'package:flow/core/widgets/media.dart';
 import 'package:flow/core/widgets/misc.dart';
 import 'package:flow/core/widgets/surfaces.dart';
@@ -37,6 +38,9 @@ const _long =
     'exists to make the text wrap several times over.';
 
 final _cases = <String, Widget Function()>{
+  // Pumped mid-animation: the harness's fixed pumps land it partway through
+  // a revolution, which is the state it actually ships in.
+  'FlowLoader': () => const Center(child: FlowLoader()),
   'FlowCard': () => const FlowCard(child: Text(_long)),
   'FlowCard.onTap': () => FlowCard(onTap: () {}, child: const Text(_long)),
   // Three metrics on a 320px phone at 1.3x is the case this component is most

@@ -12,6 +12,7 @@ import '../../core/theme/palette.dart';
 import '../../core/theme/typography.dart';
 import '../../core/utils/haptics.dart';
 import '../../core/widgets/feedback.dart';
+import '../../core/widgets/loader.dart';
 
 /// Crop shapes the app asks for.
 enum CropShape {
@@ -235,9 +236,7 @@ class _CropScreenState extends State<CropScreen> {
               subtitle: 'Pick a different photo and try again.',
             )
           : _image == null
-              ? Center(
-                  child:
-                      CircularProgressIndicator(color: context.scheme.primary))
+              ? Center(child: FlowLoader(color: context.scheme.primary))
               : _buildEditor(),
     );
   }

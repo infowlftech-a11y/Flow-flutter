@@ -9,6 +9,7 @@ import '../../core/utils/date_x.dart';
 import '../../core/widgets/buttons.dart';
 import '../../core/widgets/feedback.dart';
 import '../../core/widgets/flow_image.dart';
+import '../../core/widgets/loader.dart';
 import '../../core/widgets/misc.dart';
 import '../../core/widgets/sheets.dart';
 import '../../core/widgets/surfaces.dart';
@@ -149,7 +150,7 @@ class _TicketCard extends ConsumerWidget {
                               message: value[value.length - 1 - i]),
                         ),
                       AsyncError() => const Text('Could not load the thread.'),
-                      _ => const Center(child: CircularProgressIndicator()),
+                      _ => const Center(child: FlowLoader(size: 30)),
                     };
                   },
                 ),
