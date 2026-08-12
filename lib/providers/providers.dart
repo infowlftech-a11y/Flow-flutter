@@ -715,6 +715,22 @@ final leaveReasonsProvider =
   return ref.watch(adminRepositoryProvider).watchLeaveReasons();
 });
 
+/// Every account on the platform — the console's directory (§3.15).
+final allUsersProvider = StreamProvider.autoDispose<List<AppUser>>((ref) {
+  if (!ref.watch(sessionProvider).isStaff) return Stream.value(const []);
+  return ref.watch(userRepositoryProvider).watchAllUsers();
+});
+
+/// Every booking on the platform — the console's sessions view (§3.15).
+///
+/// The staff gate here is not decoration: for anyone else the unfiltered
+/// query is *rejected by the rules*, and an error stream would poison the
+/// console shell for a non-staff account that somehow watched it.
+final allBookingsProvider = StreamProvider.autoDispose<List<Booking>>((ref) {
+  if (!ref.watch(sessionProvider).isStaff) return Stream.value(const []);
+  return ref.watch(bookingRepositoryProvider).watchAllBookings();
+});
+
 /// Work waiting on staff, across every queue the console owns.
 final adminQueueCountProvider = Provider.autoDispose<int>((ref) {
   final trainers = ref.watch(pendingTrainersProvider).value?.length ?? 0;

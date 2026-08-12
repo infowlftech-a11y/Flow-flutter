@@ -7,8 +7,14 @@ Every numbered section of §6.2, §6.3, §8, §9, §10 and §11 gets a row.
 
 | Suite | Runs against | Count |
 |---|---|---|
-| `test/` (`flutter test`) | `fake_cloud_firestore` — **rules are not evaluated** | 694 |
-| `test_rules/` (`npm test`) | Firestore emulator — the real `firestore.rules` | 336 |
+| `test/` (`flutter test`) | `fake_cloud_firestore` — **rules are not evaluated** | 709 |
+| `test_rules/` (`npm test`) | Firestore emulator — the real `firestore.rules` | 341 |
+
+709/341 as of the staff-oversight pass (§3.15): `admin_directory_test.dart`
+(filter/search logic), the console layout suite grown to all eight tabs plus
+a keyboard regression on the ticket sheet, and five rules cases pinning that
+the unfiltered booking list is staff-only — allowed for admin and support,
+refused wholesale for a rider *and* for a trainer.
 | `test/capture/board_capture.dart` | the same harness, rendering to PNG | asserts nothing |
 
 `board_capture.dart` is not a suite and is deliberately excluded from

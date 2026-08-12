@@ -130,6 +130,41 @@ describe('the clash re-check — _assertSlotsFree, immediately before the write'
     });
   });
 
+describe('the console sees everything — watchAllBookings / watchAllUsers', () => {
+  // The console's sessions view issues a completely unfiltered list. That is
+  // legal for staff and only for staff: the read rule is
+  // `isParty() || isStaff()`, rules cannot see query filters, and the only
+  // arm that is provable for *every possible document* is the
+  // document-independent isStaff(). The same query from anyone else must be
+  // refused wholesale — not filtered down, refused.
+  for (const staff of ['admin', 'support']) {
+    test(`${staff} lists every booking on the platform, unfiltered`,
+      async () => {
+        const db = await as(staff);
+        await assertSucceeds(db.collection('bookings').get());
+      });
+  }
+
+  test('DENY a rider listing every booking', async () => {
+    const db = await as('rider');
+    await assertFails(db.collection('bookings').get());
+  });
+
+  test('DENY a trainer listing every booking — parties see their own',
+    async () => {
+      const db = await as('trainer');
+      await assertFails(db.collection('bookings').get());
+    });
+
+  test('the user directory reads through the open profile rule', async () => {
+    // users allows any signed-in read, document-independently, so the
+    // unfiltered directory list needs no staff-only rule. Pinned because the
+    // console's USERS tab is built on exactly this property.
+    const db = await as('admin');
+    await assertSucceeds(db.collection('users').get());
+  });
+});
+
 describe('what the occupied doc leaks — nothing but the hours', () => {
   test('the doc a stranger can read carries no rider identity', async () => {
     // Not a rules assertion — a schema one, pinned where the privacy

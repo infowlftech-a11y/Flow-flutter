@@ -19,6 +19,7 @@ import '../../data/models/report.dart';
 import '../../data/models/support.dart';
 import '../../providers/providers.dart';
 import '../explore/trainer_profile_screen.dart' show ikoLabel;
+import 'admin_directory.dart';
 import 'admin_queues.dart';
 
 /// Staff moderation console (§14.2, ported in-app).
@@ -58,17 +59,22 @@ class AdminScreen extends ConsumerWidget {
     String label(String name, int count) =>
         count == 0 ? name : '$name ($count)';
 
-    // Six tabs, because six things are staff-only.
+    // Eight tabs: six queues, then the directory and the sessions view.
     //
-    // Support tickets and suspensions had repositories, rules and providers
-    // and no screen at all: a ticket a rider opened was answered by nobody,
-    // and `unblockUser` had no caller, so every suspension was permanent in
-    // practice. Leave reasons were written on every account deletion into a
-    // collection only staff could read, and nobody read it. If the console
-    // is the whole of the staff app, then anything a rider or trainer cannot
-    // do has to live here — otherwise it does not live anywhere.
+    // The queues came first — support tickets and suspensions had
+    // repositories, rules and providers and no screen at all: a ticket a
+    // rider opened was answered by nobody, and `unblockUser` had no caller,
+    // so every suspension was permanent in practice. Leave reasons were
+    // written on every account deletion into a collection only staff could
+    // read, and nobody read it.
+    //
+    // USERS and SESSIONS close the other half of "the console is the whole
+    // of the staff app": an account that was in no queue was invisible to
+    // staff, and a booking was visible only through the two people on it.
+    // Support conversations start with a name; the person answering has to
+    // be able to find that name and see what it has been doing.
     return DefaultTabController(
-      length: 6,
+      length: 8,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Admin console'),
@@ -106,6 +112,8 @@ class AdminScreen extends ConsumerWidget {
               Tab(text: label('APPEALS', openAppeals)),
               Tab(text: label('SUSPENDED', blocked.length)),
               const Tab(text: 'FEEDBACK'),
+              const Tab(text: 'USERS'),
+              const Tab(text: 'SESSIONS'),
             ],
           ),
         ),
@@ -117,6 +125,8 @@ class AdminScreen extends ConsumerWidget {
             _AppealsTab(),
             SuspendedTab(),
             LeaveReasonsTab(),
+            UsersTab(),
+            AllSessionsTab(),
           ],
         ),
       ),

@@ -378,6 +378,36 @@ irreversible and must be presented as such.
 Emptying an optional field must actually clear it. "Not editing this field" and "clearing
 this field" are different intents and cannot share a representation.
 
+### 3.14 Support (added 2026-08-12)
+
+- **Tickets** — any signed-in user opens a ticket (subject + body) and replies on it; the
+  thread is a sub-collection, readable and writable by its owner and staff, nobody else.
+  Messages are immutable once sent — for everyone, staff included.
+- **Staff answer as FLOW support** (`isAdmin: true` on the message), can close a ticket,
+  and the owner reopens it simply by replying. Closing is staff-only; deleting the thread
+  is not offered in the app at all.
+- **Leave reasons** — the optional "why are you leaving?" on account deletion is written to
+  a write-only collection carrying the author's name and email (the profile is deleted
+  moments later, so the document must carry who it was). Staff read it in the console's
+  FEEDBACK tab; nobody edits or deletes it, staff included.
+
+### 3.15 Staff oversight (added 2026-08-12)
+
+The console is the whole of the staff app, and staff see everything:
+
+- **Every account** — the USERS directory lists all users whatever their role or status,
+  searchable by name/email, filterable (riders / business / pending / suspended). From an
+  account's sheet staff can suspend (7 days, same mechanics as a report's uphold), lift a
+  suspension, and open a business account's public profile. Staff accounts themselves are
+  managed out-of-band — the console does not offer staff-on-staff suspension.
+- **Every session** — the SESSIONS view lists all bookings platform-wide, searchable by
+  either party, filterable by status, each opening a detail sheet (parties, hours, price,
+  payment state, check-in state, request message).
+- **Authorisation shape** — the users list rides the open profile-read rule; the bookings
+  list is provable only through the document-independent `isStaff()` arm of
+  `isParty() || isStaff()`, so the same unfiltered query from anyone else is refused
+  wholesale (pinned in `test_rules/booking_reads.test.mjs`).
+
 ---
 
 ## 4. Navigation map & user flows

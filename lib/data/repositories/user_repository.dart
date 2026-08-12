@@ -29,6 +29,20 @@ class UserRepository {
             for (final doc in qs.docs) AppUser.fromDoc(doc.id, doc.data()),
           ]);
 
+  /// The console's directory: every account, whatever its role or status.
+  ///
+  /// The unfiltered list is legal because `users` allows any signed-in read —
+  /// the rule is document-independent, so the query is provable. Sorted by
+  /// name client-side, same discipline as everything else in §6.2.
+  Stream<List<AppUser>> watchAllUsers() => _users.snapshots().map((qs) {
+        final list = [
+          for (final doc in qs.docs) AppUser.fromDoc(doc.id, doc.data()),
+        ];
+        list.sort(
+            (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+        return list;
+      });
+
   /// Rider onboarding — one page, `status: 'active'`, straight in (§3.2).
   Future<void> createRiderProfile({
     required String uid,

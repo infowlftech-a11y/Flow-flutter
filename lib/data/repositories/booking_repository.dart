@@ -110,6 +110,14 @@ class BookingRepository {
           .snapshots()
           .map((qs) => [for (final d in qs.docs) _fromDoc(d)]);
 
+  /// Every booking on the platform — the console's sessions view.
+  ///
+  /// Staff-only in practice and in the rules: the bookings read rule is
+  /// `isParty() || isStaff()`, and an unfiltered list is provable only
+  /// through the document-independent `isStaff()` arm, so the same query
+  /// from a rider is refused wholesale. Pinned in test_rules.
+  Stream<List<Booking>> watchAllBookings() => _col.snapshots().map(_sortDesc);
+
   List<Booking> _sortDesc(QuerySnapshot<Map<String, dynamic>> qs) {
     final list = [for (final d in qs.docs) _fromDoc(d)];
     list.sort((a, b) => b.date.compareTo(a.date));

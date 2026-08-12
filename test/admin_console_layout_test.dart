@@ -111,6 +111,10 @@ const _tabs = <String, String>{
   'APPEALS': 'I was outside the marked zone and happy to explain.',
   'SUSPENDED': 'Karim Adel',
   'FEEDBACK': 'Moving away from the coast — thanks for everything.',
+  // The directory and sessions views are proved open by their search hints —
+  // the only strings on those tabs that no seeded data could also produce.
+  'USERS': 'Search name or email…',
+  'SESSIONS': 'Search rider or trainer…',
 };
 
 void main() {
@@ -193,7 +197,9 @@ void main() {
   group('at 320px', () {
     // The narrowest supported phone at the largest text — where the
     // applicant card's two button rows and the pill wrap have least room.
-    for (final tab in ['APPROVALS', 'REPORTS', 'SUSPENDED']) {
+    // USERS joins the list because its cards stack two pills against a
+    // name+email column, which is the same shape that broke elsewhere.
+    for (final tab in ['APPROVALS', 'REPORTS', 'SUSPENDED', 'USERS']) {
       testWidgets('$tab — 320px @1.3x', (tester) async {
         await pumpScreen(tester, const AdminScreen(),
             db: await staffDb(),
