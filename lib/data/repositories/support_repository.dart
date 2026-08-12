@@ -121,11 +121,17 @@ class SupportRepository {
         return list;
       });
 
+  /// [sessionId]/[sessionRef] tie the ticket to one booking when the user
+  /// attached one — the raw id for anything that looks the booking up, the
+  /// rendered `FLW-…` ref so screens can print it without a read. Optional:
+  /// most tickets ("how do refunds work?") are about no session at all.
   Future<String> openTicket({
     required String userId,
     required String userName,
     required String subject,
     required String body,
+    String? sessionId,
+    String? sessionRef,
   }) async {
     final doc = _tickets.doc();
     await doc.set({
@@ -135,6 +141,8 @@ class SupportRepository {
       'status': 'open',
       'createdAt': FieldValue.serverTimestamp(),
       'lastMessageAt': FieldValue.serverTimestamp(),
+      'sessionId': ?sessionId,
+      'sessionRef': ?sessionRef,
     });
     await doc.collection(Col.messages).add({
       'text': body,
@@ -227,6 +235,8 @@ class SupportRepository {
 
   // ── Reports & leave reasons (§6.3) ─────────────────────────────────────
 
+  /// [sessionId]/[sessionRef] as on [openTicket]: the booking the complaint
+  /// is about, when the reporter picked one.
   Future<void> reportUser({
     required String reporterId,
     required String reporterName,
@@ -235,6 +245,8 @@ class SupportRepository {
     required String reason,
     String? details,
     List<String> attachments = const [],
+    String? sessionId,
+    String? sessionRef,
   }) {
     return _db.collection(Col.reports).add({
       'reporterId': reporterId,
@@ -246,6 +258,8 @@ class SupportRepository {
       'attachments': attachments,
       'status': 'pending',
       'createdAt': FieldValue.serverTimestamp(),
+      'sessionId': ?sessionId,
+      'sessionRef': ?sessionRef,
     });
   }
 

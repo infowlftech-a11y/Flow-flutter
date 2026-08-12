@@ -6,12 +6,14 @@ import '../../core/theme/app_theme.dart';
 import '../../core/theme/typography.dart';
 import '../../core/utils/date_x.dart';
 import '../../core/utils/haptics.dart';
+import '../../core/utils/refs.dart';
 import '../../core/widgets/buttons.dart';
 import '../../core/widgets/feedback.dart';
 import '../../core/widgets/misc.dart';
 import '../../core/widgets/sheets.dart';
 import '../../core/widgets/surfaces.dart';
 import '../../core/widgets/thread.dart';
+import '../../data/models/booking.dart';
 import '../../data/models/support.dart';
 import '../../providers/providers.dart';
 
@@ -82,7 +84,11 @@ class SupportScreen extends ConsumerWidget {
                                       .textTheme
                                       .titleMedium),
                               Text(
-                                '${t.isOpen ? 'Open' : 'Resolved'} · ${timeAgo(t.lastMessageAt)}',
+                                [
+                                  t.isOpen ? 'Open' : 'Resolved',
+                                  ?t.sessionRef,
+                                  timeAgo(t.lastMessageAt),
+                                ].join(' · '),
                                 style: inter(12.5, 520,
                                     color: tones.textFaint),
                               ),
@@ -102,12 +108,14 @@ class SupportScreen extends ConsumerWidget {
   }
 
   /// New ticket: subject* + body*; the sheet owns the send, so it stays open
-  /// until it succeeds (§9.7, §10.5).
+  /// until it succeeds (§9.7, §10.5). A recent session can be attached, which
+  /// stamps the ticket with the `FLW-…` reference staff can search.
   void _openNewTicketSheet(BuildContext context, WidgetRef ref) {
     final subject = TextEditingController();
     final body = TextEditingController();
     var busy = false;
     var attempted = false;
+    Booking? about;
 
     showFlowSheet<void>(
       context,
@@ -127,6 +135,10 @@ class SupportScreen extends ConsumerWidget {
                     userName: session.displayName,
                     subject: subject.text.trim(),
                     body: body.text.trim(),
+                    sessionId: about?.id,
+                    sessionRef: about == null
+                        ? null
+                        : sessionRef(about!.id, about!.date),
                   );
               Haptics.light();
               if (sheetContext.mounted) {
@@ -171,6 +183,53 @@ class SupportScreen extends ConsumerWidget {
                 ),
                 onChanged: (_) => setSheet(() {}),
               ),
+              // The session the ticket is about, offered rather than asked:
+              // most tickets concern no session, so nothing here is required.
+              Consumer(builder: (context, ref, _) {
+                final me = ref.watch(sessionProvider);
+                final recent = ref
+                        .watch(me.isTrainer
+                            ? trainerBookingsProvider
+                            : riderBookingsProvider)
+                        .value ??
+                    const <Booking>[];
+                if (recent.isEmpty) return const SizedBox.shrink();
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 16),
+                    Text('ABOUT A SESSION? — OPTIONAL',
+                        style: microLabel(context.tones.textFaint, size: 10)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final b in recent.take(6))
+                          FlowChoiceChip(
+                            label:
+                                '${prettyYmd(b.date)} · ${me.isTrainer ? b.studentName : b.instructorName}',
+                            selected: about?.id == b.id,
+                            onTap: busy
+                                ? () {}
+                                : () {
+                                    Haptics.select();
+                                    setSheet(() => about =
+                                        about?.id == b.id ? null : b);
+                                  },
+                          ),
+                      ],
+                    ),
+                    if (about != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        'Attaches ${sessionRef(about!.id, about!.date)} so support can look it up.',
+                        style: inter(12, 500, color: context.tones.textFaint),
+                      ),
+                    ],
+                  ],
+                );
+              }),
               const SizedBox(height: 18),
               PrimaryButton(
                   label: 'Open ticket', busy: busy, onPressed: submit),
@@ -253,6 +312,27 @@ class _TicketThreadScreenState extends ConsumerState<TicketThreadScreen> {
       ),
       body: Column(
         children: [
+          // The session this ticket is about, when one was attached — the
+          // same reference the session sheet and beach ticket print.
+          if (ticket?.sessionRef != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+              child: Row(
+                children: [
+                  Icon(Symbols.confirmation_number_rounded,
+                      size: 16, color: tones.textFaint),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'About session ${ticket!.sessionRef}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: inter(12.5, 600, color: tones.textFaint),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           Expanded(
             child: AsyncView<List<TicketMessage>>(
               value: messages,

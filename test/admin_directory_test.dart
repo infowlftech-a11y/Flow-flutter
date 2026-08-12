@@ -125,6 +125,17 @@ void main() {
       expect(filterBookings(bookings, null, 'anna').length, 3);
     });
 
+    test('search matches the session reference tickets and reports carry', () {
+      // sessionRef('b3', '2099-08-29') == 'FLW-0829-B3'. Staff paste the ref
+      // from a ticket into this search to pull the booking, so both the full
+      // form and its tail must land, case-insensitively.
+      expect(filterBookings(bookings, null, 'FLW-0829-B3').single.id, 'b3');
+      expect(filterBookings(bookings, null, 'flw-0829-b1').single.id, 'b1');
+      expect(filterBookings(bookings, null, '0829-b2').single.id, 'b2');
+      expect(filterBookings(bookings, null, 'flw-0829').length, 4,
+          reason: 'the date part alone matches every booking of that day');
+    });
+
     test('status and search compose', () {
       expect(filterBookings(bookings, BookingStatus.completed, 'anna'),
           isEmpty,

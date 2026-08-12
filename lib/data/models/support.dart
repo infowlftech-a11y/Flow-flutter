@@ -8,6 +8,8 @@ class SupportTicket {
     required this.subject,
     required this.isOpen,
     this.lastMessageAt,
+    this.sessionId,
+    this.sessionRef,
   });
 
   final String id;
@@ -16,6 +18,13 @@ class SupportTicket {
   final String subject;
   final bool isOpen;
   final DateTime? lastMessageAt;
+
+  /// The booking this ticket is about, when the user attached one. The raw
+  /// document id is the canonical key; [sessionRef] is its rendered
+  /// `FLW-…` name, denormalised at write time so no screen needs a booking
+  /// read to say which session the complaint concerns.
+  final String? sessionId;
+  final String? sessionRef;
 
   factory SupportTicket.fromDoc(String id, Map<String, dynamic> d) =>
       SupportTicket(
@@ -26,6 +35,8 @@ class SupportTicket {
         // Defaults to open when status is missing.
         isOpen: (d.str('status') ?? 'open') == 'open',
         lastMessageAt: d.date('lastMessageAt'),
+        sessionId: d.str('sessionId'),
+        sessionRef: d.str('sessionRef'),
       );
 }
 

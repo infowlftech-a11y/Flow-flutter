@@ -17,6 +17,8 @@ class Report {
     required this.status,
     this.createdAt,
     this.resolutionNote,
+    this.sessionId,
+    this.sessionRef,
   });
 
   final String id;
@@ -27,6 +29,12 @@ class Report {
   final String reason;
   final String? details;
   final List<String> attachments;
+
+  /// The booking the complaint is about, when the reporter attached one —
+  /// raw id as the canonical key, plus its rendered `FLW-…` name so the
+  /// console can print it without a booking read.
+  final String? sessionId;
+  final String? sessionRef;
 
   /// `pending` · `resolved` · `dismissed`.
   final String status;
@@ -45,6 +53,8 @@ class Report {
         status: d.str('status') ?? 'pending',
         createdAt: d.date('createdAt'),
         resolutionNote: d.str('resolutionNote'),
+        sessionId: d.str('sessionId'),
+        sessionRef: d.str('sessionRef'),
       );
 
   bool get isOpen => status == 'pending';

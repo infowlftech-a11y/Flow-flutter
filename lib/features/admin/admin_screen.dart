@@ -483,7 +483,13 @@ class _ReportCard extends ConsumerWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            '${report.reporterName} → ${report.reportedUserName} · ${timeAgo(report.createdAt)}',
+            [
+              '${report.reporterName} → ${report.reportedUserName}',
+              // The session the complaint is about — searchable in the
+              // Sessions tab.
+              ?report.sessionRef,
+              timeAgo(report.createdAt),
+            ].join(' · '),
             style: inter(12.5, 500, color: tones.textFaint),
           ),
           if ((report.details ?? '').isNotEmpty) ...[

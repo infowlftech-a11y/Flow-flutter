@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/typography.dart';
 import '../../core/utils/date_x.dart';
+import '../../core/utils/refs.dart';
 import '../../core/widgets/buttons.dart';
 import '../../core/widgets/feedback.dart';
 import '../../core/widgets/flow_image.dart';
@@ -73,7 +74,10 @@ List<Booking> filterBookings(
       if ((status == null || b.status == status) &&
           (q.isEmpty ||
               b.studentName.toLowerCase().contains(q) ||
-              b.instructorName.toLowerCase().contains(q)))
+              b.instructorName.toLowerCase().contains(q) ||
+              // The `FLW-…` reference tickets and reports carry — pasting
+              // one here is how staff get from a complaint to its booking.
+              sessionRef(b.id, b.date).toLowerCase().contains(q)))
         b,
   ];
 }
@@ -531,6 +535,7 @@ void _openSessionSheet(BuildContext context, Booking b) {
     builder: (sheetContext) {
       final tones = sheetContext.tones;
       final facts = <(String, String)>[
+        ('Session ID', sessionRef(b.id, b.date)),
         ('Rider', b.studentName),
         ('Trainer', b.instructorName),
         ('Hours', '${b.durationHours ?? '—'}'),

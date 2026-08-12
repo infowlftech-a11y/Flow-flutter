@@ -11,6 +11,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/theme/typography.dart';
 import '../../core/utils/date_x.dart';
 import '../../core/utils/haptics.dart';
+import '../../core/utils/refs.dart';
 import '../../core/widgets/buttons.dart';
 import '../../core/widgets/feedback.dart';
 import '../../core/widgets/misc.dart';
@@ -658,6 +659,9 @@ class _SessionSheet extends ConsumerWidget {
           FlowCard(
             child: Column(
               children: [
+                // The name to quote at support — the same reference the
+                // beach ticket prints, and the one staff can search.
+                _DetailRow(label: 'SESSION ID', value: sessionRef(b.id, b.date)),
                 _DetailRow(label: 'WHEN', value: longYmd(b.date)),
                 _DetailRow(label: 'TIME', value: b.timeRange),
                 _DetailRow(label: 'TOTAL', value: money(b.totalPrice)),
@@ -857,6 +861,14 @@ class _QrTicketDialogState extends ConsumerState<_QrTicketDialog> {
                           '${prettyYmd(widget.booking.date)} · ${widget.booking.timeRange}',
                           style: interNum(14, 640,
                               color: context.scheme.onSurfaceVariant),
+                        ),
+                        const SizedBox(height: 3),
+                        // The spoken fallback when the camera won't play —
+                        // the same reference the full ticket screen prints.
+                        Text(
+                          sessionRef(widget.booking.id, widget.booking.date),
+                          style: interNum(12, 560,
+                              color: context.tones.textFaint, spacing: .5),
                         ),
                       ],
                     ),

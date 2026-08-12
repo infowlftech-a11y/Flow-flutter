@@ -390,6 +390,17 @@ this field" are different intents and cannot share a representation.
   a write-only collection carrying the author's name and email (the profile is deleted
   moments later, so the document must carry who it was). Staff read it in the console's
   FEEDBACK tab; nobody edits or deletes it, staff included.
+- **Session references (added 2026-08-12)** — every booking has a public name derived from
+  its document id and date, `FLW-<MMDD>-<last four of the id>` (`core/utils/refs.dart`,
+  pinned by `test/session_ref_test.dart`). Derived, never stored on the booking, so all
+  history has one. It is printed on the beach ticket, the QR dialog and the session sheets.
+  A ticket or report may attach one session; the document then stores **both** `sessionId`
+  (the raw booking id — canonical) and `sessionRef` (the rendered name — display without a
+  read, the same denormalisation reports apply to names). Attaching is always optional and
+  offered only from the user's own bookings (for reports, only bookings with the reported
+  trainer). The console prints the ref on ticket and report cards, and the SESSIONS search
+  matches it, which is the route from a complaint to its booking. No rules change: ticket
+  and report creates validate ownership, not a key whitelist.
 
 ### 3.15 Staff oversight (added 2026-08-12)
 

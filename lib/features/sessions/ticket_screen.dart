@@ -5,6 +5,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/utils/date_x.dart';
+import '../../core/utils/refs.dart';
 import '../../core/widgets/feedback.dart';
 import '../../core/widgets/ticket.dart';
 import '../../data/models/booking.dart';
@@ -78,7 +79,7 @@ class TicketScreen extends ConsumerWidget {
                             child: Center(
                               child: TicketCard(
                                 payload: payloadFor(b),
-                                ticketId: _reference(b),
+                                ticketId: sessionRef(b.id, b.date),
                                 rows: [
                                   ('SESSION',
                                       dayAndTime(b, prettyYmd(b.date))),
@@ -104,12 +105,4 @@ class TicketScreen extends ConsumerWidget {
     );
   }
 
-  /// A short human-readable reference, derived rather than stored — it exists
-  /// so a rider and a trainer can say the same thing out loud when a camera
-  /// will not cooperate, not as an identifier anything looks up.
-  static String _reference(Booking b) {
-    final id = b.id.replaceAll(RegExp('[^A-Za-z0-9]'), '').toUpperCase();
-    final tail = id.length <= 4 ? id : id.substring(id.length - 4);
-    return 'FLW-${b.date.replaceAll('-', '').substring(4)}-$tail';
-  }
 }

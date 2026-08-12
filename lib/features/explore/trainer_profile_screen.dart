@@ -11,6 +11,7 @@ import '../../core/theme/radii.dart';
 import '../../core/theme/typography.dart';
 import '../../core/utils/date_x.dart';
 import '../../core/utils/haptics.dart';
+import '../../core/utils/refs.dart';
 import '../../core/widgets/buttons.dart';
 import '../../core/widgets/feedback.dart';
 import '../../core/widgets/flow_image.dart';
@@ -326,11 +327,14 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
           maxScale: 4);
 
   /// Reason (fixed list) + free-text details + optional screenshots (§3.4).
+  /// A session with this trainer can be attached, stamping the report with
+  /// the `FLW-…` reference the console can search.
   void _openReportSheet(BuildContext context, AppUser trainer) {
     String? reason;
     final details = TextEditingController();
     final shots = <XFile>[];
     var busy = false;
+    Booking? about;
 
     showFlowSheet<void>(
       context,
@@ -364,6 +368,44 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
               decoration:
                   const InputDecoration(hintText: 'What happened? (optional)'),
             ),
+            // The complaint's session, when it is about one — only sessions
+            // with this trainer are offered, and none is required.
+            Consumer(builder: (context, ref, _) {
+              final mine =
+                  ref.watch(riderBookingsProvider).value ?? const <Booking>[];
+              final withThem = [
+                for (final b in mine)
+                  if (b.instructorId == trainer.uid) b
+              ];
+              if (withThem.isEmpty) return const SizedBox.shrink();
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 14),
+                  Text('ABOUT A SESSION? — OPTIONAL',
+                      style: microLabel(context.tones.textFaint, size: 10)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final b in withThem.take(6))
+                        FlowChoiceChip(
+                          label: '${prettyYmd(b.date)} · ${b.timeRange}',
+                          selected: about?.id == b.id,
+                          onTap: busy
+                              ? () {}
+                              : () {
+                                  Haptics.select();
+                                  setSheet(() =>
+                                      about = about?.id == b.id ? null : b);
+                                },
+                        ),
+                    ],
+                  ),
+                ],
+              );
+            }),
             const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: busy
@@ -405,6 +447,10 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
                               reason: reason!,
                               details: details.text,
                               attachments: urls,
+                              sessionId: about?.id,
+                              sessionRef: about == null
+                                  ? null
+                                  : sessionRef(about!.id, about!.date),
                             );
                         if (sheetContext.mounted) {
                           Navigator.pop(sheetContext);

@@ -121,6 +121,57 @@ void main() {
     });
   });
 
+  group('a ticket about one session carries its reference', () {
+    test('the attached session is stored and read back', () async {
+      final id = await support.openTicket(
+        userId: 'rider1', userName: 'Rider One',
+        subject: 'Trainer never showed up',
+        body: 'Waited forty minutes on the beach.',
+        sessionId: 'xK9fQ2abcd7x8k',
+        sessionRef: 'FLW-0513-7X8K',
+      );
+
+      final ticket = await support.watchTicket(id).first;
+      expect(ticket!.sessionId, 'xK9fQ2abcd7x8k',
+          reason: 'the raw id is the canonical key for looking the booking up');
+      expect(ticket.sessionRef, 'FLW-0513-7X8K',
+          reason: 'the rendered ref is what screens print without a read');
+    });
+
+    test('a ticket about nothing in particular stores no session fields',
+        () async {
+      final id = await support.openTicket(
+        userId: 'rider1', userName: 'Rider One',
+        subject: 'How do refunds work?', body: 'Just asking.',
+      );
+
+      final raw = await db.collection(Col.tickets).doc(id).get();
+      expect(raw.data()!.containsKey('sessionId'), isFalse,
+          reason: 'absent means absent — not null, not an empty string');
+      expect(raw.data()!.containsKey('sessionRef'), isFalse);
+
+      final ticket = await support.watchTicket(id).first;
+      expect(ticket!.sessionId, isNull);
+      expect(ticket.sessionRef, isNull);
+    });
+
+    test('a report carries the same pair when one was attached', () async {
+      await support.reportUser(
+        reporterId: 'rider1',
+        reporterName: 'Rider One',
+        reportedUserId: 'trainer1',
+        reportedUserName: 'Anna Bergström',
+        reason: 'No-show',
+        sessionId: 'b3',
+        sessionRef: 'FLW-0829-B3',
+      );
+
+      final raw = await db.collection(Col.reports).get();
+      expect(raw.docs.single.data()['sessionId'], 'b3');
+      expect(raw.docs.single.data()['sessionRef'], 'FLW-0829-B3');
+    });
+  });
+
   group('the queues the console reads', () {
     test('a ticket appears in its owner list and the staff list', () async {
       await support.openTicket(

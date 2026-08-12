@@ -95,9 +95,15 @@ class _TicketCard extends ConsumerWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            ticket.lastMessageAt == null
-                ? '${ticket.userName} · no replies yet'
-                : '${ticket.userName} · ${timeAgo(ticket.lastMessageAt!)}',
+            [
+              ticket.userName,
+              // The session the ticket is about — paste it into the
+              // Sessions tab's search to pull the booking.
+              ?ticket.sessionRef,
+              ticket.lastMessageAt == null
+                  ? 'no replies yet'
+                  : timeAgo(ticket.lastMessageAt!),
+            ].join(' · '),
             style: inter(12.5, 480, color: tones.textFaint),
           ),
         ],
@@ -112,7 +118,11 @@ class _TicketCard extends ConsumerWidget {
     showFlowSheet<void>(
       context,
       title: ticket.subject,
-      subtitle: '${ticket.userName} · ${ticket.isOpen ? 'open' : 'closed'}',
+      subtitle: [
+        ticket.userName,
+        ?ticket.sessionRef,
+        ticket.isOpen ? 'open' : 'closed',
+      ].join(' · '),
       // No viewInsets here: showFlowSheet already pads the sheet by the
       // keyboard inset. Adding it again doubled the padding — with the
       // keyboard up that was ~600px of blank sheet, the content squeezed to
