@@ -105,15 +105,25 @@ class AdminScreen extends ConsumerWidget {
           bottom: TabBar(
             isScrollable: true,
             tabAlignment: TabAlignment.start,
+            // Styled here, not in the theme: the inherited tab label is
+            // display-sized shouting caps, and at eight tabs it fit barely
+            // two of them on a 360dp phone — the row read as three giant
+            // words, not as navigation. Sentence case at label size shows
+            // four to five tabs, and the label-width indicator plus even
+            // padding keeps the row visually justified while it scrolls.
+            labelStyle: inter(13.5, 680, spacing: .2),
+            unselectedLabelStyle: inter(13.5, 520, spacing: .2),
+            labelPadding: const EdgeInsets.symmetric(horizontal: 14),
+            indicatorSize: TabBarIndicatorSize.label,
             tabs: [
-              Tab(text: label('APPROVALS', pending.length)),
-              Tab(text: label('TICKETS', openTickets)),
-              Tab(text: label('REPORTS', openReports)),
-              Tab(text: label('APPEALS', openAppeals)),
-              Tab(text: label('SUSPENDED', blocked.length)),
-              const Tab(text: 'FEEDBACK'),
-              const Tab(text: 'USERS'),
-              const Tab(text: 'SESSIONS'),
+              Tab(text: label('Approvals', pending.length)),
+              Tab(text: label('Tickets', openTickets)),
+              Tab(text: label('Reports', openReports)),
+              Tab(text: label('Appeals', openAppeals)),
+              Tab(text: label('Suspended', blocked.length)),
+              const Tab(text: 'Feedback'),
+              const Tab(text: 'Users'),
+              const Tab(text: 'Sessions'),
             ],
           ),
         ),

@@ -105,16 +105,16 @@ Future<FakeFirebaseFirestore> staffDb() async {
 /// while testing the same tab six times — which is the exact way the case in
 /// screen_overlap_test.dart has been passing.
 const _tabs = <String, String>{
-  'APPROVALS': 'Mostafa El-Sharkawy',
-  'TICKETS': 'Refund for a cancelled session',
-  'REPORTS': 'Unsafe behaviour on the water',
-  'APPEALS': 'I was outside the marked zone and happy to explain.',
-  'SUSPENDED': 'Karim Adel',
-  'FEEDBACK': 'Moving away from the coast — thanks for everything.',
+  'Approvals': 'Mostafa El-Sharkawy',
+  'Tickets': 'Refund for a cancelled session',
+  'Reports': 'Unsafe behaviour on the water',
+  'Appeals': 'I was outside the marked zone and happy to explain.',
+  'Suspended': 'Karim Adel',
+  'Feedback': 'Moving away from the coast — thanks for everything.',
   // The directory and sessions views are proved open by their search hints —
   // the only strings on those tabs that no seeded data could also produce.
-  'USERS': 'Search name or email…',
-  'SESSIONS': 'Search rider or trainer…',
+  'Users': 'Search name or email…',
+  'Sessions': 'Search rider or trainer…',
 };
 
 void main() {
@@ -164,7 +164,7 @@ void main() {
         (tester) async {
       await pumpScreen(tester, const AdminScreen(),
           db: await staffDb(), as: staff);
-      await _openTab(tester, 'TICKETS', marker: _tabs['TICKETS']!);
+      await _openTab(tester, 'Tickets', marker: _tabs['Tickets']!);
 
       await tester.tap(
           find.textContaining('Refund for a cancelled session').first);
@@ -199,7 +199,7 @@ void main() {
     // applicant card's two button rows and the pill wrap have least room.
     // USERS joins the list because its cards stack two pills against a
     // name+email column, which is the same shape that broke elsewhere.
-    for (final tab in ['APPROVALS', 'REPORTS', 'SUSPENDED', 'USERS']) {
+    for (final tab in ['Approvals', 'Reports', 'Suspended', 'Users']) {
       testWidgets('$tab — 320px @1.3x', (tester) async {
         await pumpScreen(tester, const AdminScreen(),
             db: await staffDb(),
