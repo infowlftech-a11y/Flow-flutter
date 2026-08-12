@@ -100,72 +100,82 @@ rules change.
 
 ## BUG-003 — A trainer can reassign a booking to a different trainer
 
-**Severity:** major (unverified — awaiting a decision on intent)
+**Severity:** major
 **Found:** rules suite, while scoping BUG-001
-**File:** [firestore.rules:120-123](firestore.rules#L120-L123)
-**Status:** not fixed — needs a decision, see COVERAGE.md
+**File:** [firestore.rules](firestore.rules) — `providerFieldsOnly()`
+**Status:** FIXED — deploy pending
 
-`isProvider()` is checked first and carries no field restriction at all, so
-the trainer on a booking may write `instructorId` and hand the session to
-someone else, who then has a booking on their calendar they never accepted.
+`isProvider()` was checked first and carried no field restriction at all, so
+the trainer on a booking could write `instructorId` and hand the session to
+someone else, who then had a booking on their calendar they never accepted.
 
-Not fixed with BUG-001 because, unlike the rider case, I cannot tell from
-the blueprint whether this is intended (a station reassigning between its
-instructors is a plausible real feature). §6.3 lists no write that changes
-`instructorId`, which suggests it is not intended — but absence from a
-write list is not the same as a stated prohibition.
-
-**Question for you:** should a trainer be able to move a booking to another
-trainer? If no, the same `hasOnly` treatment applies to the provider branch.
+Fixed under the blanket fix-everything instruction, resolving the open
+question the same way §6.3 implies: no repository write ever changes
+`instructorId`, `date`, `kiterId`, the selected hours or the price after
+creation, so `providerFieldsOnly()` closes the trainer's writable set to
+what the repository actually writes — status transitions, check-in fields,
+settlement fields, `hiddenByInstructor`, `updatedAt`. Five denial tests in
+`bookings — update, the trainer` pin it. If station-internal reassignment
+ever becomes a feature, it needs its own rule, written on purpose.
 
 ---
 
 ## BUG-004 — Review eligibility is unenforceable outside the app
 
-**Severity:** major (by design, but worth a decision)
+**Severity:** major
 **Found:** rules suite, `test_rules/reviews.test.mjs`
-**File:** [firestore.rules:151-161](firestore.rules#L151-L161)
-**Status:** not fixed — needs a decision
+**File:** [firestore.rules](firestore.rules) — `reviewedBooking()`
+**Status:** MOSTLY FIXED — deploy pending; one residue stands
 
-The rules pin authorship and the 1-5 range. Everything §8.9 specifies —
-a **completed**, **unreviewed** booking with **that** trainer — lives in
-`ReviewRepository`, which a direct Firestore client simply does not run.
-Four writes the rules accept today:
+The rules pinned authorship and the 1-5 range; everything §8.9 specifies
+lived in `ReviewRepository`, which a direct Firestore client does not run.
+Of the four writes the rules accepted:
 
-- a review whose `bookingId` refers to no booking at all
-- two reviews for the same `bookingId` (the repository's no-op guard is
-  client-side only)
-- a trainer reviewing themselves
-- a blocked user writing a review
+- ~~a review whose `bookingId` refers to no booking at all~~ — **denied**
+- ~~a trainer reviewing themselves~~ — **denied** (`kiterId == uid()`)
+- ~~a blocked user writing a review~~ — **denied** since BUG-007
+- **two reviews for the same `bookingId` — still possible.** Enforcing it
+  needs a deterministic review id (review id == booking id), a document-
+  shape change, which per the standing constraint is not made unilaterally.
+  The repository's re-check guard holds that line; the rules test pins the
+  gap open so it stays visible.
 
-The rules comment states the split deliberately, so this is documented
-behaviour rather than an oversight. It is listed because BUG-001 made it
-reachable: a rider could self-complete a booking and then review it. With
-BUG-001 fixed the escalation path is closed, but direct fabrication is not.
-
-Closing it properly needs a rule that reads the booking
-(`get(/bookings/$(bookingId)).data.status == 'completed'` and
-`.kiterId == uid()`), which costs one extra document read per review write.
-Not applied unilaterally: it changes the enforcement model.
+The create rule now `get()`s the named booking — one billed read per review
+write — and requires: `status == 'completed'`, `kiterId == uid()`, and
+`instructorId == trainerId`. Six denial tests in
+`reviews — eligibility is enforced at the API` pin it.
 
 ---
 
 ## BUG-005 — Any signed-in user can send any user a notification
 
-**Severity:** major (by design; spoofing and spam surface)
+**Severity:** major (spoofing and spam surface)
 **Found:** rules suite, `test_rules/misc.test.mjs`
-**File:** [firestore.rules:196-200](firestore.rules#L196-L200)
-**Status:** not fixed — needs a decision
+**File:** [firestore.rules](firestore.rules) — notifications `allow create`
+**Status:** FIXED — deploy pending
 
-`allow create: if signedIn()` with no constraint on `targetUserId`, title,
-body or `type`. The comment explains why it is open — the app notifies the
-*other* party, so the writer is never the recipient — but the consequence
-is that any account can write a convincing "Booking cancelled" or "Booking
-approved ✅" notification to any user, and it will render identically to a
-genuine one and route into their sessions list (§11.2).
+`allow create: if signedIn()` had no constraint on `targetUserId`, title,
+body or `type`, so any account could write a convincing "Booking cancelled"
+into any stranger's inbox and it rendered identically to a genuine one.
 
-A tighter rule cannot simply require `targetUserId != uid()`; it would need
-to tie the notification to a booking or chat the sender is party to.
+Fixed exactly the way the entry predicted it had to be: the create is tied
+to a relationship the sender can prove. Permitted shapes —
+
+- **staff**, unconditionally (approval, rejection, restoration notices);
+- **a booking-scoped notification** whose `bookingId` names a booking both
+  the sender and the recipient are parties to (one billed `get()`);
+- **a `message` notification** where a chat thread between sender and
+  target exists — the thread id is the sorted uid pair, so it is
+  addressable without a query;
+- and never to yourself (`targetUserId != uid()`).
+
+Deliberately **not** `notBlocked()`: a blocked rider may still cancel
+(BUG-007's carve-out), so the cancel's warning to the trainer must still
+land — asserted by `a blocked rider cancelling still warns the trainer`.
+The relationship constraint is what keeps a blocked account from reaching
+anyone *new*. A trainer can still send a false "cancelled" to their own
+rider about their own booking; that is a dispute between counterparties,
+not spoofing across strangers, and no rule can adjudicate it.
 
 ---
 
@@ -173,18 +183,26 @@ to tie the notification to a booking or chat the sender is party to.
 
 **Severity:** major
 **Found:** rules suite, `test_rules/misc.test.mjs`
-**File:** [firestore.rules:261-268](firestore.rules#L261-L268)
-**Status:** not fixed — needs a decision
+**File:** [firestore.rules](firestore.rules) — safari_trips `allow update`
+**Status:** FIXED — deploy pending; one residue stands
 
-`allow update: if signedIn()` is justified in the comment for one field:
-`bookedSeats`, incremented by the reserving rider inside the transaction.
-It authorises every other field too, so any signed-in user can set a trip's
-`price` to 0, its `capacity` to 999, or its `status` to `full` — closing a
-competitor's trip.
+`allow update: if signedIn()` was justified in the comment for one field —
+`bookedSeats`, moved by the reserving rider's transaction — but authorised
+every field, so any signed-in user could set a trip's `price` to 0 or its
+`capacity` to 999.
 
-The same `hasOnly` treatment as BUG-001 fits: a non-host may change only
-`bookedSeats` and `status`. Not applied unilaterally because the safari
-flow is outside the six flows in scope and I have not traced its writes.
+Fixed with the `hasOnly` treatment, after tracing the two writes that
+actually move a trip from outside: `reserveSafariSeat` (seats +1, status
+open/full) and `cancelByRider`'s release (seats −1 floored at 0, status
+open). A non-host write may now touch only `bookedSeats` and `status`, one
+seat at a time, `>= 0`, `<= capacity` when capped, status in open/full.
+Eight tests pin both directions.
+
+**Residue:** one seat per write is the shape of every legitimate call, but
+a signed-in stranger can still *walk* a manifest up seat by seat and mark
+it full. Fully preventing that needs the seat increment tied to a booking
+created in the same transaction, which needs deterministic booking ids — a
+shape change, not made unilaterally. Noted in the rules comment.
 
 ---
 
@@ -278,7 +296,7 @@ time, so `affectedKeys()` stays empty and the guard does not affect it.
 
 **Severity:** minor (documentation drift)
 **File:** [APP_LOGIC_BLUEPRINT.md](APP_LOGIC_BLUEPRINT.md) §6.2, §6.3, §8.10
-**Status:** not fixed — blueprint edit, needs your say-so
+**Status:** FIXED — blueprint corrected in `f46996e`
 
 The blueprint says reviews carry `listingId` and that ratings are grouped by
 it. The code writes and queries **`trainerId`**, and
@@ -294,8 +312,9 @@ silently corrected because the blueprint is the specification of record.
 ## BUG-010 — Blueprint §11.1/§6.3 say notifications dual-write `userId`
 
 **Severity:** minor (documentation drift)
-**File:** [APP_LOGIC_BLUEPRINT.md](APP_LOGIC_BLUEPRINT.md) §6.3, §11.1
-**Status:** not fixed — blueprint edit, needs your say-so
+**File:** [APP_LOGIC_BLUEPRINT.md](APP_LOGIC_BLUEPRINT.md) §6.3, §11.1, §15
+**Status:** FIXED — §6.3 in `f46996e`; §11.1's prose and two §15 checklist
+rows still asserted the dual writes and were corrected in this pass
 
 Both sections state notifications are written with **both** `targetUserId`
 and `userId`. `NotificationRepository.notify` writes only `targetUserId`,
@@ -313,18 +332,17 @@ Same as BUG-009 — code is right, blueprint is stale.
 **Severity:** minor
 **Found:** `test/flow_approval_test.dart`
 **Files:** [admin_repository.dart](lib/data/repositories/admin_repository.dart),
-[social.dart:157-167](lib/data/models/social.dart#L157-L167)
-**Status:** not fixed — reported only
+[social.dart](lib/data/models/social.dart)
+**Status:** FIXED
 
-`AdminRepository` writes `type: 'account_approved'` and
-`type: 'account_rejected'`. `NotificationKind.parse` has a case for neither,
-so both fall through to `_ => system` and route to a plain text sheet
-(§11.2) rather than anywhere useful. §11.1's table does not list them
-either, so all three places were written independently.
-
-Harmless as it stands — a text sheet is a reasonable destination for "your
-application was reviewed" — but it is unintended rather than chosen, and
-the approval notification arguably belongs on the trainer's own profile.
+`AdminRepository` writes `account_approved`, `account_rejected` and
+`account_restored`; `NotificationKind.parse` had a case for none of them,
+so all fell through to `_ => system`. The three now resolve to their own
+`NotificationKind.account`: a distinct icon on the tile, and the full-text
+sheet as a *chosen* destination — a rejection carries its reason in full,
+and the account state the message announces is already wherever the gate
+routed the user. §11.1's table and note were updated to match, so the
+three places are no longer written independently.
 
 ---
 
@@ -333,7 +351,7 @@ the approval notification arguably belongs on the trainer's own profile.
 **Severity:** major (latent — not reachable from today's UI)
 **Found:** `test/flow_approval_test.dart`, adversarial pass
 **File:** [admin_repository.dart](lib/data/repositories/admin_repository.dart)
-**Status:** not fixed — needs a decision
+**Status:** FIXED
 
 `approveTrainer` and `restoreToPending` write `status` without touching
 `blockedUntil` or `statusBeforeBlock`. Two consequences, both pinned by
@@ -353,11 +371,25 @@ so a blocked account never appears in it, and `watchBlockedUsers()` has no
 UI at all — so `unblockUser` currently has no caller either. This becomes
 live the moment the blocked-users list is built.
 
-The fix is to clear `blockedUntil` and `statusBeforeBlock` in
-`approveTrainer`, `rejectTrainer` and `restoreToPending` — a change to a
-frozen repository, so it needs your approval, and I would want the
-blocked-users UI decided first since that is what determines the intended
-semantics.
+### Fix (applied)
+
+Two guards, because clearing the markers alone was not enough — with
+`statusBeforeBlock` gone, a later `unblockUser` would have fallen back to
+demoting any business account to `pending` anyway:
+
+1. `approveTrainer`, `rejectTrainer` and `restoreToPending` clear
+   `blockedUntil` and `statusBeforeBlock`: a review decision is an explicit
+   statement of what the account now *is*, so it supersedes a suspension
+   rather than cohabiting with its leftovers.
+2. `unblockUser` refuses an account that is not currently blocked — the
+   same stale-copy reading `_writeIfLive` and `markPaid` take: the
+   blocked-users list is a live stream, and a row tapped after a colleague
+   already acted is a retry, not a demotion. The no-op also skips the
+   "account restored" notification.
+
+Semantics chosen under the fix-everything instruction, ahead of the
+blocked-users UI: whatever that screen becomes, an unblock that demotes an
+approved trainer could never be the intended behaviour.
 
 ---
 
@@ -421,8 +453,8 @@ say-so — and BUG-014 deserves it soon, because it is live and it is money.
 
 **Severity:** minor (latent — unreachable from the UI)
 **Found:** `test/flow_collision_test.dart`
-**File:** [booking_repository.dart:140-160](lib/data/repositories/booking_repository.dart#L140-L160)
-**Status:** not fixed — reported only
+**File:** [booking_repository.dart](lib/data/repositories/booking_repository.dart)
+**Status:** FIXED
 
 Booking `['10:00', '15:00']` succeeds. Duration is the *count* of selected
 hours, so the window is cut as start + 2h: the booking claims 10:00 and
@@ -435,9 +467,12 @@ selection cannot be produced by the app. `createBooking` itself does not
 re-check it, which makes the invariant a property of one widget rather than
 of the write.
 
-Left alone because the guard belongs next to the rule it enforces, and
-deciding where that is — the repository, or `BookingMath` beside
-`leadingRun` — is a design call rather than a fix.
+Originally left alone as a design call. The BUG-017 fix settled it:
+`createBooking` now writes an occupied availability doc that is one
+`[start, end)` range and *cannot represent a gap*, so the write must hold
+the contiguity invariant itself. `createBooking` refuses non-consecutive
+hours with an `ArgumentError`; the pinned-behaviour test flipped to assert
+the refusal writes nothing.
 
 ---
 
@@ -494,20 +529,24 @@ needs the same treatment.
 
 **Severity:** minor
 **Found:** `test/flow_moderation_test.dart`, adversarial pass
-**Files:** [support_repository.dart:109-124](lib/data/repositories/support_repository.dart#L109-L124),
+**Files:** [support_repository.dart](lib/data/repositories/support_repository.dart),
 §6.2 (`My appeal` — `userId == uid`, limit 1)
-**Status:** not fixed — reported only
+**Status:** FIXED
 
-`submitAppeal` always `add`s a new document, with no check for an existing
-one. `watchMyAppeal` reads `where('userId', ==, uid).limit(1)`.
+`submitAppeal` always `add`ed a new document; the user's screen showed one
+appeal while the admin queue showed both, so staff could answer the one the
+user was not looking at and the thread appeared dead from both ends.
+(`watchMyAppeal`'s half — an unordered `limit(1)` returning an arbitrary
+document — had already been fixed to surface the most recent.)
 
-So a user who submits twice creates two appeals; their own screen shows
-whichever the limit-1 query returns, while the admin queue shows both. If
-staff answer the one the user is not looking at, the reply is invisible to
-them and the thread appears dead from both ends.
-
-Whether the fix is "refuse a second appeal while one is pending" or "show
-them all" is a product decision.
+Of the two candidate fixes, "refuse a second appeal while one is pending"
+matches the screen that exists: it renders exactly one thread. The guard is
+per open case, not per lifetime — a user suspended a second time appeals a
+second time once the first is decided; both directions are pinned. The
+refusal is its own type, `DuplicateAppealFailure`, because the generic
+"try again" toast would invite exactly the retry the guard refuses; the
+blocked screen closes the sheet instead, revealing the open thread behind
+it.
 
 ---
 
@@ -516,7 +555,7 @@ them all" is a product decision.
 **Severity:** critical (total blocker on live Firestore)
 **Found:** reported from the device; reproduced in `test_rules/booking_reads.test.mjs`
 **File:** [firestore.rules](firestore.rules) — `match /bookings`, `allow read`
-**Status:** REPRODUCED, not fixed — the fix is a design decision, see below
+**Status:** FIXED — option B built; deploy + backfill pending
 
 ### What
 
@@ -579,3 +618,50 @@ other rider's name, message and price, and rules cannot project fields.
   backfill.
 - **C — a Cloud Function** maintaining a public busy-slots document. Blocked:
   Functions are disabled on this project.
+
+### Fix (applied) — option B, after A ran as the marked stopgap
+
+A live booking now maintains `availability/{bookingId}` with
+`status: 'occupied'`: written in `createBooking`/`createWalkIn`'s batch,
+deleted inside `_writeIfLive`'s transaction on any terminal transition, and
+carrying the hours and nothing else — no name, no message, no price
+(`booking_reads.test.mjs` pins the doc's key set). The grid's occupied docs
+land in `booked` so they read "Booked" and are not releasable from the
+schedule tab; `_assertSlotsFree` reads both calendars and lets a readable
+booking supersede its own occupied doc; `dayAvailabilityProvider` treats
+the bookings stream's permission-denied as "no bookings visible". The
+rules authorise the rider's occupied-doc writes through `getAfter` on the
+sibling booking in the same atomic commit, and the temporary
+`allow read: if signedIn()` is reverted to `isParty() || isStaff()` — the
+four TEMPORARY tests flipped back to the denials they were the checklist
+for.
+
+**Backfill:** bookings created while the stopgap was live have no occupied
+docs; until each is backfilled (staff may create occupied docs directly —
+tested) or reaches a terminal status, its hours are invisible to *other
+riders'* grids only. The trainer's own calendar still shows them, and the
+clash check for the trainer still sees them, so the §8.6 recovery (decline
+one) covers the gap.
+
+---
+
+## BUG-018 — A user can pre-load the status a future unblock will restore
+
+**Severity:** major (privilege escalation, two-step)
+**Found:** this pass, while fixing BUG-012 — reading what `unblockUser`
+restores made it obvious the restored value was user-writable
+**File:** [firestore.rules](firestore.rules) — `privilegedFieldsUnchanged()`
+**Status:** FIXED — deploy pending
+
+`privilegedFieldsUnchanged()` named `role`, `status`, `blockedUntil`,
+`blockedAt`, `reviewedAt` and `reviewNote` — but not `statusBeforeBlock`,
+which `unblockUser` restores **verbatim**. A pending trainer could write
+`statusBeforeBlock: 'active'` on their own profile (an ordinary self-update
+the rules accepted), and any later block-then-unblock cycle would hand them
+`active` without ever passing review.
+
+Convoluted — it needs staff to block and unblock them — but it is exactly
+the laundering path BUG-012's `restoreToPending` semantics exist to
+prevent, reachable by any user, silently. `statusBeforeBlock` is now on the
+privileged list; the denial test sits in the `privilegedFieldsUnchanged`
+loop in `users.test.mjs`.

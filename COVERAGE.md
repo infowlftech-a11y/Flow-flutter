@@ -7,14 +7,19 @@ Every numbered section of §6.2, §6.3, §8, §9, §10 and §11 gets a row.
 
 | Suite | Runs against | Count |
 |---|---|---|
-| `test/` (`flutter test`) | `fake_cloud_firestore` — **rules are not evaluated** | 636 |
-| `test_rules/` (`npm test`) | Firestore emulator — the real `firestore.rules` | 268 |
+| `test/` (`flutter test`) | `fake_cloud_firestore` — **rules are not evaluated** | 659 |
+| `test_rules/` (`npm test`) | Firestore emulator — the real `firestore.rules` | 321 |
 
-636 = the 445 that existed before this work, unmodified and still green,
-plus 191 new. New files: `flow_approval_test.dart` (30),
-`flow_booking_test.dart` (51), `flow_collision_test.dart` (30),
-`flow_checkin_test.dart` (17), `flow_review_test.dart` (34),
-`flow_moderation_test.dart` (28).
+659 = the 445 that existed before this work, unmodified and still green,
+plus 191 from the verification pass (`flow_approval_test.dart` 30,
+`flow_booking_test.dart` 51, `flow_collision_test.dart` 30,
+`flow_checkin_test.dart` 17, `flow_review_test.dart` 34,
+`flow_moderation_test.dart` 28), plus 23 from the fix-everything pass
+(`flow_availability_test.dart` 17 for BUG-017/BUG-015, and additions across
+the flow files for BUG-011/012/016). Tests that pinned a defect as current
+behaviour — the four TEMPORARY booking reads, the non-contiguous span, the
+BUG-012 consequences, the second appeal, the account_* fall-through —
+flipped to assert the fix, which is what they existed to become.
 
 ---
 
@@ -97,9 +102,9 @@ now routed to `test_rules/transactions.test.mjs` and
 | 8.1 | Time slots, `Slot.tryParse` | `core_logic_test` (pre-existing) + `flow_collision_test` — "boundaries of the bookable day" | pass |
 | 8.2 | Same-day lead time | `core_logic_test`; `booking_repository_test` — LeadTimeFailure | pass |
 | 8.3 | Booking window & travel buffer | `flow_collision_test` — "the travel buffer is stored, not enforced" (3 cases) | pass — **and the warning is now pinned** |
-| 8.4 | Contiguous hour selection | `core_logic_test` — `leadingRun` (4 cases) | **partial** — `leadingRun` is tested; `_tapSlot` itself is a private method in `booking_screen.dart` and is not. BUG-015 records that `createBooking` does not re-check it. |
-| 8.5 | Availability composition | `availability_merge_test` (pre-existing); `flow_collision_test` — "which statuses hold an hour" (6 cases) | pass |
-| 8.6 | Collision handling | `flow_collision_test` (5 cases) + `transactions.test.mjs` (5 cases) | pass — both halves, hourly and safari |
+| 8.4 | Contiguous hour selection | `core_logic_test` — `leadingRun` (4 cases); `flow_availability_test` + `flow_collision_test` — `createBooking` refuses a gap (BUG-015 fixed) | **partial** — the write now holds the invariant itself; `_tapSlot` (private, in `booking_screen.dart`) still isn't driven directly |
+| 8.5 | Availability composition | `availability_merge_test` (pre-existing); `flow_collision_test` — "which statuses hold an hour" (6 cases); `flow_availability_test` — the occupied-doc lifecycle (BUG-017) | pass — including the `occupied` half of the schema, now written |
+| 8.6 | Collision handling | `flow_collision_test` (5 cases) + `transactions.test.mjs` (5 cases) + `flow_availability_test` — the clash check reads availability | pass — both halves, hourly and safari; host blocks now join the re-check |
 | 8.7 | Booking bucketing + subLabel | `booking_model_test`, `providers_logic_test` (pre-existing); `flow_booking_test` — subLabel table in full | pass — subLabel went from 1 of 7 rows to 7 of 7 |
 | 8.8 | Explore filtering | `providers_logic_test` (pre-existing) | pass — not re-tested here |
 | 8.9 | Review eligibility | `flow_review_test` — 13 cases across two groups | pass |
@@ -146,26 +151,28 @@ now routed to `test_rules/transactions.test.mjs` and
 | Rider cancels | `flow_booking_test` — "the trainer is told, with the session named" | pass |
 | Safari seat reserved | `booking_repository_test` (pre-existing) | pass |
 | Chat message | `chats.test.mjs` — permissions only | **partial** — the 117-char truncation is not tested |
-| account_approved / account_rejected / account_restored | `flow_approval_test`, `flow_moderation_test` | pass — **now documented in §11.1** (commit f46996e). All three still parse to `NotificationKind.system` (BUG-011, open) |
+| account_approved / account_rejected / account_restored | `flow_approval_test`, `flow_moderation_test` | pass — documented in §11.1, and all three now parse to `NotificationKind.account` (BUG-011 fixed) |
 
 | §11.2 In-app tap routing | Not covered | **not covered** — routing lives in `notifications_screen.dart` |
 | §11.3 Push (FCM) | Not covered | **not covered** — and **Cloud Functions are disabled on this project**, so no push is delivered at all today |
 
 ## firestore.rules — every rule has an allow *and* a deny
 
-260 emulator cases. Coverage by block:
+321 emulator cases, counted per executed file (`node --test` totals, not
+grep — the loops expand):
 
-| Block | Cases | Notes |
+| File | Cases | Notes |
 |---|---|---|
-| `users` | 46 | one denial per privileged field; the no-op-write semantic of `affectedKeys()` pinned |
-| `bookings` | 43 | **BUG-001 found and fixed here** |
-| `availability` + `vacations` | 22 | driven from one table, identical rules |
-| `reviews` | 21 | rating bounds on both edges and both sides; what the rules deliberately do *not* enforce is pinned (BUG-004) |
-| `chats` + messages | 25 | **BUG-008 found and fixed here** |
-| tickets, appeals, reports, leave_reasons | 44 | reports write-only for the reporter (§3.12) |
-| notifications, safari_trips, catch-all | 40 | BUG-005 and BUG-006 pinned as current behaviour |
-| blocked-account reach | 15 | **BUG-007 fixed** — notBlocked() on the five creates that reach someone else; the appeal, ticket, cancel, delete and read paths each have a test proving they stay open |
-| transactions + arrays | 9 | real-Firestore semantics the Dart double gets wrong |
+| `users.test.mjs` | 47 | one denial per privileged field — now including `statusBeforeBlock` (**BUG-018 found and fixed here**); the no-op-write semantic of `affectedKeys()` pinned |
+| `bookings.test.mjs` | 51 | **BUG-001 found and fixed here**; **BUG-003 fixed** — the provider's field set closed; **BUG-017's revert checklist flipped** — a booking is its parties' business again |
+| `booking_reads.test.mjs` | 9 | the exact queries the app issues on the way to a booking — the file that reproduced BUG-017 from the device report, now asserting the availability-shaped reads and the occupied doc's key set |
+| `schedule.test.mjs` | 35 | the shared availability/vacations table, plus the occupied-doc boundary: a rider writes one only inside the atomic commit that creates or cancels its booking (`getAfter`) |
+| `reviews.test.mjs` | 27 | rating bounds on both edges; **BUG-004 fixed** — eligibility enforced by reading the booking; the one-review-per-booking residue pinned open |
+| `chats.test.mjs` | 26 | **BUG-008 found and fixed here** |
+| `support.test.mjs` | 45 | tickets, appeals, reports, leave_reasons; reports write-only for the reporter (§3.12) |
+| `misc.test.mjs` | 63 | **BUG-005 fixed** — notification creates tied to a shared booking or thread; **BUG-006 fixed** — non-host trip writes pinned to one seat at a time; **BUG-007's** blocked-account reach, including the cancel-warning carve-out; the catch-all |
+| `payloads.test.mjs` | 9 | the app's real write payloads against the real rules — createBooking is now the batch with its occupied doc, cancelByRider the transaction with its release |
+| `transactions.test.mjs` + `arrays.test.mjs` | 9 | real-Firestore semantics the Dart double gets wrong |
 
 ---
 

@@ -568,8 +568,14 @@ client still needs.
 ### 5.3 Scheduling
 
 **`Availability`** — `availability/{id}`: `instructorId`, `date`, `startTime`, `endTime`,
-`label`. `status` is `'host-blocked'` (calendar) or `'occupied'` (legacy toggle); both mean
-unavailable, and **any other status is ignored**.
+`label`. `status` is `'host-blocked'` (the trainer's own calendar block) or `'occupied'`
+(a live booking's shadow — see §8.5); both mean unavailable, and **any other status is
+ignored**. An occupied doc is keyed by its booking's id, written in the same atomic commit
+as the booking, and deleted in the same transaction that moves the booking to a terminal
+status. It exists because bookings are readable only by their own parties: it carries the
+hours and nothing else, so a stranger's grid can see the hour is gone without seeing whose
+it is. In `DayAvailability` occupied docs land in `booked`, host blocks in `blocked` — the
+schedule tab offers release only on `blocked`.
 
 **`Vacation`** — `vacations/{id}`: `instructorId`, `startDate`, `endDate`, `label`.
 `covers(date)` is an inclusive lexicographic string comparison — valid because dates are
@@ -742,6 +748,7 @@ Then the thread: `{lastMessage, lastMessageTimestamp, updatedAt, unreadCount: {<
 **Mark read** → `{unreadCount: {<uid>: 0}}` (merge, so only that participant's entry changes).
 
 **Availability block** — `{instructorId, date, startTime, endTime, status: 'host-blocked', label, createdAt}`
+**Occupied doc** — `availability/{bookingId}`: `{instructorId, date, startTime, endTime, status: 'occupied', label: 'Booked', createdAt}` — written in `createBooking`/`createWalkIn`'s batch, deleted by the terminal-status transaction (§5.3, §8.5)
 **Vacation** — `{instructorId, startDate, endDate, label, createdAt}`
 **Review** — `{trainerId, userId, userName, rating, comment, bookingId, createdAt}`
 **Report** — `{reporterId, reporterName, reportedUserId, reportedUserName, reason, details, attachments, status: 'pending', createdAt}`
@@ -862,22 +869,30 @@ frame — but only once real availability data has arrived.
 
 ```
 isFree(slot) = !onVacation
-             ∧ slot ∉ blocked      (availability docs, status host-blocked|occupied)
-             ∧ slot ∉ booked       (bookings whose status.isLive)
+             ∧ slot ∉ blocked      (availability docs, status host-blocked)
+             ∧ slot ∉ booked       (bookings whose status.isLive, ∪ occupied docs)
              ∧ slot ∉ past         (same-day lead time)
 ```
-Cancelled, declined and completed bookings **release** their hours.
+Cancelled, declined and completed bookings **release** their hours — the terminal-status
+transaction deletes the occupied doc alongside. For a viewer who cannot read the bookings
+stream (anyone but the trainer or staff), `booked` is fed by the occupied docs alone;
+`dayAvailabilityProvider` treats that stream's permission-denied as "no bookings visible"
+rather than an error.
 `expandBlock(start, end)` covers `[startHour, endHour)`; a block with no distinct end covers
 only its start hour.
 
 ### 8.6 Collision handling
 
 - **Hourly bookings are checked, not locked.** `createBooking` and `createWalkIn` re-query
-  the day's bookings immediately before writing and throw `SlotTakenFailure` on a clash.
-  Firestore transactions cannot read a *query*, only known documents, so with this schema a
-  true lock is impossible without a per-slot document — a schema change the web client
-  wouldn't respect. Two riders confirming the same hour in the same instant both land as
-  pending requests, and the trainer declines one.
+  the day immediately before writing and throw `SlotTakenFailure` on a clash. The check
+  reads both calendars: the day's bookings where the caller may (their own two-party reads;
+  a rider's query is refused by design and degrades to the second source), and the
+  `availability` docs — occupied docs *and* host blocks, so a block added between the grid
+  snapshot and the confirm no longer slips through. An occupied doc whose booking was
+  readable defers to the booking's own status. Firestore transactions cannot read a
+  *query*, only known documents, so a true lock is impossible without a per-slot document.
+  Two riders confirming the same hour in the same instant both land as pending requests,
+  and the trainer declines one.
 - **Safari seats *are* transactional**, because the seat count lives on one known document.
   The transaction re-reads capacity and throws `SlotTakenFailure(['seat'])` if full.
 
@@ -1133,11 +1148,10 @@ point of no return on account deletion; vibrate on a bad QR scan.
 
 ### 11.1 Generated notifications
 
-Every notification is written by `NotificationRepository.notify()` with **both**
-`targetUserId` and `userId` (the web client wrote only `userId` in places, and those
-notifications were invisible to the listener, which queries `targetUserId`; writing both
-keeps the query working *and* still triggers the `onNewNotification` Cloud Function, which
-reads `data.userId || data.targetUserId`).
+Every notification is written by `NotificationRepository.notify()` with `targetUserId`
+only. (v2.6 dual-wrote a `userId` alias for a web client that queried it; with this app as
+the sole writer the alias is dead weight, and the `onNewNotification` Cloud Function reads
+`data.userId || data.targetUserId`, so it still resolves — see §6.3.)
 
 | Trigger | Recipient | `type` | Title | Body |
 |---|---|---|---|---|
@@ -1153,9 +1167,11 @@ reads `data.userId || data.targetUserId`).
 | Admin declines an application | trainer | `account_rejected` | "Application not approved" | "We could not verify…" + " Reason: {reason}" when given |
 | Admin lifts a suspension | user | `account_restored` | "Your account is active again" | "Welcome back. Your suspension has been lifted." |
 
-> The three `account_*` types have no case in `NotificationKind.parse`, so they
-> all resolve to `system` and open a plain text sheet rather than routing
-> anywhere (§11.2). Unintended rather than chosen — see BUGS.md BUG-011.
+> The three `account_*` types resolve to `NotificationKind.account`: their own
+> icon on the tile, and deliberately the full-text sheet as destination — a
+> rejection carries its reason in full, and the account state the message
+> announces is already wherever the gate routed the user (was BUG-011, when
+> they fell through to `system` by accident).
 
 Walk-ins never notify (`kiterId == 'manual_entry'` has no account behind it), and
 `setStatus` returns early for manual bookings or an empty `kiterId`.
@@ -1356,8 +1372,10 @@ Treat every item here as a functional requirement, not a stylistic one.
 
 **Data & compatibility**
 - [ ] Local `YYYY-MM-DD` date strings everywhere — never `toISOString()`
-- [ ] Dual-write legacy + modern field names on bookings (`time`/`startTime`, `price`/`totalPrice`, `type`/`bookingType`)
-- [ ] Dual-write `targetUserId` + `userId` on notifications
+- [x] ~~Dual-write legacy + modern field names on bookings~~ — deliberately dropped; this
+  app is the sole writer, one canonical name each (§6.3, booking_repository.dart)
+- [x] ~~Dual-write `targetUserId` + `userId` on notifications~~ — deliberately dropped
+  (§11.1, notification_repository.dart)
 - [ ] Tolerant readers for every Firestore field
 - [ ] Collection names unchanged; client-side sorting retained
 - [ ] `applicationId` stays `com.wlftech.flow`
