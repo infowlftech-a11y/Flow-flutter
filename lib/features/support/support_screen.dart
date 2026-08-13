@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/constants.dart';
 import '../../core/theme/app_theme.dart';
@@ -59,11 +60,11 @@ class SupportScreen extends ConsumerWidget {
               final t = list[i];
               final tones = context.tones;
               return FlowCard(
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => TicketThreadScreen(ticketId: t.id),
-                  ),
-                ),
+                // Through the router, not a raw MaterialPageRoute (P12):
+                // the thread is the same /support/ticket/:id destination
+                // the push notification deep-links to, and going there the
+                // same way gives it the same transition as every push.
+                onTap: () => context.push('/support/ticket/${t.id}'),
                 child: Row(
                   children: [
                     Container(

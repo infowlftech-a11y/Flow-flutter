@@ -919,6 +919,22 @@ a safari station's name overran the sheet by 96px. Fixed in
 theme work, so the fix ships with that commit; the test holds it in
 place either way.
 
+## P12 — Motion with one accent (ordered 2026-08-13)
+
+Two rough edges owned the whole feel. Tab switches were IndexedStack
+hard cuts — the shell now uses the base StatefulShellRoute constructor
+with a custom container that cross-fades branches (200ms, the app's
+easing) while keeping the state-preservation contract; hidden branches
+are pointer-ignored, semantics-excluded and ticker-muted, because a
+Stack, unlike IndexedStack, hides none of that for free. And pushes ran
+whatever the platform shipped — every pushed route now rises in through
+one `_detailPage` (fade + 4% upward drift, easeOutCubic, 300ms in /
+240ms out), so a push feels identical from every screen. The gate fade
+kept its 260ms but gained the curve; the ticket thread stopped being a
+raw MaterialPageRoute and rides `/support/ticket/:id` like the deep
+link always did. Durations live in router.dart on purpose — the motion
+scale's header says route transitions are flow, not presentation.
+
 ## P11 — The coach profile says more, and everything points at it (ordered 2026-08-13)
 
 The profile grew the facts the data already held. A rating breakdown —

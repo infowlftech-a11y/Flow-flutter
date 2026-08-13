@@ -38,13 +38,53 @@ import 'providers/providers.dart';
 final rootNavigatorKey = GlobalKey<NavigatorState>();
 
 /// Gate routes cross-fade (260 ms) instead of sliding (§10.9).
+///
+/// P12 gave the fade the app's easing — it ran linear, the one curve
+/// nothing physical moves along.
 CustomTransitionPage<void> _fadePage(GoRouterState state, Widget child) =>
     CustomTransitionPage(
       key: state.pageKey,
       child: child,
       transitionDuration: const Duration(milliseconds: 260),
       transitionsBuilder: (context, animation, secondary, child) =>
-          FadeTransition(opacity: animation, child: child),
+          FadeTransition(
+            opacity: CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+            ),
+            child: child,
+          ),
+    );
+
+/// Every pushed route rises in (P12): fade plus a short upward drift on the
+/// app's own easing, replacing the platform default so a push feels the
+/// same on every screen and every device. Durations live here, not in
+/// FlowMotion — the route transition is flow, not presentation (see
+/// motion.dart's header), and 300/240 are tuned to travel with the finger:
+/// the reverse leg reads sluggish at full length.
+CustomTransitionPage<void> _detailPage(GoRouterState state, Widget child) =>
+    CustomTransitionPage(
+      key: state.pageKey,
+      child: child,
+      transitionDuration: const Duration(milliseconds: 300),
+      reverseTransitionDuration: const Duration(milliseconds: 240),
+      transitionsBuilder: (context, animation, secondary, child) {
+        final eased = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+        return FadeTransition(
+          opacity: eased,
+          child: SlideTransition(
+            position: Tween(
+              begin: const Offset(0, .04),
+              end: Offset.zero,
+            ).animate(eased),
+            child: child,
+          ),
+        );
+      },
     );
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -127,15 +167,18 @@ final routerProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(
             path: 'sign-in',
-            builder: (context, state) => const SignInScreen(),
+            pageBuilder: (context, state) =>
+                _detailPage(state, const SignInScreen()),
           ),
           GoRoute(
             path: 'sign-up',
-            builder: (context, state) => const SignUpScreen(),
+            pageBuilder: (context, state) =>
+                _detailPage(state, const SignUpScreen()),
           ),
           GoRoute(
             path: 'reset',
-            builder: (context, state) => const ResetPasswordScreen(),
+            pageBuilder: (context, state) =>
+                _detailPage(state, const ResetPasswordScreen()),
           ),
         ],
       ),
@@ -146,11 +189,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/onboarding/rider',
-        builder: (context, state) => const KiterFormScreen(),
+        pageBuilder: (context, state) =>
+            _detailPage(state, const KiterFormScreen()),
       ),
       GoRoute(
         path: '/onboarding/trainer',
-        builder: (context, state) => const TrainerFormScreen(),
+        pageBuilder: (context, state) =>
+            _detailPage(state, const TrainerFormScreen()),
       ),
       // The same form, prefilled, for a declined trainer correcting their
       // application. A distinct path rather than a query flag so the
@@ -158,7 +203,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/onboarding/trainer/reapply',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => const TrainerFormScreen(reapply: true),
+        pageBuilder: (context, state) =>
+            _detailPage(state, const TrainerFormScreen(reapply: true)),
       ),
       GoRoute(
         path: '/pending',
@@ -175,9 +221,18 @@ final routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) =>
             _fadePage(state, const RejectedScreen()),
       ),
-      StatefulShellRoute.indexedStack(
+      // The base constructor, not `.indexedStack` (P12): branch switches
+      // cross-fade instead of hard-cutting. The container keeps the
+      // state-preservation contract indexedStack had; see
+      // AnimatedBranchContainer for what "inert" has to mean in a Stack.
+      StatefulShellRoute(
         builder: (context, state, navigationShell) =>
             AppShell(navigationShell: navigationShell),
+        navigatorContainerBuilder: (context, navigationShell, children) =>
+            AnimatedBranchContainer(
+              currentIndex: navigationShell.currentIndex,
+              children: children,
+            ),
         branches: [
           // Branch 0 resolves through a Consumer so a role change swaps
           // Explore ⇄ Command Center without a restart (§4.3).
@@ -250,28 +305,37 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/trainer/:id',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) =>
-            TrainerProfileScreen(trainerId: state.pathParameters['id']!),
+        pageBuilder: (context, state) => _detailPage(
+          state,
+          TrainerProfileScreen(trainerId: state.pathParameters['id']!),
+        ),
       ),
       GoRoute(
         path: '/station/:id',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) =>
-            StationProfileScreen(stationId: state.pathParameters['id']!),
+        pageBuilder: (context, state) => _detailPage(
+          state,
+          StationProfileScreen(stationId: state.pathParameters['id']!),
+        ),
       ),
       GoRoute(
         path: '/chat/:id',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => ChatScreen(
-          partnerId: state.pathParameters['id']!,
-          partnerName: state.uri.queryParameters['name'] ?? 'Chat',
+        pageBuilder: (context, state) => _detailPage(
+          state,
+          ChatScreen(
+            partnerId: state.pathParameters['id']!,
+            partnerName: state.uri.queryParameters['name'] ?? 'Chat',
+          ),
         ),
       ),
       GoRoute(
         path: '/book/:id',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) =>
-            BookingScreen(target: state.extra as BookingTarget),
+        pageBuilder: (context, state) => _detailPage(
+          state,
+          BookingScreen(target: state.extra as BookingTarget),
+        ),
       ),
       // Inbox is no longer a tab — it is reached from the Discover header, so
       // it is a pushed route with its own back affordance rather than a shell
@@ -279,17 +343,20 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/inbox',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => const InboxScreen(),
+        pageBuilder: (context, state) =>
+            _detailPage(state, const InboxScreen()),
       ),
       GoRoute(
         path: '/notifications',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => const NotificationsScreen(),
+        pageBuilder: (context, state) =>
+            _detailPage(state, const NotificationsScreen()),
       ),
       GoRoute(
         path: '/support',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => const SupportScreen(),
+        pageBuilder: (context, state) =>
+            _detailPage(state, const SupportScreen()),
         routes: [
           // The destination a support notification deep-links to (P2). As a
           // child of /support, Back from a pushed thread falls out to the
@@ -297,20 +364,24 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: 'ticket/:id',
             parentNavigatorKey: rootNavigatorKey,
-            builder: (context, state) =>
-                TicketThreadScreen(ticketId: state.pathParameters['id']!),
+            pageBuilder: (context, state) => _detailPage(
+              state,
+              TicketThreadScreen(ticketId: state.pathParameters['id']!),
+            ),
           ),
         ],
       ),
       GoRoute(
         path: '/admin',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => const AdminScreen(),
+        pageBuilder: (context, state) =>
+            _detailPage(state, const AdminScreen()),
       ),
       GoRoute(
         path: '/profile/edit',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => const EditProfileScreen(),
+        pageBuilder: (context, state) =>
+            _detailPage(state, const EditProfileScreen()),
       ),
     ],
     errorBuilder: (context, state) => const _NotFoundScreen(),

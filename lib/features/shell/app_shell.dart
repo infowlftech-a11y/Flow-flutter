@@ -4,6 +4,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/theme/motion.dart';
 import '../../core/widgets/sheets.dart';
 import '../../providers/providers.dart';
 
@@ -69,6 +70,51 @@ List<int> branchesFor({required bool isTrainer}) => isTrainer
         ShellBranch.profile,
       ];
 
+/// Cross-fades between branch navigators (P12).
+///
+/// `IndexedStack`'s swap is a hard cut — the one instant transition left in
+/// the app. This keeps its contract (every branch stays mounted, so tab
+/// state survives switching) and adds a 200ms fade on the app's easing.
+/// Non-current branches are made properly inert: pointer-ignored, excluded
+/// from semantics — a Stack, unlike IndexedStack, would otherwise leave
+/// five invisible screens readable by a screen reader — and ticker-muted,
+/// because an invisible branch that still animates is a battery drain.
+class AnimatedBranchContainer extends StatelessWidget {
+  const AnimatedBranchContainer({
+    super.key,
+    required this.currentIndex,
+    required this.children,
+  });
+
+  final int currentIndex;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        for (final (i, child) in children.indexed)
+          IgnorePointer(
+            ignoring: i != currentIndex,
+            child: ExcludeSemantics(
+              excluding: i != currentIndex,
+              child: TickerMode(
+                enabled: i == currentIndex,
+                child: AnimatedOpacity(
+                  opacity: i == currentIndex ? 1 : 0,
+                  duration: FlowMotion.base,
+                  curve: FlowMotion.curve,
+                  child: child,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 class AppShell extends ConsumerWidget {
   const AppShell({super.key, required this.navigationShell});
 
@@ -114,7 +160,8 @@ class AppShell extends ConsumerWidget {
         final leave = await confirmAction(
           context,
           title: 'Leave FLOW?',
-          body: 'Your session, bookings and messages are saved — you can '
+          body:
+              'Your session, bookings and messages are saved — you can '
               'come straight back.',
           confirmLabel: 'Leave',
           cancelLabel: 'Stay',
@@ -125,8 +172,12 @@ class AppShell extends ConsumerWidget {
     );
   }
 
-  Widget _buildShell(BuildContext context, List<int> branchOf, int selected,
-      bool isTrainer) {
+  Widget _buildShell(
+    BuildContext context,
+    List<int> branchOf,
+    int selected,
+    bool isTrainer,
+  ) {
     return Scaffold(
       body: navigationShell,
       bottomNavigationBar: NavigationBar(
@@ -175,7 +226,10 @@ class AppShell extends ConsumerWidget {
                 ),
                 NavigationDestination(
                   icon: Icon(Symbols.confirmation_number_rounded),
-                  selectedIcon: Icon(Symbols.confirmation_number_rounded, fill: 1),
+                  selectedIcon: Icon(
+                    Symbols.confirmation_number_rounded,
+                    fill: 1,
+                  ),
                   label: 'Ticket',
                 ),
                 NavigationDestination(
