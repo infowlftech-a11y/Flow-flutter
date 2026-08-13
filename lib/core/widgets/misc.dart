@@ -50,6 +50,9 @@ class PaymentPill extends StatelessWidget {
     final (color, icon) = switch (payment.status) {
       PaymentStatus.paid => (tones.success, Symbols.check_circle_rounded),
       PaymentStatus.unpaid => (tones.warning, Symbols.payments_rounded),
+      PaymentStatus.held =>
+        (tones.azureBrand, Symbols.account_balance_wallet_rounded),
+      PaymentStatus.paidOut => (tones.success, Symbols.check_circle_rounded),
       PaymentStatus.processing => (tones.azureBrand, Symbols.sync_rounded),
       PaymentStatus.failed => (tones.danger, Symbols.error_outline_rounded),
       PaymentStatus.refunded => (tones.textFaint, Symbols.undo_rounded),

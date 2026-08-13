@@ -598,3 +598,69 @@ asserting the button enables when the last required field becomes valid.
 
 CLAUDE.md: `State` fields and lifecycle methods are approval-zone. Adding a
 `ValueNotifier` field and disposing it is exactly that, however small.
+
+---
+
+## P1 — Payments move through FLOW (ordered 2026-08-12, implemented same day)
+
+Direct product order, quoted: *"The payment will be through the application, when
+the kiter book a session, he pays to the application, and then the application
+pays the trainer after the session completed. the cancellation policy should
+follow the cancellation policy in booking.com"* — followed by *"apply this
+system"*. That order is the approval this document usually waits for; the
+design is recorded here so the reasoning stays auditable.
+
+### The system
+
+- **Escrow at booking.** A rider booking (lesson or safari seat) records
+  `paymentStatus: 'held'`, `paymentMethod: 'app'`, `paidAt` at creation: the
+  rider pays FLOW when they book. Walk-ins keep the cash path — there is no
+  rider account behind them to charge.
+- **Payout after delivery.** A completed session with a held payment is a
+  payout FLOW owes the trainer. `markPaid` (the beach-cash settlement) refuses
+  held bookings — there is nothing to collect in person.
+- **Cancellation policy, booking.com template mapped to single sessions:**
+  free cancellation until **24 h before start**; cancelling inside the window,
+  or a no-show, is **charged in full** (a session is one "night", and
+  booking.com's late fee is the first night). A **pending request** — not yet
+  accepted — refunds in full whenever it dies: rider withdrawal, trainer
+  decline, or expiry. A **trainer/staff cancellation** refunds in full always.
+  The window is one constant (`CancellationPolicy.freeCancelWindow`).
+
+### The load-bearing decision: executed states are written, entitlements are derived
+
+`paymentStatus` only ever records what has *actually happened* to money:
+`held` when the rider pays at booking, `refunded` / `paid_out` when a
+processor (or staff) executes the movement. Everything in between —
+"refund due", "charged, payout due" — is **derived** (`EscrowState` in
+`lib/data/models/cancellation.dart`) from facts the rules already pin:
+booking status, `cancelledBy`, `cancelledAt`, the 24 h window.
+
+Why: the rules deliberately close the rider's post-create write surface to
+`{status, cancelledAt, cancelledBy, hiddenByGuest, updatedAt}` — a rider must
+never write payment fields — and a 24 h boundary over `date`+`startTime`
+strings is not provable in rules. Deriving means no new write surface, no
+client ever claims money moved when it did not, and the future
+processor/Functions layer executes exactly what the derivation reports.
+
+### Rules delta (the whole of it)
+
+1. Rider create: `paymentStatus == 'unpaid'` → `in ['unpaid', 'held']`. The
+   guarded invariant — the rider states what they owe or have put in escrow,
+   never that the trainer was settled (`'paid'` stays rider-refused).
+2. A rider writing `status: 'cancelled'` must stamp `cancelledBy: 'user'` and
+   a `cancelledAt` — the fields the free-window derivation reads. Presence is
+   required, server-time equality is not (the pinned test writes an ISO
+   string); a back-dated stamp from a hand-rolled client is therefore
+   possible today and is accepted as a known limit, closed when Functions
+   execute refunds server-side from their own clock.
+3. Provider update set gains `cancelledAt`/`cancelledBy` so trainer
+   cancellations can stamp themselves (`'provider'` ⇒ full refund).
+
+### What this is not yet
+
+No card is charged and no payout is sent — there is no PSP and Cloud Functions
+are still disabled on wlf-flow. The app writes and enforces the ledger the
+processor will execute (Stripe Connect is the natural fit: rider pays the
+platform, platform transfers to the trainer). Wiring it is provisioning work
+on the owner's side; the seam is `paymentRef` + the executed states.

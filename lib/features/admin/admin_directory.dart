@@ -540,7 +540,7 @@ void _openSessionSheet(BuildContext context, Booking b) {
         ('Trainer', b.instructorName),
         ('Hours', '${b.durationHours ?? '—'}'),
         ('Price', money(b.totalPrice)),
-        ('Payment', b.payment.status.name),
+        ('Payment', b.payment.status.label),
         ('Checked in', b.checkedIn ? 'yes' : 'no'),
         if (b.gearNeeded) ('Gear', 'needs gear'),
         if (b.message != null && b.message!.trim().isNotEmpty)

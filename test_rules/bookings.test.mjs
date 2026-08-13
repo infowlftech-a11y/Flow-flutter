@@ -94,6 +94,25 @@ describe('bookings — create (lines 107-111)', () => {
     );
   });
 
+  // P1 — escrow. The rider may state a hold (paid to FLOW at booking); what
+  // they still may not state is that the *trainer* was settled, which is the
+  // 'paid' denial above.
+  test('a rider creates an escrow booking — paymentStatus held', async () => {
+    const db = await as('rider');
+    await assertSucceeds(
+      db.collection('bookings').doc('n1').set(bookingDoc({
+        id: 'n1', paymentStatus: 'held', paymentMethod: 'app',
+      })),
+    );
+  });
+
+  test('DENY a rider creating a booking already paid out', async () => {
+    const db = await as('rider');
+    await assertFails(
+      db.collection('bookings').doc('n1').set(bookingDoc({ id: 'n1', paymentStatus: 'paid_out' })),
+    );
+  });
+
   test('DENY a rider creating a booking with no paymentStatus at all', async () => {
     const doc = bookingDoc({ id: 'n1' });
     delete doc.paymentStatus;
@@ -161,6 +180,17 @@ describe('bookings — update, the trainer (lines 120-123)', () => {
     await assertSucceeds(db.collection('bookings').doc('b1').update({ paymentStatus: 'paid' }));
   });
 
+  // P1 — a provider cancellation stamps itself, and the stamp is in the
+  // provider's writable set. 'provider' in cancelledBy is what refunds the
+  // held payment in full under the escrow derivation.
+  test('the trainer cancels with the provider stamp', async () => {
+    const db = await as('trainer');
+    await assertSucceeds(db.collection('bookings').doc('b1').update({
+      status: 'cancelled', cancelledAt: new Date().toISOString(), cancelledBy: 'provider',
+      updatedAt: new Date().toISOString(),
+    }));
+  });
+
   test('DENY another trainer touching the booking', async () => {
     const db = await as('trainer2');
     await assertFails(db.collection('bookings').doc('b1').update({ status: 'confirmed' }));
@@ -217,6 +247,29 @@ describe('bookings — update, the rider (lines 120-123)', () => {
   test('the rider hides a booking from their own history', async () => {
     const db = await as('rider');
     await assertSucceeds(db.collection('bookings').doc('b1').update({ hiddenByGuest: true }));
+  });
+
+  // P1 — the cancellation stamps are mandatory, not polite. cancelledAt and
+  // cancelledBy are what the escrow derivation reads to decide refund vs
+  // charge, so a rider cancel may not exist without them, and a rider may
+  // not sign one as the provider (whose cancellations always refund).
+  test('DENY a rider cancel with no stamps at all', async () => {
+    const db = await as('rider');
+    await assertFails(db.collection('bookings').doc('b1').update({ status: 'cancelled' }));
+  });
+
+  test('DENY a rider cancel missing its cancelledAt', async () => {
+    const db = await as('rider');
+    await assertFails(db.collection('bookings').doc('b1').update({
+      status: 'cancelled', cancelledBy: 'user',
+    }));
+  });
+
+  test('DENY a rider cancel signed as the provider', async () => {
+    const db = await as('rider');
+    await assertFails(db.collection('bookings').doc('b1').update({
+      status: 'cancelled', cancelledAt: new Date().toISOString(), cancelledBy: 'provider',
+    }));
   });
 
   // paymentFieldsUnchanged() — one denial per named field (lines 96-100).

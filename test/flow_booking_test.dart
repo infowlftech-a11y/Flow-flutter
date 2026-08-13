@@ -350,7 +350,10 @@ void main() {
       final id = await request(hours: ['10:00', '11:00']); // 2h × €50
       await repo.setStatus(await asTrainer(id), BookingStatus.confirmed);
       await repo.setStatus(await asTrainer(id), BookingStatus.completed);
-      await repo.markPaid(id, trainerId: trainer);
+      // No markPaid here since P1: a rider booking is escrow — held by
+      // FLOW, paid out after completion — and markPaid refuses it (its own
+      // case in booking_repository_test). Delivered is what earns; the
+      // earnings sum below never depended on the settlement write.
 
       Future<double> earnings() async => (await repo
               .watchTrainerBookings(trainer)

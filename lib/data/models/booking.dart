@@ -60,6 +60,8 @@ class Booking {
     this.reminderSent = false,
     this.checkedIn = false,
     this.tripId,
+    this.cancelledAt,
+    this.cancelledBy,
     this.payment = PaymentInfo.none,
   });
 
@@ -94,6 +96,14 @@ class Booking {
   final bool reminderSent;
   final bool checkedIn;
   final String? tripId;
+
+  /// Who ended a cancelled booking and when — `'user'` for the rider
+  /// (stamped by rules, riderStatusIsCancellation), `'provider'` for the
+  /// trainer, `'staff'`/absent otherwise. The cancellation policy derives
+  /// the money outcome from exactly these two fields, so a rider cancel
+  /// cannot exist without them.
+  final DateTime? cancelledAt;
+  final String? cancelledBy;
 
   /// What is owed and whether it has been collected.
   ///
@@ -136,6 +146,8 @@ class Booking {
         reminderSent: d.boolean('reminderSent'),
         checkedIn: d.boolean('checkedIn'),
         tripId: d.str('tripId'),
+        cancelledAt: d.date('cancelledAt'),
+        cancelledBy: d.str('cancelledBy'),
         payment: PaymentInfo.fromDoc(d),
       );
 
@@ -153,6 +165,11 @@ class Booking {
   /// payment tracking must not be reported as money owed.
   bool get awaitsPayment =>
       status == BookingStatus.completed && payment.isOutstanding;
+
+  /// True when this session is delivered and FLOW is still holding the
+  /// rider's money — the escrow payout FLOW owes the trainer (P1).
+  bool get awaitsPayout =>
+      status == BookingStatus.completed && payment.status.isHeldByApp;
 
   bool get isManual => kiterId == 'manual_entry' || type == 'manual';
   bool get isSafari => type == 'safari';

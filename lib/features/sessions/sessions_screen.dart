@@ -19,6 +19,7 @@ import '../../core/widgets/session_card.dart';
 import '../../core/widgets/sheets.dart';
 import '../../core/widgets/surfaces.dart';
 import '../../data/models/booking.dart';
+import '../../data/models/cancellation.dart';
 import '../../data/repositories/booking_repository.dart';
 import '../../providers/providers.dart';
 import 'review_composer.dart';
@@ -559,13 +560,25 @@ class _ActionButton extends ConsumerWidget {
   }
 
   Future<void> _cancel(BuildContext context, WidgetRef ref) async {
-    // Confirmation names the session and date; warns the trainer is
-    // notified (§10.4).
+    // Confirmation names the session, the date, and — since the money moved
+    // at booking (P1) — exactly what cancelling does to it. The fee is
+    // stated before the tap, never discovered after.
+    final preview = CancellationPolicy.preview(booking);
+    final amount = money(booking.amountDue);
+    final moneyLine = !preview.prepaid
+        ? ''
+        : booking.status == BookingStatus.pending
+            ? ' Your $amount comes back in full — a request is never '
+                'charged before your trainer accepts it.'
+            : preview.charged
+                ? ' It starts in under 24 hours, so per the cancellation '
+                    'policy you are charged the full $amount.'
+                : ' You are refunded the full $amount.';
     final ok = await confirmAction(
       context,
       title: 'Cancel this session?',
       body: '${booking.title} on ${longYmd(booking.date)} will be cancelled '
-          'and your trainer will be notified.',
+          'and your trainer will be notified.$moneyLine',
       confirmLabel: 'Cancel session',
       cancelLabel: 'Keep it',
       destructive: true,
@@ -630,6 +643,20 @@ class _SessionSheet extends ConsumerWidget {
 
   final Booking booking;
 
+  /// The rider's answer to "where is my money?", from the escrow ledger.
+  /// Null (no row at all) for cash-era bookings — "settled in person" needs
+  /// no line item.
+  static String? _moneyLine(Booking b) => switch (CancellationPolicy.settle(b)) {
+        EscrowState.none => null,
+        EscrowState.held => 'Held by FLOW — trainer is paid after',
+        EscrowState.refundDue => 'Refund due — ${money(b.amountDue)}',
+        EscrowState.payoutDue => b.status == BookingStatus.cancelled
+            ? 'Charged — cancelled inside 24 h'
+            : 'Paid — trainer payout queued',
+        EscrowState.refunded => 'Refunded in full',
+        EscrowState.paidOut => 'Paid out to your trainer',
+      };
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Watched live: a rider can be standing at the counter with this open when
@@ -649,10 +676,14 @@ class _SessionSheet extends ConsumerWidget {
             runSpacing: 6,
             children: [
               StatusPill(status: b.status),
-              // Only once the session is over. Before that "Unpaid" is
-              // technically true and completely unhelpful — nobody pays for a
-              // lesson they have not had.
-              if (b.status == BookingStatus.completed) PaymentPill(b.payment),
+              // Escrow states matter the whole way through — "Held by FLOW"
+              // on a live booking is the receipt, and the refund state on a
+              // cancelled one is the answer the rider opened the sheet for.
+              // Cash bookings keep the old rule: "Unpaid" before the session
+              // is technically true and completely unhelpful.
+              if (b.payment.status.isHeldByApp ||
+                  b.status == BookingStatus.completed)
+                PaymentPill(b.payment),
             ],
           ),
           const SizedBox(height: 16),
@@ -665,6 +696,8 @@ class _SessionSheet extends ConsumerWidget {
                 _DetailRow(label: 'WHEN', value: longYmd(b.date)),
                 _DetailRow(label: 'TIME', value: b.timeRange),
                 _DetailRow(label: 'TOTAL', value: money(b.totalPrice)),
+                if (_moneyLine(b) case final line?)
+                  _DetailRow(label: 'PAYMENT', value: line),
                 _DetailRow(label: 'STATUS', value: b.subLabel, last: true),
               ],
             ),

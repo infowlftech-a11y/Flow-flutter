@@ -164,11 +164,18 @@ service cloud.firestore {
                     'updatedAt']);
       }
 
-      // …and `cancelled` is the only status a rider may write.
+      // …and `cancelled` is the only status a rider may write — stamped.
+      // `cancelledBy`/`cancelledAt` are what the cancellation policy reads
+      // to decide whether the held payment refunds (before the free-cancel
+      // deadline) or is charged (P1), so a rider cancel may not exist
+      // without them. Presence is what is provable here; the timestamp's
+      // honesty is the processor's to verify when it executes the refund.
       function riderStatusIsCancellation() {
         return !request.resource.data.diff(resource.data).affectedKeys()
                  .hasAny(['status'])
-            || request.resource.data.status == 'cancelled';
+            || (request.resource.data.status == 'cancelled'
+                && request.resource.data.cancelledBy == 'user'
+                && 'cancelledAt' in request.resource.data);
       }
 
       // The trainer's writable set, closed the same way the rider's is.
@@ -183,7 +190,11 @@ service cloud.firestore {
         return request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['status', 'updatedAt', 'checkedIn', 'startedAt',
                     'paymentStatus', 'paymentMethod', 'paidAt', 'refundedAt',
-                    'paymentRef', 'hiddenByInstructor']);
+                    'paymentRef', 'hiddenByInstructor',
+                    // A provider cancellation stamps itself like a rider's —
+                    // 'provider' in cancelledBy is what makes it refund in
+                    // full under the escrow derivation (P1).
+                    'cancelledAt', 'cancelledBy']);
       }
 
       // A booking is its two parties' business, and staff's. The grid and
@@ -194,14 +205,16 @@ service cloud.firestore {
       // BUG-017 — which made the whole collection listable.)
       allow read: if signedIn() && (isParty() || isStaff());
 
-      // On create the rider states what they owe, never that it is settled.
-      // A trainer creating a walk-in may record cash taken up front, so the
+      // On create the rider states what they owe ('unpaid', the cash era) or
+      // what they have put in escrow ('held' — paid to FLOW at booking, P1),
+      // never that the trainer was settled: 'paid' stays rider-refused. A
+      // trainer creating a walk-in may record cash taken up front, so the
       // constraint is on riders only.
       allow create: if signedIn() && notBlocked()
         && (request.resource.data.kiterId == uid()
             || request.resource.data.instructorId == uid())
         && (request.resource.data.instructorId == uid()
-            || request.resource.data.paymentStatus == 'unpaid');
+            || request.resource.data.paymentStatus in ['unpaid', 'held']);
 
       // Order matters here, for cost as much as clarity. `isStaff()` does a
       // `get()` on the caller's profile — a billed read, and one of only ten

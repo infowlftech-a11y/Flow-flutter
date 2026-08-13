@@ -470,7 +470,10 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
     final send = await showFlowSheet<bool>(
       context,
       title: 'Decline this request?',
-      subtitle: 'The rider is notified — a reason softens the blow.',
+      subtitle: widget.booking.payment.status.isHeldByApp
+          ? 'The rider is refunded in full and notified — a reason softens '
+              'the blow.'
+          : 'The rider is notified — a reason softens the blow.',
       builder: (sheetContext) => Padding(
         padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
         child: Column(
@@ -712,6 +715,40 @@ class _ManifestCard extends ConsumerWidget {
   }
 
   Future<void> _finish(BuildContext context, WidgetRef ref) async {
+    // Escrow sessions (P1) have nothing to collect on the beach — FLOW holds
+    // the rider's money and finishing is what queues the payout. The cash
+    // settlement question would be a lie here, so it is not asked.
+    if (booking.payment.status.isHeldByApp) {
+      final amount = money(booking.amountDue);
+      final sure = await confirmAction(
+        context,
+        title: 'Finish this session?',
+        body: 'FLOW holds $amount for it. Finishing marks the session '
+            'delivered and queues your payout.',
+        confirmLabel: 'Finish session',
+        cancelLabel: 'Not yet',
+      );
+      if (!sure) return;
+      Haptics.medium();
+      try {
+        await ref
+            .read(bookingRepositoryProvider)
+            .setStatus(booking, BookingStatus.completed);
+      } on StatusConflictFailure catch (e) {
+        if (context.mounted) showFlowToast(context, e.message);
+        return;
+      } catch (_) {
+        if (context.mounted) {
+          showFlowToast(context, "Couldn't finish the session. Try again.");
+        }
+        return;
+      }
+      if (context.mounted) {
+        showFlowToast(context, '$amount payout queued 💶');
+      }
+      return;
+    }
+
     // Finishing and settling are one decision on the beach, so they are one
     // sheet. Asking "finish?" and then "paid?" back to back would be two
     // dialogs for a moment where the trainer is standing in the wind holding

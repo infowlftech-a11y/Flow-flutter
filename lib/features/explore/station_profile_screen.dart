@@ -380,8 +380,11 @@ class _TripCardState extends ConsumerState<_TripCard> {
       context,
       title: 'Reserve your seat?',
       body:
-          '${trip.title} · departs ${prettyYmd(trip.startDate)} · ${money(trip.price)} per seat, settled in person.',
-      confirmLabel: 'Reserve',
+          '${trip.title} · departs ${prettyYmd(trip.startDate)} · '
+          '${money(trip.price)} per seat, paid to FLOW now. The host is paid '
+          'after the expedition; free cancellation until 24 h before '
+          'departure.',
+      confirmLabel: 'Reserve & pay',
       cancelLabel: 'Not yet',
     );
     if (!ok || !mounted) return;

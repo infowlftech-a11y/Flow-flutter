@@ -438,6 +438,15 @@ final trainerOutstandingProvider = Provider<AsyncValue<double>>((ref) => ref
     .watch(trainerUnpaidProvider)
     .whenData((list) => list.fold<double>(0, (acc, b) => acc + b.amountDue)));
 
+/// What FLOW owes the trainer for delivered escrow sessions (P1) — the
+/// riders already paid; the payout waits on the processor. Kept apart from
+/// [trainerOutstandingProvider], which is cash a *rider* still owes: one is
+/// something the trainer can act on (collect), the other is FLOW's debt.
+final trainerPayoutDueProvider = Provider<AsyncValue<double>>((ref) =>
+    ref.watch(trainerCompletedProvider).whenData((list) => list
+        .where((b) => b.awaitsPayout)
+        .fold<double>(0, (acc, b) => acc + b.amountDue)));
+
 /// A week of earnings, Monday-first, plus how it compares with the week before.
 ///
 /// Monday-first because that is what a working week means to a centre taking

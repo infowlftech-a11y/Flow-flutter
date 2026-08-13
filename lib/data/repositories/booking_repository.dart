@@ -293,10 +293,16 @@ class BookingRepository {
       'gearNeeded': gearNeeded,
       'message': message ?? '',
       'status': 'pending',
-      // Payment is recorded from the first write, not bolted on at the end:
-      // a booking that exists without an amount owed is a booking nobody can
-      // reconcile later.
-      ...PaymentInfo.initialFields(amount: total),
+      // Escrow from the first write (P1): the rider pays FLOW at booking and
+      // FLOW holds it until the session resolves. `paidAt` is the hold
+      // instant. What the hold becomes — refund or payout — is derived by
+      // CancellationPolicy, never written from here.
+      ...PaymentInfo.initialFields(
+        amount: total,
+        method: PaymentMethod.app,
+        status: PaymentStatus.held,
+      ),
+      'paidAt': FieldValue.serverTimestamp(),
       'createdAt': FieldValue.serverTimestamp(),
     });
     batch.set(
@@ -427,9 +433,14 @@ class BookingRepository {
         'message': '',
         'status': 'confirmed',
         // v2.6 wrote `paymentStatus: 'paid'` here, which was a lie: nothing
-        // had been charged. A seat is now recorded as owed like everything
-        // else, and the host settles it when the rider turns up.
-        ...PaymentInfo.initialFields(amount: trip.price),
+        // had been charged. A seat is escrow like a lesson (P1): the rider
+        // pays FLOW at reservation, the host is paid after the expedition.
+        ...PaymentInfo.initialFields(
+          amount: trip.price,
+          method: PaymentMethod.app,
+          status: PaymentStatus.held,
+        ),
+        'paidAt': FieldValue.serverTimestamp(),
         'createdAt': FieldValue.serverTimestamp(),
       });
     });
@@ -515,6 +526,13 @@ class BookingRepository {
     final written = await _writeIfLive(booking.id, status, {
       'status': status.wire,
       'updatedAt': FieldValue.serverTimestamp(),
+      // A provider-side cancellation stamps itself the way a rider's does —
+      // `cancelledBy` is what tells the escrow derivation this one refunds
+      // in full, whenever it happened.
+      if (status == BookingStatus.cancelled) ...{
+        'cancelledAt': FieldValue.serverTimestamp(),
+        'cancelledBy': 'provider',
+      },
     });
     if (!written) return;
 
@@ -597,6 +615,14 @@ class BookingRepository {
       if (current == PaymentStatus.refunded) {
         throw const PaymentFailure(
             'That session was refunded. Reopen it before taking payment.');
+      }
+      if (current == PaymentStatus.held ||
+          current == PaymentStatus.paidOut) {
+        // Escrow bookings are settled by FLOW, not on the beach — a trainer
+        // "collecting" one would clear FLOW's debt to themselves.
+        throw const PaymentFailure(
+            'FLOW holds this payment. It is paid out to you after the '
+            'session — there is nothing to collect in person.');
       }
       tx.update(ref, {
         'paymentStatus': PaymentStatus.paid.wire,

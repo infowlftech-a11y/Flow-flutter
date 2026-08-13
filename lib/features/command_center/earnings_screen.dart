@@ -33,6 +33,7 @@ class EarningsScreen extends ConsumerWidget {
     final completed = ref.watch(trainerCompletedProvider);
     final allTime = ref.watch(trainerRevenueProvider);
     final outstanding = ref.watch(trainerOutstandingProvider);
+    final payoutDue = ref.watch(trainerPayoutDueProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Earnings')),
@@ -79,10 +80,16 @@ class EarningsScreen extends ConsumerWidget {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
+                  // Cash a rider still owes plus payouts FLOW owes (P1) —
+                  // both are money on its way to the trainer, and one figure
+                  // answers the question this tile exists for.
                   child: _Stat(
-                    label: 'STILL TO COLLECT',
-                    value: money(outstanding.value ?? 0),
-                    tone: (outstanding.value ?? 0) > 0
+                    label: 'OWED TO YOU',
+                    value: money((outstanding.value ?? 0) +
+                        (payoutDue.value ?? 0)),
+                    tone: ((outstanding.value ?? 0) +
+                                (payoutDue.value ?? 0)) >
+                            0
                         ? context.tones.warning
                         : null,
                   ),
@@ -106,8 +113,18 @@ class EarningsScreen extends ConsumerWidget {
                     when: dayAndTime(b, prettyYmd(b.date)),
                     who: b.studentName,
                     priceLabel: money(b.amountDue),
-                    statusLabel: b.payment.isOutstanding ? 'UNPAID' : null,
-                    statusColor: context.tones.warning,
+                    // Escrow rows say the money is coming from FLOW and take
+                    // no tap — there is nothing for the trainer to do; the
+                    // payout is the processor's job (P1). Cash rows keep
+                    // UNPAID + tap-to-settle.
+                    statusLabel: b.awaitsPayout
+                        ? 'FLOW PAYOUT'
+                        : b.payment.isOutstanding
+                            ? 'UNPAID'
+                            : null,
+                    statusColor: b.awaitsPayout
+                        ? context.tones.azureBrand
+                        : context.tones.warning,
                     // Settled rows do nothing, and say so by not rippling.
                     // The unpaid ones are the only reason a trainer opens this
                     // list twice.

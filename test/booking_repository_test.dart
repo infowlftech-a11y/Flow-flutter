@@ -48,7 +48,7 @@ void main() {
       );
 
   group('createBooking', () {
-    test('writes the canonical shape, pending, with payment owed', () async {
+    test('writes the canonical shape, pending, with the payment held', () async {
       final id = await create();
       final doc = (await db.collection(Col.bookings).doc(id).get()).data()!;
       expect(doc['status'], 'pending',
@@ -56,7 +56,12 @@ void main() {
       expect(doc['selectedTimes'], ['10:00', '11:00']);
       expect(doc['durationHours'], 2);
       expect(doc['totalPrice'], 100);
-      expect(doc['paymentStatus'], 'unpaid');
+      // P1 (FLOW_REDESIGN.md): the rider pays FLOW at booking. This asserted
+      // 'unpaid' through the cash era; the escrow order flipped it.
+      expect(doc['paymentStatus'], 'held');
+      expect(doc['paymentMethod'], 'app');
+      expect(doc['paidAt'], isNotNull,
+          reason: 'the hold instant is the receipt');
       expect(doc['amountDue'], 100,
           reason: 'the amount is captured at booking time, not derived later');
       final b = Booking.fromDoc(id, doc);
@@ -135,7 +140,7 @@ void main() {
           'status': 'open',
         });
 
-    test('reserving counts the seat and books it as owed', () async {
+    test('reserving counts the seat and holds the payment', () async {
       await seedTrip();
       await repo.reserveSafariSeat(
           trip: trip(), hostName: 'Red Sea Co.', riderUid: 'r1', riderName: 'S');
@@ -144,8 +149,9 @@ void main() {
       expect(t['status'], 'open');
       final b = (await db.collection(Col.bookings).get()).docs.single.data();
       expect(b['type'], 'safari');
-      expect(b['paymentStatus'], 'unpaid',
-          reason: 'a reserved seat is owed, not paid — the v2.6 lie');
+      expect(b['paymentStatus'], 'held',
+          reason: 'a seat is escrow like a lesson (P1) — paid to FLOW at '
+              'reservation, never marked settled to the host at creation');
     });
 
     test('the last seat flips the trip to full; the next rider bounces',
@@ -276,6 +282,39 @@ void main() {
     test('a vanished booking is a named failure, not a crash', () async {
       expect(() => repo.markPaid('ghost', trainerId: 't'),
           throwsA(isA<PaymentFailure>()));
+    });
+
+    // ── P1: escrow bookings are settled by FLOW, not on the beach ─────────
+
+    test('markPaid refuses a held booking — nothing to collect in person',
+        () async {
+      await seedBooking('b1', payment: 'held');
+      expect(() => repo.markPaid('b1', trainerId: 'trainer1'),
+          throwsA(isA<PaymentFailure>()));
+      final doc = (await db.collection(Col.bookings).doc('b1').get()).data()!;
+      expect(doc['paymentStatus'], 'held',
+          reason: 'a refused settlement must not half-write');
+    });
+
+    test('a rider cancel stamps who and when — the policy inputs', () async {
+      final id = await create();
+      final before =
+          (await db.collection(Col.bookings).doc(id).get()).data()!;
+      await repo.cancelByRider(Booking.fromDoc(id, before));
+      final doc = (await db.collection(Col.bookings).doc(id).get()).data()!;
+      expect(doc['cancelledBy'], 'user');
+      expect(doc['cancelledAt'], isNotNull,
+          reason: 'the free-cancel window is judged against this stamp');
+    });
+
+    test('a provider cancel stamps itself too — it always refunds', () async {
+      final id = await create();
+      final doc0 = (await db.collection(Col.bookings).doc(id).get()).data()!;
+      await repo.setStatus(
+          Booking.fromDoc(id, doc0), BookingStatus.cancelled);
+      final doc = (await db.collection(Col.bookings).doc(id).get()).data()!;
+      expect(doc['cancelledBy'], 'provider');
+      expect(doc['cancelledAt'], isNotNull);
     });
   });
 

@@ -556,8 +556,8 @@ class _TrainerFormScreenState extends ConsumerState<TrainerFormScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _header('Your rate',
-            'You set the price. One hourly rate, settled in person at the '
-                'centre. FLOW takes nothing.'),
+            'You set the price. Riders pay FLOW when they book, and FLOW '
+                'pays you after each completed session.'),
         FormGroup(
           label: 'Hourly rate',
           required: true,

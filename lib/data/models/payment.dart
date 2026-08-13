@@ -30,8 +30,15 @@ import '../../core/utils/doc_x.dart';
 
 /// How a booking is settled.
 enum PaymentMethod {
-  /// Today's only real answer: the rider pays the trainer at the centre.
+  /// The legacy answer, still real for walk-ins: the rider pays the trainer
+  /// at the centre. There is no rider account behind a walk-in to charge.
   cash('cash', 'Pay at the centre'),
+
+  /// The escrow path (P1 in FLOW_REDESIGN.md): the rider pays FLOW at
+  /// booking, FLOW pays the trainer after the session completes. Until a
+  /// processor is wired this is a recorded hold, not a card charge — the
+  /// PSP drops into `paymentRef` and the executed statuses below.
+  app('app', 'Paid through FLOW'),
 
   /// Reserved. Card taken in-app at booking time.
   card('card', 'Card'),
@@ -49,6 +56,7 @@ enum PaymentMethod {
   /// Unrecognised wire values fall back to [cash] rather than throwing — the
   /// same tolerance every other reader in the app applies (§5).
   static PaymentMethod parse(String? raw) => switch (raw) {
+        'app' => app,
         'card' => card,
         'wallet' => wallet,
         'transfer' => transfer,
@@ -65,7 +73,7 @@ enum PaymentMethod {
   /// Whether this method can be chosen right now. Everything else is modelled
   /// but not offered, so the enum can be complete without the UI lying about
   /// what works.
-  bool get isAvailable => this == cash;
+  bool get isAvailable => this == cash || this == app;
 }
 
 /// Where a booking's money has got to.
@@ -82,6 +90,14 @@ enum PaymentStatus {
   /// Owed. The normal state of a cash booking until the trainer collects.
   unpaid('unpaid', 'Unpaid'),
 
+  /// The rider paid FLOW at booking and FLOW is holding it — escrow. Not
+  /// settled: the trainer has not been paid, and if the booking dies in the
+  /// rider's favour the money goes back. What the hold becomes ("refund
+  /// due", "payout due") is *derived* from the booking, never written from a
+  /// client — see EscrowState in cancellation.dart and P1 in
+  /// FLOW_REDESIGN.md.
+  held('held', 'Held by FLOW'),
+
   /// Reserved. Handed to a processor, no result yet — the state that makes
   /// asynchronous payment methods representable at all.
   processing('processing', 'Processing'),
@@ -89,6 +105,11 @@ enum PaymentStatus {
   paid('paid', 'Paid'),
 
   refunded('refunded', 'Refunded'),
+
+  /// A held payment FLOW has actually transferred to the trainer. Written by
+  /// the processor/Functions layer (or staff), never by either party — until
+  /// then a delivered session sits at [held] and reads as "payout due".
+  paidOut('paid_out', 'Paid out'),
 
   /// Reserved. The processor declined it.
   failed('failed', 'Payment failed');
@@ -99,9 +120,11 @@ enum PaymentStatus {
 
   static PaymentStatus parse(String? raw) => switch (raw) {
         'unpaid' => unpaid,
+        'held' => held,
         'processing' => processing,
         'paid' => paid,
         'refunded' => refunded,
+        'paid_out' => paidOut,
         'failed' => failed,
         // Absent, empty or unrecognised — all mean "we do not know", which is
         // the truth and is not the same as "unpaid".
@@ -113,11 +136,17 @@ enum PaymentStatus {
   /// people to ignore the pill.
   bool get isDisplayable => this != unknown;
 
-  /// Whether the trainer is still owed for this session.
+  /// Whether the trainer is still owed for this session *by the rider* —
+  /// the cash ledger. A held payment is deliberately not here: the rider has
+  /// already paid, and what FLOW owes the trainer is the payout question,
+  /// answered by [isHeldByApp] + the booking's own status.
   bool get isOutstanding => this == unpaid || this == failed;
 
-  /// Whether money has actually landed.
-  bool get isSettled => this == paid;
+  /// FLOW is holding the rider's money.
+  bool get isHeldByApp => this == held;
+
+  /// Whether money has actually landed with the trainer.
+  bool get isSettled => this == paid || this == paidOut;
 }
 
 /// The money on one booking, read as a unit.

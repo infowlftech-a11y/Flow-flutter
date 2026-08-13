@@ -290,11 +290,12 @@ class ProfileScreen extends ConsumerWidget {
                 ),
                 _PrivacyItem(
                   icon: Symbols.payments_rounded,
-                  title: 'You are paid in person',
+                  title: 'You are paid through FLOW',
                   body:
-                      'FLOW takes nothing and handles no money. You mark a '
-                      'session settled once the rider has paid you directly, '
-                      'and your earnings sum exactly those sessions.',
+                      'Riders pay FLOW when they book, and FLOW pays you '
+                      'after each completed session. A late cancellation '
+                      '(inside 24 hours) is still paid out — the policy '
+                      'protects your committed hours.',
                 ),
               ]
             : const [
@@ -316,11 +317,12 @@ class ProfileScreen extends ConsumerWidget {
                 ),
                 _PrivacyItem(
                   icon: Symbols.payments_rounded,
-                  title: 'Pay your trainer directly',
+                  title: 'Pay when you book',
                   body:
-                      'Prices are in Egyptian pounds and settled in person at '
-                      'the centre. FLOW never takes a cut and never holds '
-                      'your money.',
+                      'Prices are in euros. You pay FLOW at booking and your '
+                      'trainer is paid after the session. Free cancellation '
+                      'until 24 hours before the start; declined or '
+                      'unanswered requests are always refunded in full.',
                 ),
               ],
       ),

@@ -18,6 +18,7 @@ import '../../core/widgets/misc.dart';
 import '../../core/widgets/sheets.dart';
 import '../../core/widgets/surfaces.dart';
 import '../../core/theme/palette.dart';
+import '../../data/models/cancellation.dart';
 import '../../data/models/catalogue.dart';
 import '../../data/models/schedule.dart';
 import '../../data/models/wind.dart';
@@ -315,19 +316,29 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        Icon(Symbols.storefront_rounded,
+                        Icon(Symbols.account_balance_wallet_rounded,
                             size: 15,
                             color: sheetContext.tones.textFaint),
                         const SizedBox(width: 6),
-                        Text('Pay at the centre — nothing is charged in FLOW',
-                            style: inter(12.5, 540,
-                                color: sheetContext.tones.textFaint)),
+                        Expanded(
+                          child: Text(
+                              'You pay FLOW now — your trainer is paid '
+                              'after the session',
+                              style: inter(12.5, 540,
+                                  color: sheetContext.tones.textFaint)),
+                        ),
                       ],
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 10),
+              // The policy, before the money leaves — a fee nobody was
+              // warned about is a complaint, not a policy. Wording follows
+              // the booking.com pattern: name the deadline when there is
+              // one, say plainly when there is not.
+              _PolicyLine(date: _date, start: _sortedSelection.first),
+              const SizedBox(height: 6),
               Text(
                 'Your kite level is shared with the trainer so they can prep '
                 'the right session.',
@@ -335,7 +346,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
               ),
               const SizedBox(height: 16),
               PrimaryButton(
-                label: 'Confirm booking',
+                label: 'Confirm & pay ${money(_total)}',
                 busy: _submitting,
                 onPressed: () => _confirm(sheetContext, setSheet),
               ),
@@ -414,8 +425,9 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                     style: Theme.of(dialogContext).textTheme.headlineMedium),
                 const SizedBox(height: 10),
                 Text(
-                  "Your trainer has been notified. You'll get a ping the "
-                  'moment they approve.',
+                  '${money(_total)} is held by FLOW — refunded in full if '
+                  "the trainer declines. You'll get a ping the moment they "
+                  'approve.',
                   textAlign: TextAlign.center,
                   style: Theme.of(dialogContext).textTheme.bodyMedium,
                 ),
@@ -432,6 +444,63 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The cancellation terms, stated before the money leaves.
+///
+/// booking.com's pattern: name the free-cancellation deadline when there is
+/// one, and say plainly when there is not — a session booked inside the
+/// window has no free exit, and the rider should know that with their thumb
+/// still off the pay button.
+class _PolicyLine extends StatelessWidget {
+  const _PolicyLine({required this.date, required this.start});
+
+  /// Local `YYYY-MM-DD` + the first selected hour — the session's start.
+  final String date;
+  final Slot start;
+
+  static String _fmt(DateTime t) {
+    final ymd = '${t.year.toString().padLeft(4, '0')}-'
+        '${t.month.toString().padLeft(2, '0')}-'
+        '${t.day.toString().padLeft(2, '0')}';
+    final hh = t.hour.toString().padLeft(2, '0');
+    final mm = t.minute.toString().padLeft(2, '0');
+    return '${prettyYmd(ymd)}, $hh:$mm';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tones = context.tones;
+    final day = parseYmd(date);
+    final deadline = day
+        ?.add(Duration(minutes: start.minutesOfDay))
+        .subtract(CancellationPolicy.freeCancelWindow);
+    final free = deadline != null && DateTime.now().isBefore(deadline);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          free ? Symbols.event_available_rounded : Symbols.schedule_rounded,
+          size: 15,
+          color: free ? tones.success : tones.warning,
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            free
+                ? 'Free cancellation until ${_fmt(deadline)}. After that '
+                    "you're charged in full. Declined or unanswered requests "
+                    'are always refunded.'
+                : 'Starts within 24 hours — cancelling after you pay is '
+                    'charged in full. Declined or unanswered requests are '
+                    'always refunded.',
+            style: inter(12.5, 520, color: tones.textFaint, height: 1.4),
+          ),
+        ),
+      ],
     );
   }
 }
