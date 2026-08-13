@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/theme/motion.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/typography.dart';
+import '../../core/widgets/flow_image.dart';
 import '../../services/image_service.dart';
 
 /// Circular avatar picker: shows the picked file, an existing URL, or a
@@ -35,14 +36,20 @@ class AvatarPicker extends StatelessWidget {
     final tones = context.tones;
     Widget content;
     if (file != null) {
-      content = Image.file(File(file!.path),
-          width: size, height: size, fit: BoxFit.cover);
+      content = Image.file(
+        File(file!.path),
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+      );
     } else if (existingUrl != null && existingUrl!.isNotEmpty) {
-      content = Image.network(existingUrl!,
-          width: size,
-          height: size,
-          fit: BoxFit.cover,
-          errorBuilder: (_, _, _) => _placeholder(tones));
+      content = FlowImage(
+        url: existingUrl,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        placeholderIcon: Symbols.add_a_photo_rounded,
+      );
     } else {
       content = _placeholder(tones);
     }
@@ -75,7 +82,8 @@ class AvatarPicker extends StatelessWidget {
                     ? null
                     : Border.all(
                         color: tones.azureBrand.withValues(alpha: .5),
-                        width: 2),
+                        width: 2,
+                      ),
               ),
               clipBehavior: Clip.antiAlias,
               child: content,
@@ -89,11 +97,15 @@ class AvatarPicker extends StatelessWidget {
                   color: tones.azureBrand,
                   shape: BoxShape.circle,
                   border: Border.all(
-                      color: Theme.of(context).scaffoldBackgroundColor,
-                      width: 2),
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    width: 2,
+                  ),
                 ),
-                child: const Icon(Symbols.photo_camera_rounded,
-                    size: 15, color: Colors.white),
+                child: const Icon(
+                  Symbols.photo_camera_rounded,
+                  size: 15,
+                  color: Colors.white,
+                ),
               ),
             ),
           ],
@@ -103,14 +115,16 @@ class AvatarPicker extends StatelessWidget {
   }
 
   Widget _placeholder(dynamic tones) => Container(
-        width: size,
-        height: size,
-        color: (tones.azureBrand as Color).withValues(alpha: .12),
-        child: Icon(Symbols.add_a_photo_rounded,
-            color: tones.azureBrand as Color, size: size * .3),
-      );
+    width: size,
+    height: size,
+    color: (tones.azureBrand as Color).withValues(alpha: .12),
+    child: Icon(
+      Symbols.add_a_photo_rounded,
+      color: tones.azureBrand as Color,
+      size: size * .3,
+    ),
+  );
 }
-
 
 /// Labeled form group with an optional "required" marker + inline error.
 class FormGroup extends StatelessWidget {
@@ -140,13 +154,14 @@ class FormGroup extends StatelessWidget {
             // an unflexed label pushed the required marker out of the row and
             // the two painted on top of each other.
             Flexible(
-              child: Text(label.toUpperCase(),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: microLabel(tones.textFaint)),
+              child: Text(
+                label.toUpperCase(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: microLabel(tones.textFaint),
+              ),
             ),
-            if (required)
-              Text(' *', style: microLabel(tones.azureBrand)),
+            if (required) Text(' *', style: microLabel(tones.azureBrand)),
           ],
         ),
         const SizedBox(height: 8),
@@ -159,8 +174,10 @@ class FormGroup extends StatelessWidget {
               ? const SizedBox.shrink()
               : Padding(
                   padding: const EdgeInsets.only(top: 7),
-                  child: Text(errorText!,
-                      style: inter(12.5, 560, color: tones.danger)),
+                  child: Text(
+                    errorText!,
+                    style: inter(12.5, 560, color: tones.danger),
+                  ),
                 ),
         ),
         const SizedBox(height: 24),

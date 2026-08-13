@@ -344,9 +344,15 @@ class SessionRow extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 4),
+                      // Two lines, not one: this line carries who the session
+                      // is with. On one line at 1.3x, `Anna Bergström ·
+                      // Expedition: Long Downwinder` ellipsized to `Anna
+                      // Bergström · Ex…`, deleting the only description the
+                      // row has. The column is height-flexible, so the second
+                      // line costs nothing when the text is short.
                       Text(
                         location == null ? who : '$who · $location',
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: inter(12.5, 500, color: scheme.onSurfaceVariant),
                       ),

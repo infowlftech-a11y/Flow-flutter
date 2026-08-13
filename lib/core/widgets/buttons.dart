@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/motion.dart';
 import '../theme/palette.dart';
+import '../theme/radii.dart';
 
 /// Primary CTA. While busy it swaps the label for a spinner and **keeps its
 /// brand fill** — a disabled grey pill reads as dead (§10.5).
@@ -29,7 +30,9 @@ class PrimaryButton extends StatelessWidget {
     final button = FilledButton(
       style: destructive
           ? FilledButton.styleFrom(
-              backgroundColor: scheme.error, foregroundColor: scheme.onError)
+              backgroundColor: scheme.error,
+              foregroundColor: scheme.onError,
+            )
           : null,
       // Busy keeps the fill: onPressed stays non-null but ignores taps.
       onPressed: busy ? () {} : onPressed,
@@ -122,9 +125,7 @@ class ScrimIconButton extends StatelessWidget {
     return Tooltip(
       message: tooltip,
       child: Material(
-        color: active
-            ? FlowColors.azure
-            : Colors.black.withValues(alpha: .38),
+        color: active ? FlowColors.azure : Colors.black.withValues(alpha: .38),
         shape: const CircleBorder(),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -170,13 +171,16 @@ class MicroAction extends StatelessWidget {
     final style = ButtonStyle(
       minimumSize: const WidgetStatePropertyAll(Size(48, 40)),
       padding: const WidgetStatePropertyAll(
-          EdgeInsets.symmetric(horizontal: 14, vertical: 8)),
-      shape: WidgetStatePropertyAll(
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(11))),
-      textStyle: WidgetStatePropertyAll(Theme.of(context)
-          .textTheme
-          .labelSmall!
-          .copyWith(fontSize: 11.5, letterSpacing: 1)),
+        EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      ),
+      shape: const WidgetStatePropertyAll(
+        RoundedRectangleBorder(borderRadius: FlowRadii.chip),
+      ),
+      textStyle: WidgetStatePropertyAll(
+        Theme.of(
+          context,
+        ).textTheme.labelSmall!.copyWith(fontSize: 11.5, letterSpacing: 1),
+      ),
     );
     final child = Row(
       mainAxisSize: MainAxisSize.min,
@@ -200,7 +204,8 @@ class MicroAction extends StatelessWidget {
         style: style.copyWith(
           backgroundColor: WidgetStatePropertyAll(c),
           foregroundColor: WidgetStatePropertyAll(
-              filled ? scheme.onPrimary : c),
+            filled ? scheme.onPrimary : c,
+          ),
         ),
         child: child,
       );
@@ -210,7 +215,8 @@ class MicroAction extends StatelessWidget {
       style: style.copyWith(
         foregroundColor: WidgetStatePropertyAll(c),
         side: WidgetStatePropertyAll(
-            BorderSide(color: c.withValues(alpha: .5))),
+          BorderSide(color: c.withValues(alpha: .5)),
+        ),
       ),
       child: child,
     );

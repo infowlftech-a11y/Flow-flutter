@@ -10,7 +10,7 @@ import '../../core/utils/haptics.dart';
 import '../../core/widgets/gate.dart';
 import '../../providers/providers.dart';
 
-/// "I'm a Kiter" / "I'm a Trainer". Sign-out lives in the app-bar *trailing*
+/// "I'm a Rider" / "I'm a Trainer". Sign-out lives in the app-bar *trailing*
 /// slot — never the back slot (§3.2, §10.4).
 class RoleSelectScreen extends ConsumerWidget {
   const RoleSelectScreen({super.key});
@@ -46,7 +46,10 @@ class RoleSelectScreen extends ConsumerWidget {
           const SizedBox(height: 32),
           _RoleCard(
             icon: Symbols.kitesurfing_rounded,
-            title: "I'm a Kiter",
+            // "Rider", matching every other surface — Rider ID, receipts, the
+            // admin dossier. "Kiter" was the one place the app used a second
+            // name for the same person. (Class and wire names keep `kiter`.)
+            title: "I'm a Rider",
             body:
                 'Find certified trainers, book hours on the water and check in with a QR ticket.',
             cta: 'Ride with FLOW',

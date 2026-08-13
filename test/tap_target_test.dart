@@ -35,77 +35,100 @@ final _cases = <String, Widget Function()>{
   // it sits in a 3-across grid where the temptation is always to shrink it.
   'SlotTile.free': () =>
       SlotTile(range: '09:00 – 10:00', state: SlotState.free, onTap: _noop),
-  'SlotTile.selected': () => SlotTile(
-      range: '09:00 – 10:00', state: SlotState.selected, onTap: _noop),
+  'SlotTile.selected': () =>
+      SlotTile(range: '09:00 – 10:00', state: SlotState.selected, onTap: _noop),
   'WeekStrip': () => WeekStrip(
-        days: [for (var i = 0; i < 7; i++) DateTime(2026, 5, 13 + i)],
-        selected: DateTime(2026, 5, 13),
-        onSelect: (_) {},
-      ),
+    days: [for (var i = 0; i < 7; i++) DateTime(2026, 5, 13 + i)],
+    selected: DateTime(2026, 5, 13),
+    onSelect: (_) {},
+  ),
   'RequestRow': () => RequestRow(
-      when: 'Tomorrow, 09:00 - 10:00',
-      name: 'Nicolas P.',
-      onApprove: _noop,
-      onDecline: _noop),
+    when: 'Tomorrow, 09:00 - 10:00',
+    name: 'Nicolas P.',
+    onApprove: _noop,
+    onDecline: _noop,
+  ),
   'AgendaRow': () =>
       AgendaRow(time: '10:00', name: 'Julie M.', live: true, onTap: _noop),
   'ProviderCard': () => ProviderCard(
-        name: 'Marco B.',
-        photoUrl: null,
-        rating: 4.9,
-        reviewCount: 128,
-        location: 'El Gouna',
-        priceLabel: '€110',
-        onTap: _noop,
-      ),
+    name: 'Marco B.',
+    photoUrl: null,
+    rating: 4.9,
+    reviewCount: 128,
+    location: 'El Gouna',
+    priceLabel: '€110',
+    onTap: _noop,
+  ),
   'MicroAction.filled': () => MicroAction(label: 'APPROVE', onPressed: _noop),
   'MicroAction.outlined': () =>
       MicroAction(label: 'DECLINE', onPressed: _noop, filled: false),
   'ScrimIconButton': () => ScrimIconButton(
-      icon: Icons.close_rounded, tooltip: 'Close', onTap: _noop),
+    icon: Icons.close_rounded,
+    tooltip: 'Close',
+    onTap: _noop,
+  ),
   'FlowChoiceChip': () =>
       FlowChoiceChip(label: 'El Gouna', selected: false, onTap: _noop),
   'FlowChoiceChip.deletable': () => FlowChoiceChip(
-      label: 'English', selected: true, onTap: _noop, onDeleted: _noop),
+    label: 'English',
+    selected: true,
+    onTap: _noop,
+    onDeleted: _noop,
+  ),
   'FlowCard.onTap': () =>
       FlowCard(onTap: _noop, child: const Text('A tappable card')),
   'InfoTile.onTap': () =>
       InfoTile(label: 'Location', value: 'El Gouna', onTap: _noop),
   'FlowPickerField': () => FlowPickerField(
-        values: const [],
-        onChanged: (_) {},
-        options: const ['El Gouna'],
-        sheetTitle: 'Spot',
-      ),
+    values: const [],
+    onChanged: (_) {},
+    options: const ['El Gouna'],
+    sheetTitle: 'Spot',
+  ),
+  // With tags. The old per-tag remove ✕ was an 18px unlabelled target these
+  // guidelines never saw, because the only case here pumped an empty field.
+  // Tags are inert now — this case keeps anyone from making them tappable
+  // again without giving each one a real target and a name.
+  'FlowPickerField.tags': () => FlowPickerField(
+    values: const ['English', 'Arabic'],
+    onChanged: (_) {},
+    options: const ['English', 'Arabic'],
+    sheetTitle: 'Languages',
+    multiSelect: true,
+  ),
   'ThumbTile': () => ThumbTile(
-      onRemove: _noop,
-      isNew: true,
-      child: const SizedBox(width: 84, height: 84)),
+    onRemove: _noop,
+    isNew: true,
+    child: const SizedBox(width: 84, height: 84),
+  ),
   'MessageComposer': () => MessageComposer(
-      controller: TextEditingController(text: 'hi'), onSend: _noop),
+    controller: TextEditingController(text: 'hi'),
+    onSend: _noop,
+  ),
   'Stars.interactive': () => Stars(value: 3, onChanged: (_) {}),
 };
 
 void main() {
   for (final entry in _cases.entries) {
-    testWidgets('${entry.key} meets the tap-target guidelines',
-        (tester) async {
+    testWidgets('${entry.key} meets the tap-target guidelines', (tester) async {
       final handle = tester.ensureSemantics();
       tester.view.physicalSize = const Size(360, 720);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
 
-      await tester.pumpWidget(MaterialApp(
-        theme: FlowTheme.light(),
-        home: Scaffold(
-          body: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: entry.value(),
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: FlowTheme.light(),
+          home: Scaffold(
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: entry.value(),
+              ),
             ),
           ),
         ),
-      ));
+      );
       await tester.pumpAndSettle();
 
       await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));

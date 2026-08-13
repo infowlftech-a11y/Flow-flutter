@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/radii.dart';
 import '../../core/theme/typography.dart';
 import '../../core/utils/date_x.dart';
 import '../../core/utils/haptics.dart';
@@ -530,7 +531,7 @@ class _ReportCard extends ConsumerWidget {
                   url: report.attachments[i],
                   width: 64,
                   height: 64,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: FlowRadii.chip,
                 ),
               ),
             ),
@@ -864,7 +865,7 @@ class _AppealCardState extends ConsumerState<_AppealCard> {
                   url: a.attachments[i],
                   width: 64,
                   height: 64,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: FlowRadii.chip,
                 ),
               ),
             ),

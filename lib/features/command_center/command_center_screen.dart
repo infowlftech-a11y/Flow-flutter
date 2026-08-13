@@ -691,7 +691,7 @@ class _ManifestCard extends ConsumerWidget {
                 ),
                 decoration: BoxDecoration(
                   color: tones.azureBrand.withValues(alpha: .1),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: FlowRadii.chip,
                 ),
                 child: Text(
                   b.startTime ?? '--:--',

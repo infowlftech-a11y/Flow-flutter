@@ -825,9 +825,13 @@ class _DayStrip extends ConsumerWidget {
                                       style: interNum(
                                         11.5,
                                         760,
+                                        // onTint: raw amber at 11.5px on a
+                                        // white card is decoration, not text.
                                         color: active
                                             ? Colors.white
-                                            : windColor(gust.rating),
+                                            : tones.onTint(
+                                                windColor(gust.rating),
+                                              ),
                                       ),
                                     ),
                                   ),
@@ -902,7 +906,7 @@ class _WindSummary extends ConsumerWidget {
                   Icon(
                     Symbols.air_rounded,
                     size: 18,
-                    color: windColor(day.rating),
+                    color: tones.onTint(windColor(day.rating)),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -917,7 +921,10 @@ class _WindSummary extends ConsumerWidget {
                           style: inter(
                             14,
                             700,
-                            color: windColor(day.rating),
+                            // A label on a tint of its own tone goes through
+                            // onTint — the 10% wash barely moves the white
+                            // underneath, so the text carries the whole ratio.
+                            color: tones.onTint(windColor(day.rating)),
                             height: 1.25,
                           ),
                         ),

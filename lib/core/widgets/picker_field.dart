@@ -94,10 +94,7 @@ class FlowPickerField extends StatelessWidget {
                         style: inter(15, 460, color: tones.textFaint),
                       )
                     : (multiSelect
-                          ? _Tags(
-                              values: values,
-                              onRemove: enabled ? _remove : null,
-                            )
+                          ? _Tags(values: values)
                           : Text(
                               values.first,
                               style: inter(
@@ -118,58 +115,40 @@ class FlowPickerField extends StatelessWidget {
       ),
     );
   }
-
-  void _remove(String value) => onChanged([
-    for (final v in values)
-      if (v != value) v,
-  ]);
 }
 
-/// Selected values as removable tags — the whole point of multi-select being
-/// a field rather than a chip wall is that only the *chosen* items take space.
+/// Selected values as plain tags — the whole point of multi-select being a
+/// field rather than a chip wall is that only the *chosen* items take space.
+///
+/// Deliberately not removable inline. The per-tag ✕ was an 18px target inside
+/// a field whose every other pixel opens the picker, so missing it by 3px did
+/// something entirely different — and the sheet already lists every selected
+/// value, custom ones included, as a full-height row to untick. One tap, one
+/// meaning: the field opens the editor; editing happens there.
 class _Tags extends StatelessWidget {
-  const _Tags({required this.values, required this.onRemove});
+  const _Tags({required this.values});
 
   final List<String> values;
-  final ValueChanged<String>? onRemove;
 
   @override
   Widget build(BuildContext context) {
     final tones = context.tones;
     return Wrap(
-      spacing: 7,
-      runSpacing: 7,
+      spacing: 8,
+      runSpacing: 8,
       children: [
         for (final v in values)
           Container(
-            padding: const EdgeInsets.fromLTRB(11, 6, 5, 6),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
               color: tones.azureBrand.withValues(alpha: .14),
-              borderRadius: BorderRadius.circular(9),
+              borderRadius: FlowRadii.pill,
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(v, style: inter(14, 600, color: tones.azureBrand)),
-                const SizedBox(width: 3),
-                InkWell(
-                  onTap: onRemove == null
-                      ? null
-                      : () {
-                          Haptics.select();
-                          onRemove!(v);
-                        },
-                  borderRadius: FlowRadii.card,
-                  child: Padding(
-                    padding: const EdgeInsets.all(2),
-                    child: Icon(
-                      Symbols.close_rounded,
-                      size: 14,
-                      color: tones.azureBrand,
-                    ),
-                  ),
-                ),
-              ],
+            child: Text(
+              v,
+              // onTint: the 14% wash barely moves the card underneath, so
+              // raw azure at 14px would have to carry the ratio alone.
+              style: inter(14, 600, color: tones.onTint(tones.azureBrand)),
             ),
           ),
       ],

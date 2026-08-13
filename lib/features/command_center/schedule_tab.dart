@@ -652,6 +652,10 @@ class _Timeline extends ConsumerWidget {
                             ),
                           ),
                         ),
+                        // A real gap, not leftover column width: at 1.3x the
+                        // scaled hour fills all 52px and the dot sat flush
+                        // against "08:00".
+                        const SizedBox(width: 8),
                         Container(
                           width: 8,
                           height: 8,
