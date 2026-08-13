@@ -157,6 +157,71 @@ describe('bookings — create (lines 107-111)', () => {
   });
 });
 
+// P5 — Instant Book. A rider-created booking is born 'pending' unless the
+// trainer's own document carries instantBook: true, in which case — and only
+// in which case — it may be born 'confirmed'. Before P5 the create rule did
+// not constrain status at all: any rider could self-confirm against any
+// trainer with a hand-rolled client. These pin both the feature and the
+// closed hole.
+describe('bookings — create, Instant Book (trainerAllowsInstant)', () => {
+  test('DENY a rider self-confirming against a trainer who never opted in', async () => {
+    const db = await as('rider');
+    await assertFails(
+      db.collection('bookings').doc('n1').set(bookingDoc({
+        id: 'n1', status: 'confirmed', paymentStatus: 'held', paymentMethod: 'app',
+      })),
+    );
+  });
+
+  test('a rider books confirmed when the trainer opted into Instant Book', async () => {
+    await seed(async (db) => {
+      await db.collection('users').doc('trainer').set({ instantBook: true }, { merge: true });
+    });
+    const db = await as('rider');
+    await assertSucceeds(
+      db.collection('bookings').doc('n1').set(bookingDoc({
+        id: 'n1', status: 'confirmed', paymentStatus: 'held', paymentMethod: 'app',
+      })),
+    );
+  });
+
+  test('DENY confirmed when the trainer explicitly turned Instant Book off', async () => {
+    await seed(async (db) => {
+      await db.collection('users').doc('trainer').set({ instantBook: false }, { merge: true });
+    });
+    const db = await as('rider');
+    await assertFails(
+      db.collection('bookings').doc('n1').set(bookingDoc({
+        id: 'n1', status: 'confirmed', paymentStatus: 'held', paymentMethod: 'app',
+      })),
+    );
+  });
+
+  test('DENY any other rider-written status, Instant Book or not', async () => {
+    await seed(async (db) => {
+      await db.collection('users').doc('trainer').set({ instantBook: true }, { merge: true });
+    });
+    const db = await as('rider');
+    await assertFails(
+      db.collection('bookings').doc('n1').set(bookingDoc({
+        id: 'n1', status: 'completed', paymentStatus: 'held', paymentMethod: 'app',
+      })),
+    );
+  });
+
+  test('pending stays allowed regardless of the trainer flag', async () => {
+    await seed(async (db) => {
+      await db.collection('users').doc('trainer').set({ instantBook: true }, { merge: true });
+    });
+    const db = await as('rider');
+    await assertSucceeds(
+      db.collection('bookings').doc('n1').set(bookingDoc({
+        id: 'n1', status: 'pending', paymentStatus: 'held', paymentMethod: 'app',
+      })),
+    );
+  });
+});
+
 describe('bookings — update, the trainer (lines 120-123)', () => {
   test('the trainer approves', async () => {
     const db = await as('trainer');

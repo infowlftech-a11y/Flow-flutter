@@ -57,7 +57,10 @@ void main() {
         expect(
           doc['status'],
           'pending',
-          reason: 'every rider booking starts pending — no instant booking',
+          // Reason updated by P5: instant booking exists now, as an opt-in.
+          reason:
+              'a rider booking starts pending unless the trainer opted '
+              'into Instant Book — this one has not',
         );
         expect(doc['selectedTimes'], ['10:00', '11:00']);
         expect(doc['durationHours'], 2);
@@ -87,6 +90,37 @@ void main() {
       expect(inbox, hasLength(1));
       expect(inbox.single.kind, NotificationKind.bookingRequest);
       expect(inbox.single.bookingId, id);
+    });
+
+    // ── Instant Book (P5) ──────────────────────────────────────────────────
+    test('an opted-in trainer gets bookings born confirmed', () async {
+      await db.collection(Col.users).doc('trainer1').set({'instantBook': true});
+      final id = await create();
+      final doc = (await db.collection(Col.bookings).doc(id).get()).data()!;
+      expect(doc['status'], 'confirmed');
+      expect(
+        doc['paymentStatus'],
+        'held',
+        reason: 'instant changes the approval step, never the escrow',
+      );
+
+      final inbox = await notifications.watchFor('trainer1').first;
+      expect(
+        inbox.single.kind,
+        NotificationKind.bookingConfirmed,
+        reason: 'nothing to approve — the notification is news, not a task',
+      );
+    });
+
+    test('the flag set false books pending, exactly like absent', () async {
+      await db.collection(Col.users).doc('trainer1').set({
+        'instantBook': false,
+      });
+      final id = await create();
+      final doc = (await db.collection(Col.bookings).doc(id).get()).data()!;
+      expect(doc['status'], 'pending');
+      final inbox = await notifications.watchFor('trainer1').first;
+      expect(inbox.single.kind, NotificationKind.bookingRequest);
     });
 
     test('no slots is a programming error, not a Firestore write', () async {

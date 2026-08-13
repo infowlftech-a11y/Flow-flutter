@@ -10,12 +10,12 @@ enum UserRole {
   unknown;
 
   static UserRole parse(String? raw) => switch (raw) {
-        'kiter' => kiter,
-        'business' || 'host' || 'trainer' => business, // legacy aliases
-        'admin' || 'owner' => admin,
-        'support' => support,
-        _ => unknown,
-      };
+    'kiter' => kiter,
+    'business' || 'host' || 'trainer' => business, // legacy aliases
+    'admin' || 'owner' => admin,
+    'support' => support,
+    _ => unknown,
+  };
 }
 
 /// `users/{uid}.status` (§2.2).
@@ -27,12 +27,12 @@ enum AccountStatus {
   none;
 
   static AccountStatus parse(String? raw) => switch (raw) {
-        'active' => active,
-        'pending' => pending,
-        'rejected' => rejected,
-        'blocked' => blocked,
-        _ => none,
-      };
+    'active' => active,
+    'pending' => pending,
+    'rejected' => rejected,
+    'blocked' => blocked,
+    _ => none,
+  };
 }
 
 class AppUser {
@@ -63,6 +63,7 @@ class AppUser {
     this.fcmToken,
     this.reviewNote,
     this.travelBufferMinutes,
+    this.instantBook = false,
   });
 
   final String uid;
@@ -104,39 +105,51 @@ class AppUser {
   // `instantBooking` removed: parsed from the profile but no caller ever
   // passed it, so every booking was created `pending` regardless (§14.3).
   // Dead code that read as a feature.
+  //
+  // P5 built the feature for real, under a *new* wire name on purpose: a
+  // legacy `instantBooking: true` set years ago against a web client that
+  // never honoured it must not silently start auto-confirming sessions now
+  // that the whole pipeline (repository, rules, UI) actually obeys it.
+  // Trainers opt in fresh, from the profile screen.
   final int? travelBufferMinutes;
+
+  /// The trainer takes bookings without approving each one (P5): a rider's
+  /// createBooking is born `confirmed`, and firestore.rules only lets a
+  /// rider write that status when this flag is true on the trainer's doc.
+  final bool instantBook;
 
   /// Canonical field names only — the `hostProfile` nested fallbacks,
   /// `businessName`, `profileImage` and the `priceList` string duplicate of
   /// `hourlyRate` all existed to read what a legacy web client wrote (§5.1).
   factory AppUser.fromDoc(String uid, Map<String, dynamic> d) => AppUser(
-        uid: uid,
-        name: d.str('name') ?? '',
-        email: d.str('email') ?? '',
-        role: UserRole.parse(d.str('role')),
-        status: AccountStatus.parse(d.str('status')),
-        level: d.str('level'),
-        homeSpot: d.str('homeSpot'),
-        location: d.str('location'),
-        bio: d.str('bio'),
-        nationality: d.str('nationality'),
-        age: d.integer('age'),
-        phoneNumber: d.str('phoneNumber'),
-        languages: d.strList('languages'),
-        quiver: d.strList('quiver'),
-        gallery: d.strList('gallery'),
-        favorites: d.strList('favorites'),
-        photoUrl: d.str('photoURL'),
-        businessType: d.str('businessType'),
-        ikoId: d.str('ikoId'),
-        certificateUrl: d.str('certificateUrl'),
-        mapsLink: d.str('mapsLink'),
-        hourlyRate: d.money('hourlyRate'),
-        blockedUntilRaw: d.str('blockedUntil'),
-        fcmToken: d.str('fcmToken'),
-        reviewNote: d.str('reviewNote'),
-        travelBufferMinutes: d.integer('travelBuffer'),
-      );
+    uid: uid,
+    name: d.str('name') ?? '',
+    email: d.str('email') ?? '',
+    role: UserRole.parse(d.str('role')),
+    status: AccountStatus.parse(d.str('status')),
+    level: d.str('level'),
+    homeSpot: d.str('homeSpot'),
+    location: d.str('location'),
+    bio: d.str('bio'),
+    nationality: d.str('nationality'),
+    age: d.integer('age'),
+    phoneNumber: d.str('phoneNumber'),
+    languages: d.strList('languages'),
+    quiver: d.strList('quiver'),
+    gallery: d.strList('gallery'),
+    favorites: d.strList('favorites'),
+    photoUrl: d.str('photoURL'),
+    businessType: d.str('businessType'),
+    ikoId: d.str('ikoId'),
+    certificateUrl: d.str('certificateUrl'),
+    mapsLink: d.str('mapsLink'),
+    hourlyRate: d.money('hourlyRate'),
+    blockedUntilRaw: d.str('blockedUntil'),
+    fcmToken: d.str('fcmToken'),
+    reviewNote: d.str('reviewNote'),
+    travelBufferMinutes: d.integer('travelBuffer'),
+    instantBook: d.boolean('instantBook'),
+  );
 
   bool get isTrainer => role == UserRole.business;
   bool get isStaff => role == UserRole.admin || role == UserRole.support;
@@ -145,9 +158,8 @@ class AppUser {
       (businessType ?? '').toLowerCase().contains('safari');
 
   bool get isPermanentlyBlocked => blockedUntilRaw == 'forever';
-  DateTime? get blockedUntil => isPermanentlyBlocked
-      ? null
-      : DateTime.tryParse(blockedUntilRaw ?? '');
+  DateTime? get blockedUntil =>
+      isPermanentlyBlocked ? null : DateTime.tryParse(blockedUntilRaw ?? '');
 
   /// Whether a `blocked` status is still in force (§2.4).
   ///
@@ -166,7 +178,9 @@ class AppUser {
     return DateTime.now().isBefore(until);
   }
 
-  int get bufferMinutes => travelBufferMinutes ?? FlowConst.defaultBufferMinutes;
+  int get bufferMinutes =>
+      travelBufferMinutes ?? FlowConst.defaultBufferMinutes;
   double get displayRate => hourlyRate ?? FlowConst.defaultDisplayRate;
-  String get initial => name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
+  String get initial =>
+      name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
 }

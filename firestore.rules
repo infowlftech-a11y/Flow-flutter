@@ -205,16 +205,30 @@ service cloud.firestore {
       // BUG-017 — which made the whole collection listable.)
       allow read: if signedIn() && (isParty() || isStaff());
 
+      // A rider-created booking is born 'pending' — unless the trainer
+      // opted into Instant Book on their own profile, in which case it may
+      // be born 'confirmed' (P5). The get() re-checks the trainer's flag at
+      // rule time, so the client's copy of it proves nothing. Before P5 the
+      // create rule did not constrain status at all, which let a hand-rolled
+      // client self-confirm against any trainer; this closes that too.
+      function trainerAllowsInstant() {
+        return get(/databases/$(database)/documents/users/
+          $(request.resource.data.instructorId)).data.instantBook == true;
+      }
+
       // On create the rider states what they owe ('unpaid', the cash era) or
       // what they have put in escrow ('held' — paid to FLOW at booking, P1),
       // never that the trainer was settled: 'paid' stays rider-refused. A
       // trainer creating a walk-in may record cash taken up front, so the
-      // constraint is on riders only.
+      // constraints are on riders only.
       allow create: if signedIn() && notBlocked()
         && (request.resource.data.kiterId == uid()
             || request.resource.data.instructorId == uid())
         && (request.resource.data.instructorId == uid()
-            || request.resource.data.paymentStatus in ['unpaid', 'held']);
+            || (request.resource.data.paymentStatus in ['unpaid', 'held']
+                && (request.resource.data.status == 'pending'
+                    || (request.resource.data.status == 'confirmed'
+                        && trainerAllowsInstant()))));
 
       // Order matters here, for cost as much as clarity. `isStaff()` does a
       // `get()` on the caller's profile — a billed read, and one of only ten

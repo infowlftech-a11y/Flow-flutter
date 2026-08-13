@@ -336,6 +336,10 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                                   ? const _KindBadge(
                                       icon: Symbols.storefront_rounded,
                                     )
+                                  // The bolt is Instant Book (P5): booking
+                                  // here confirms without approval.
+                                  : t.instantBook
+                                  ? const _KindBadge(icon: Symbols.bolt_rounded)
                                   : null,
                               onTap: () => context.push(
                                 t.isStation || t.isSafariOperator

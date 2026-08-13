@@ -153,6 +153,51 @@ class ProfileScreen extends ConsumerWidget {
                   subtitle: 'Exactly what riders see before they book',
                   onTap: () => context.push('/trainer/${session.uid}'),
                 ),
+              // Instant Book (P5) — the trainer's side of the switch the
+              // booking rules read. SwitchListTile rather than _row: the
+              // state must be visible without opening anything.
+              if (session.isTrainer)
+                SwitchListTile(
+                  secondary: const Icon(Symbols.bolt_rounded, size: 22),
+                  title: Text(
+                    'Instant booking',
+                    style: inter(15, 560, color: context.scheme.onSurface),
+                  ),
+                  subtitle: Text(
+                    (user?.instantBook ?? false)
+                        ? 'Riders book and pay without waiting for your '
+                              'approval'
+                        : 'Off — every request waits for your approval',
+                    maxLines: 2,
+                    style: inter(12.5, 460, color: tones.textFaint),
+                  ),
+                  value: user?.instantBook ?? false,
+                  onChanged: (v) async {
+                    Haptics.select();
+                    try {
+                      await ref
+                          .read(userRepositoryProvider)
+                          .setInstantBook(session.uid, v);
+                      if (context.mounted) {
+                        showFlowToast(
+                          context,
+                          v
+                              ? 'Instant booking on — new bookings '
+                                    'confirm themselves ⚡'
+                              : 'Instant booking off — requests wait '
+                                    'for you again',
+                        );
+                      }
+                    } catch (_) {
+                      if (context.mounted) {
+                        showFlowToast(
+                          context,
+                          "Couldn't save that. Try again.",
+                        );
+                      }
+                    }
+                  },
+                ),
               _row(
                 context,
                 Symbols.mail_rounded,

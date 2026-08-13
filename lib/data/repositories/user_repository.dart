@@ -25,9 +25,11 @@ class UserRepository {
       .where('role', isEqualTo: 'business')
       .where('status', isEqualTo: 'active')
       .snapshots()
-      .map((qs) => [
-            for (final doc in qs.docs) AppUser.fromDoc(doc.id, doc.data()),
-          ]);
+      .map(
+        (qs) => [
+          for (final doc in qs.docs) AppUser.fromDoc(doc.id, doc.data()),
+        ],
+      );
 
   /// The console's directory: every account, whatever its role or status.
   ///
@@ -35,13 +37,12 @@ class UserRepository {
   /// the rule is document-independent, so the query is provable. Sorted by
   /// name client-side, same discipline as everything else in §6.2.
   Stream<List<AppUser>> watchAllUsers() => _users.snapshots().map((qs) {
-        final list = [
-          for (final doc in qs.docs) AppUser.fromDoc(doc.id, doc.data()),
-        ];
-        list.sort(
-            (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-        return list;
-      });
+    final list = [
+      for (final doc in qs.docs) AppUser.fromDoc(doc.id, doc.data()),
+    ];
+    list.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    return list;
+  });
 
   /// Rider onboarding — one page, `status: 'active'`, straight in (§3.2).
   Future<void> createRiderProfile({
@@ -57,22 +58,26 @@ class UserRepository {
     String? bio,
     String? photoUrl,
   }) {
-    return _users.doc(uid).set(compact({
-      'name': name,
-      'email': email,
-      'role': 'kiter',
-      'status': 'active',
-      'nationality': nationality,
-      'age': age,
-      'level': level,
-      'homeSpot': homeSpot,
-      'languages': languages,
-      'quiver': quiver,
-      'bio': bio,
-      'photoURL': photoUrl,
-      'favorites': <String>[],
-      'createdAt': FieldValue.serverTimestamp(),
-    }));
+    return _users
+        .doc(uid)
+        .set(
+          compact({
+            'name': name,
+            'email': email,
+            'role': 'kiter',
+            'status': 'active',
+            'nationality': nationality,
+            'age': age,
+            'level': level,
+            'homeSpot': homeSpot,
+            'languages': languages,
+            'quiver': quiver,
+            'bio': bio,
+            'photoURL': photoUrl,
+            'favorites': <String>[],
+            'createdAt': FieldValue.serverTimestamp(),
+          }),
+        );
   }
 
   /// Trainer onboarding — `status: 'pending'` until an admin approves them in
@@ -95,30 +100,35 @@ class UserRepository {
     required String photoUrl,
     List<String> gallery = const [],
   }) {
-    return _users.doc(uid).set(compact({
-      'name': name,
-      'email': email,
-      'role': 'business',
-      'status': 'pending',
-      'businessType': 'Instructor',
-      'bio': bio,
-      'languages': languages,
-      'location': trainingSpot,
-      'mapsLink': mapsLink,
-      'hourlyRate': hourlyRate,
-      'ikoId': ikoId,
-      'certificateUrl': certificateUrl,
-      'photoURL': photoUrl,
-      'gallery': gallery,
-      'favorites': <String>[],
-      'createdAt': FieldValue.serverTimestamp(),
-    }));
+    return _users
+        .doc(uid)
+        .set(
+          compact({
+            'name': name,
+            'email': email,
+            'role': 'business',
+            'status': 'pending',
+            'businessType': 'Instructor',
+            'bio': bio,
+            'languages': languages,
+            'location': trainingSpot,
+            'mapsLink': mapsLink,
+            'hourlyRate': hourlyRate,
+            'ikoId': ikoId,
+            'certificateUrl': certificateUrl,
+            'photoURL': photoUrl,
+            'gallery': gallery,
+            'favorites': <String>[],
+            'createdAt': FieldValue.serverTimestamp(),
+          }),
+        );
   }
 
   /// Edit personal details (§3.13). Deliberately does NOT write rate or
   /// training spot — those are onboarding/support-only (§14.3). `compact`
   /// keeps nulls from clobbering web-client fields.
-  Future<void> updateProfile(String uid, {
+  Future<void> updateProfile(
+    String uid, {
     String? name,
     String? phoneNumber,
     String? nationality,
@@ -134,15 +144,15 @@ class UserRepository {
   }) {
     return _users.doc(uid).update({
       ...compact({
-      'name': name,
-      'phoneNumber': phoneNumber,
-      'nationality': nationality,
-      'age': age,
-      'level': level,
-      'bio': bio,
-      'languages': languages,
-      'photoURL': photoUrl,
-      'gallery': gallery,
+        'name': name,
+        'phoneNumber': phoneNumber,
+        'nationality': nationality,
+        'age': age,
+        'level': level,
+        'bio': bio,
+        'languages': languages,
+        'photoURL': photoUrl,
+        'gallery': gallery,
         'quiver': quiver,
         'homeSpot': homeSpot,
         'updatedAt': FieldValue.serverTimestamp(),
@@ -203,6 +213,12 @@ class UserRepository {
     });
   }
 
+  /// Instant Book opt-in (P5). One boolean on the trainer's own profile —
+  /// the same field firestore.rules reads before letting a rider write a
+  /// booking that is born 'confirmed'.
+  Future<void> setInstantBook(String uid, bool enabled) =>
+      _users.doc(uid).update({'instantBook': enabled});
+
   /// Optimistic favourite toggle target.
   Future<void> setFavorite(String uid, String trainerId, bool fav) {
     return _users.doc(uid).update({
@@ -233,25 +249,30 @@ class UserRepository {
           .doc(stationId)
           .collection(Col.stationInstructors)
           .snapshots()
-          .map((qs) => [
-                for (final doc in qs.docs)
-                  StationInstructor.fromDoc(doc.id, doc.data()),
-              ]);
+          .map(
+            (qs) => [
+              for (final doc in qs.docs)
+                StationInstructor.fromDoc(doc.id, doc.data()),
+            ],
+          );
 
   Stream<List<StationService>> watchStationServices(String stationId) => _users
       .doc(stationId)
       .collection(Col.stationServices)
       .snapshots()
-      .map((qs) => [
-            for (final doc in qs.docs)
-              StationService.fromDoc(doc.id, doc.data()),
-          ]);
+      .map(
+        (qs) => [
+          for (final doc in qs.docs) StationService.fromDoc(doc.id, doc.data()),
+        ],
+      );
 
   Stream<List<SafariTrip>> watchSafariTrips(String hostId) => _db
       .collection(Col.safariTrips)
       .where('hostId', isEqualTo: hostId)
       .snapshots()
-      .map((qs) => [
-            for (final doc in qs.docs) SafariTrip.fromDoc(doc.id, doc.data()),
-          ]);
+      .map(
+        (qs) => [
+          for (final doc in qs.docs) SafariTrip.fromDoc(doc.id, doc.data()),
+        ],
+      );
 }

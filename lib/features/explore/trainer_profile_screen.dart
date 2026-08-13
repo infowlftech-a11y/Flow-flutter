@@ -293,6 +293,17 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
                           ),
                         ],
                       ),
+                      // Instant Book (P5), said before the rider scrolls to
+                      // the button: no approval wait is a booking-decision
+                      // fact, same rank as the rating.
+                      if (trainer.instantBook) ...[
+                        const SizedBox(height: 8),
+                        TagPill(
+                          'INSTANT BOOK',
+                          icon: Symbols.bolt_rounded,
+                          color: tones.azureBrand,
+                        ),
+                      ],
                       const SizedBox(height: 18),
                       // Certification used to sit here, level with the place
                       // name — the same weight for "is this person qualified"

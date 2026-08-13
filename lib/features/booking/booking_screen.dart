@@ -280,6 +280,15 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   /// Review sheet → Confirm → success dialog (§3.6).
   void _openReviewSheet() {
     final target = widget.target;
+    // Copy only (P5) — the repository re-reads the flag at write time and
+    // the rules re-check it, so a stale value here can mislabel a button
+    // for a moment but never confirm anything by itself.
+    final instant =
+        ref
+            .read(trainerProfileProvider(target.providerId))
+            .value
+            ?.instantBook ??
+        false;
     showFlowSheet<void>(
       context,
       title: 'Review & confirm',
@@ -343,15 +352,20 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                     Row(
                       children: [
                         Icon(
-                          Symbols.account_balance_wallet_rounded,
+                          instant
+                              ? Symbols.bolt_rounded
+                              : Symbols.account_balance_wallet_rounded,
                           size: 15,
                           color: sheetContext.tones.textFaint,
                         ),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                            'You pay FLOW now — your trainer is paid '
-                            'after the session',
+                            instant
+                                ? 'Confirms instantly — you pay FLOW now; '
+                                      'your trainer is paid after the session'
+                                : 'You pay FLOW now — your trainer is paid '
+                                      'after the session',
                             style: inter(
                               12.5,
                               540,
@@ -378,9 +392,13 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
               ),
               const SizedBox(height: 16),
               PrimaryButton(
-                label: 'Confirm & pay ${money(_total)}',
+                // "Book", not "Confirm", when there is no approval step
+                // left for anyone — the word carries the promise.
+                label: instant
+                    ? 'Book & pay ${money(_total)}'
+                    : 'Confirm & pay ${money(_total)}',
                 busy: _submitting,
-                onPressed: () => _confirm(sheetContext, setSheet),
+                onPressed: () => _confirm(sheetContext, setSheet, instant),
               ),
             ],
           );
@@ -389,7 +407,11 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     );
   }
 
-  Future<void> _confirm(BuildContext sheetContext, StateSetter setSheet) async {
+  Future<void> _confirm(
+    BuildContext sheetContext,
+    StateSetter setSheet,
+    bool instant,
+  ) async {
     if (_submitting) return;
     setSheet(() => _submitting = true);
     setState(() {});
@@ -412,7 +434,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
           );
       Haptics.medium();
       if (sheetContext.mounted) Navigator.pop(sheetContext);
-      if (mounted) _showSuccess();
+      if (mounted) _showSuccess(instant: instant);
     } on SlotTakenFailure catch (e) {
       if (sheetContext.mounted) Navigator.pop(sheetContext);
       if (mounted) {
@@ -438,7 +460,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
 
   /// Not dismissible by tapping outside; the single Done button closes the
   /// dialog and pops the booking screen (§3.6).
-  void _showSuccess() {
+  void _showSuccess({required bool instant}) {
     showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -451,21 +473,28 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 FlowIconChip(
-                  icon: Symbols.send_rounded,
+                  icon: instant
+                      ? Symbols.event_available_rounded
+                      : Symbols.send_rounded,
                   color: dialogContext.tones.success,
                   size: 76,
                   borderRadius: const BorderRadius.all(Radius.circular(38)),
                 ),
                 const SizedBox(height: 20),
                 Text(
-                  'Request sent!',
+                  instant ? "You're booked!" : 'Request sent!',
                   style: Theme.of(dialogContext).textTheme.headlineMedium,
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  '${money(_total)} is held by FLOW — refunded in full if '
-                  "the trainer declines. You'll get a ping the moment they "
-                  'approve.',
+                  instant
+                      // The money story was disclosed before the pay tap;
+                      // this dialog only confirms it landed.
+                      ? '${money(_total)} is held by FLOW and your session '
+                            'is confirmed. See you on the beach 🤙'
+                      : '${money(_total)} is held by FLOW — refunded in full '
+                            "if the trainer declines. You'll get a ping the "
+                            'moment they approve.',
                   textAlign: TextAlign.center,
                   style: Theme.of(dialogContext).textTheme.bodyMedium,
                 ),

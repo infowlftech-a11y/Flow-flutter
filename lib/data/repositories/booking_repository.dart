@@ -275,6 +275,22 @@ class BookingRepository {
     await _assertSlotsFree(target.providerId, date, sorted);
 
     final total = target.rate * hours;
+
+    // Instant Book (P5): the trainer's own document is the authority, read
+    // at write time — the screen's copy of the flag may be minutes stale,
+    // and firestore.rules re-checks the same field before letting a rider
+    // write 'confirmed'. Absent field, absent doc, read failure: all pending.
+    var instant = false;
+    try {
+      final trainer = await _db
+          .collection(Col.users)
+          .doc(target.providerId)
+          .get();
+      instant = trainer.data()?.boolean('instantBook') ?? false;
+    } catch (_) {
+      // A failed profile read must not fail the booking — it books pending.
+    }
+
     final doc = _col.doc();
     final title = target.subTarget != null
         ? '${target.title} — ${target.subTarget}'
@@ -302,7 +318,7 @@ class BookingRepository {
       'type': target.bookingType,
       'gearNeeded': gearNeeded,
       'message': message ?? '',
-      'status': 'pending',
+      'status': instant ? 'confirmed' : 'pending',
       // Escrow from the first write (P1): the rider pays FLOW at booking and
       // FLOW holds it until the session resolves. `paidAt` is the hold
       // instant. What the hold becomes — refund or payout — is derived by
@@ -328,9 +344,15 @@ class BookingRepository {
 
     await _notifications.notify(
       targetUserId: target.providerId,
-      title: 'New booking request',
-      message: '$riderName requested ${prettyYmd(date)} at ${start.value}.',
-      type: 'booking_request',
+      title: instant ? 'New session booked ✅' : 'New booking request',
+      message: instant
+          // No question in the copy — there is nothing to approve. The
+          // trainer chose this mode; the notification reads like a diary
+          // entry, not a task.
+          ? '$riderName booked ${prettyYmd(date)} at ${start.value} — '
+                'instant booking.'
+          : '$riderName requested ${prettyYmd(date)} at ${start.value}.',
+      type: instant ? 'booking_confirmed' : 'booking_request',
       bookingId: doc.id,
     );
     return doc.id;

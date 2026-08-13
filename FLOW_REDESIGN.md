@@ -824,3 +824,35 @@ the session sheet + ticket already carry the reference, revisit when real
 money lands.
 
 Nothing in P4 is implemented. Each row is one order away.
+
+---
+
+## P5 — Instant Book, per-trainer opt-in (approved 2026-08-13 via MCQ)
+
+The trainer flips "Instant booking" on their profile; from then on a rider
+booking against them is **born `confirmed`** — escrow held exactly as P1
+wrote it, no approval step, CTA reads "Book & pay", the success dialog says
+booked rather than requested, the trainer notification is news instead of a
+task. Everyone else keeps request → approve.
+
+The flag is `users/{uid}.instantBook`, a **new** wire name on purpose: the
+legacy `instantBooking` field was removed as dead code (§14.3 — parsed but
+never honoured), and a years-old `true` written against a client that never
+obeyed it must not silently start auto-confirming sessions now that the
+pipeline does.
+
+Authority lives server-side twice over: the repository re-reads the
+trainer's document at write time (the screen's copy of the flag is
+cosmetic), and firestore.rules re-checks it — a rider may write
+`status: 'confirmed'` only when `get(users/instructor).instantBook == true`.
+Writing that rule also closed a pre-existing hole: **the create rule never
+constrained status at all**, so any hand-rolled client could self-confirm
+against any trainer. Now: `pending` always allowed, `confirmed` only with
+the flag, anything else rider-refused. All 347 prior rules tests passed
+unchanged against the tightening (nothing pinned the hole); +5 new pin the
+feature and the closure — 352 total.
+
+Surfaces: a bolt badge on the Explore card, an INSTANT BOOK pill on the
+trainer profile at rating rank, instant-aware review-sheet copy, and the
+profile-screen switch whose subtitle states the current consequence in
+words. Walk-ins and safari seats were already instant and are untouched.
