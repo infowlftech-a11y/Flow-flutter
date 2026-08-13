@@ -166,7 +166,17 @@ class _NotificationTile extends ConsumerWidget {
         if (context.canPop()) context.pop();
         context.push('/trainer/${ref.read(sessionProvider).uid}');
       case NotificationKind.review:
-        leaveTo('/sessions');
+        // "Tap to rate your trainer" carries the bookingId — land on that
+        // session so the rate control is right there. Bare '/sessions' opens
+        // on Upcoming; the completed session (and its only rate button) is on
+        // History, which the highlight switches to. The push path already
+        // routed this way (it keys off bookingId, not the type), so this is
+        // the in-app side catching up to the parity its own header promises.
+        leaveTo(
+          item.bookingId != null
+              ? '/sessions?highlight=${item.bookingId}'
+              : '/sessions',
+        );
       case NotificationKind.reportUpdate:
       case NotificationKind.account:
       // Deliberately the sheet, not a screen: the message *is* the payload

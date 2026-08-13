@@ -59,6 +59,15 @@ service cloud.firestore {
         && selfProfile().status != 'blocked';
     }
 
+    // An approved, live business — the membership Explore itself requires
+    // (§8.8). Fails closed: a signed-in user with no profile is denied, not
+    // read as a non-business.
+    function isActiveBusiness() {
+      return exists(/databases/$(database)/documents/users/$(uid()))
+        && selfProfile().role == 'business'
+        && selfProfile().status == 'active';
+    }
+
     // Fields a user must never be able to set on themselves.
     //
     // `statusBeforeBlock` is on the list because unblockUser *restores* it:
@@ -197,6 +206,47 @@ service cloud.firestore {
                     'cancelledAt', 'cancelledBy']);
       }
 
+      // A provider cancel must sign itself 'provider' (BUG-020). cancelledBy
+      // decides who the escrow favours — a provider cancel always refunds,
+      // a late user cancel is charged — so a trainer signing their own
+      // withdrawal as the rider's ('user', late) would keep the money on a
+      // session they cancelled. The rider is pinned the mirror way, to
+      // 'user', in riderStatusIsCancellation.
+      function providerCancelSigned() {
+        return !request.resource.data.diff(resource.data).affectedKeys()
+                 .hasAny(['status'])
+            || request.resource.data.status != 'cancelled'
+            || request.resource.data.cancelledBy == 'provider';
+      }
+
+      // The escrow's executed states are FLOW's, not a party's (BUG-021).
+      // payment.dart: 'paid_out' is written by the processor/staff, never a
+      // party, and a 'held' booking is settled by FLOW — markPaid refuses to
+      // let a trainer "collect" one in cash because the rider already paid
+      // FLOW. Both invariants lived only in the repository; enforce the value
+      // side here. The cash ledger the trainer does own (unpaid -> paid,
+      // paid -> refunded) is untouched.
+      function providerPaymentOk() {
+        return !request.resource.data.diff(resource.data).affectedKeys()
+                 .hasAny(['paymentStatus'])
+            || (resource.data.get('paymentStatus', '') != 'held'
+                && request.resource.data.paymentStatus != 'paid_out');
+      }
+
+      // A terminal booking's status is final (BUG-019). The repository's
+      // _writeIfLive transaction refuses to move status out of completed /
+      // cancelled / rejected; this is that guard at the API. It gates only
+      // writes that MOVE status — settlement and history-hiding write other
+      // fields on a completed booking and must still land — so a party
+      // cannot re-open a finished session (a rider erasing a delivered
+      // lesson's earnings, a trainer resurrecting a cancelled one). Staff are
+      // exempt: correcting history is theirs.
+      function statusStays() {
+        return !request.resource.data.diff(resource.data).affectedKeys()
+                 .hasAny(['status'])
+            || !(resource.data.status in ['completed', 'cancelled', 'rejected']);
+      }
+
       // A booking is its two parties' business, and staff's. The grid and
       // the clash check — which do need a stranger to see a trainer's booked
       // hours — read the `occupied` availability docs instead (§8.5), which
@@ -216,6 +266,27 @@ service cloud.firestore {
           $(request.resource.data.instructorId)).data.instantBook == true;
       }
 
+      // A safari seat is born 'confirmed' too — the host published the trip,
+      // there is nothing to approve — but a safari host has no reason to have
+      // toggled Instant Book, so the P5 gate above silently denied every
+      // reservation on live Firestore (BUG-022). A seat booking is legitimate
+      // when it names a trip the booking's instructor hosts AND consumes
+      // exactly one seat on that trip in the same commit. The getAfter mirrors
+      // the occupied-doc pattern (§8.5): the right to be born confirmed is
+      // proven by the sibling seat move in the same atomic batch, which also
+      // denies a ghost passenger — a seat booking that moves no seat.
+      function reservesASeat() {
+        return request.resource.data.type == 'safari'
+          && request.resource.data.tripId is string
+          && get(/databases/$(database)/documents/safari_trips/
+               $(request.resource.data.tripId)).data.hostId
+               == request.resource.data.instructorId
+          && getAfter(/databases/$(database)/documents/safari_trips/
+               $(request.resource.data.tripId)).data.bookedSeats
+               == get(/databases/$(database)/documents/safari_trips/
+                    $(request.resource.data.tripId)).data.bookedSeats + 1;
+      }
+
       // On create the rider states what they owe ('unpaid', the cash era) or
       // what they have put in escrow ('held' — paid to FLOW at booking, P1),
       // never that the trainer was settled: 'paid' stays rider-refused. A
@@ -228,7 +299,7 @@ service cloud.firestore {
             || (request.resource.data.paymentStatus in ['unpaid', 'held']
                 && (request.resource.data.status == 'pending'
                     || (request.resource.data.status == 'confirmed'
-                        && trainerAllowsInstant()))));
+                        && (reservesASeat() || trainerAllowsInstant())))));
 
       // Order matters here, for cost as much as clarity. `isStaff()` does a
       // `get()` on the caller's profile — a billed read, and one of only ten
@@ -238,9 +309,16 @@ service cloud.firestore {
       // Evaluating isStaff() first also threw outright for any signed-in user
       // with no profile document rather than simply denying them.
       allow update: if signedIn()
-        && ((isProvider() && providerFieldsOnly())
-            || (isParty() && paymentFieldsUnchanged()
-                && riderFieldsOnly() && riderStatusIsCancellation())
+        && ((isProvider() && providerFieldsOnly() && providerCancelSigned()
+                && providerPaymentOk() && statusStays())
+            // The rider's branch, gated to the *rider* specifically, not
+            // `isParty()`. A trainer is also a party, so an isParty() gate let
+            // them cancel through this path and sign it `cancelledBy: 'user'`
+            // — keeping the late fee on their own withdrawal, the exact forge
+            // providerCancelSigned closes on the provider branch (BUG-020).
+            || (resource.data.kiterId == uid() && paymentFieldsUnchanged()
+                && riderFieldsOnly() && riderStatusIsCancellation()
+                && statusStays())
             || isStaff());
 
       allow delete: if isStaff();
@@ -512,8 +590,13 @@ service cloud.firestore {
       }
 
       allow read: if signedIn();
+      // Publishing a bookable, commercial trip is an approved-business act,
+      // like appearing in Explore (§8.8) — and every other user-content
+      // create carries the block gate (BUG-007). This one did not (BUG-024):
+      // a suspended business kept publishing, and any account could.
       allow create: if signedIn()
-        && request.resource.data.hostId == uid();
+        && request.resource.data.hostId == uid()
+        && isActiveBusiness();
       allow update: if signedIn()
         && (resource.data.hostId == uid()
             || isStaff()

@@ -665,3 +665,297 @@ the laundering path BUG-012's `restoreToPending` semantics exist to
 prevent, reachable by any user, silently. `statusBeforeBlock` is now on the
 privileged list; the denial test sits in the `privilegedFieldsUnchanged`
 loop in `users.test.mjs`.
+
+---
+
+# Full-application audit — 2026-08-13 (CLAUDE_FULL_AUDIT.md)
+
+The pass that follows re-ran the baseline suites (780 Dart / 360 rules, all
+green) and then went where no adversarial pass had run: the money code that
+landed after the fix-everything pass closed (`d37e123`). Its single systemic
+finding: **the repository enforces a set of money and state-machine
+invariants that the security rules do not.** `_writeIfLive`, `markPaid`,
+`reserveSafariSeat` all re-read and refuse; the rules — the only authority a
+hand-rolled Firestore client is bound by — are more permissive than the
+methods. New coverage lives in `test_rules/escrow.test.mjs`.
+
+## BUG-019 — Terminal booking states are not terminal at the API
+
+**Severity:** critical (money — ledger-corrupting today, PSP-executed loss later)
+**Found:** `test_rules/escrow.test.mjs`, terminal-states group
+**File:** [firestore.rules](firestore.rules) — bookings `allow update`
+**Status:** FIXED — deploy pending
+
+BUG-013/014 hardened the *repository*: `_writeIfLive` re-reads `status` in a
+transaction and refuses to move a booking out of `completed`, `cancelled`
+or `rejected`. The rules never got that guard. BUG-001 closed the rider's
+writable *field set* (`riderFieldsOnly`) and BUG-003 the trainer's
+(`providerFieldsOnly`), but neither constrained the *from-state*, so against
+a raw SDK:
+
+| Write the rules accepted | What it does |
+|---|---|
+| rider: `completed` → `cancelled` (stamped) | `settle()` moves the session from `payoutDue` to `refundDue` — a delivered, settled lesson's price taken off the trainer and handed back to the rider. This is BUG-014 exactly, re-opened at the layer BUG-014 did not touch. |
+| trainer: `cancelled` → `completed` | the reverse: a refund-due booking flipped to payout-due. |
+| trainer: `cancelled`/`rejected` → `confirmed` | resurrects a dead booking onto the calendar. This is BUG-013 at the API. |
+
+The repository blocks all three; a hand-rolled client did not. Earnings are
+Σ `totalPrice` over `completed` bookings, so every one of these desyncs the
+trainer's revenue from what was actually delivered — and once a PSP executes
+`EscrowState`, it becomes real money moving the wrong way.
+
+### Fix
+
+A `statusStays()` guard on both party branches (not staff, who must be able
+to correct history): if the write changes `status`, the *prior* status may
+not be terminal. It gates only status-moving writes, so settlement
+(`markPaid`/`markRefunded` write payment fields on a `completed` booking)
+and history-hiding are untouched — pinned by passing allow-tests. Staff keep
+the override, pinned by `staff may move history`.
+
+## BUG-020 — A trainer can sign their own cancellation as the rider's
+
+**Severity:** major (money)
+**Found:** `test_rules/escrow.test.mjs`, provider-cancel group
+**File:** [firestore.rules](firestore.rules) — `providerFieldsOnly()`
+**Status:** FIXED — deploy pending
+
+`cancelledBy` decides who the escrow favours: a *provider* cancel always
+refunds the rider in full (the late fee protects committed hours, never a
+trainer's own withdrawal); a *late user* cancel is charged in full. The
+rider was pinned to `cancelledBy == 'user'` (BUG-001's
+`riderStatusIsCancellation`), but `providerFieldsOnly()` never constrained
+the value — so a trainer could cancel their own session, sign it
+`cancelledBy: 'user'` with a late timestamp, and `settle()` would read it as
+a rider no-show and keep the money as a payout to the trainer who withdrew.
+
+### Fix
+
+`providerCancelSigned()`: a provider write that sets `status: 'cancelled'`
+must carry `cancelledBy: 'provider'`. The trainer's real cancel
+(`setStatus` always writes `'provider'`) is pinned; the forged `'user'`
+signature is denied.
+
+## BUG-021 — A trainer can forge the escrow's executed states
+
+**Severity:** major (ledger integrity)
+**Found:** `test_rules/escrow.test.mjs`, held-money group
+**File:** [firestore.rules](firestore.rules) — `providerFieldsOnly()`
+**Status:** FIXED — deploy pending
+
+`payment.dart` is explicit that `paid_out` ("FLOW actually transferred the
+held money to the trainer") is *"written by the processor/Functions layer
+(or staff), never by either party,"* and `markPaid` refuses to let a trainer
+"collect" a `held` booking in cash because the rider already paid FLOW. Both
+invariants lived only in the repository: `providerFieldsOnly()` lists
+`paymentStatus` with no value constraint, so a raw trainer client could
+write `paid_out` (forging FLOW's transfer), or overwrite a `held` booking to
+`paid`/`refunded` (converting escrow FLOW holds into a cash claim, so the
+booking reads settled while the rider's money is still in FLOW's float).
+
+### Fix
+
+`providerPaymentOk()`: if the write touches `paymentStatus`, the prior
+status may not be `held` (escrow is FLOW's to execute) and the new value may
+not be `paid_out`. The cash ledger a trainer *does* own — `unpaid` → `paid`,
+`paid` → `refunded` — is pinned by passing allow-tests; staff keep the
+escrow-execution door, pinned by `staff still execute the escrow`.
+
+## BUG-022 — Safari seat reservation is dead on live Firestore
+
+**Severity:** critical (total blocker — no rider can book a safari seat)
+**Found:** `test_rules/escrow.test.mjs`, safari group
+**File:** [firestore.rules](firestore.rules) — bookings `allow create`
+**Status:** FIXED — deploy pending
+
+The BUG-017 pattern, second instance. P5 (Instant Book) constrained the
+booking `create` rule so a rider-written `confirmed` status is accepted only
+when `trainerAllowsInstant()` — the *trainer's* `instantBook` flag. But
+`reserveSafariSeat` writes every seat booking born `confirmed` (the host
+published the trip; there is nothing to approve), and a safari host has no
+reason to have toggled Instant Book. So the create is denied, the reserving
+transaction throws `permission-denied`, and **no rider can reserve a safari
+seat against the real rules at all.**
+
+Why nothing caught it: `booking_repository_test` runs on the fake (rules
+ignored); `transactions.test.mjs` runs with `withSecurityRulesDisabled`;
+`payloads.test.mjs` never transcribed the safari create. Exactly the class
+COVERAGE.md named — "a rule can be correct and still reject the app."
+
+### Fix
+
+`reservesASeat()`: a `confirmed` create is also legitimate when it is a
+`type: 'safari'` booking whose named trip is hosted by the booking's
+instructor *and* consumes exactly one seat on that trip in the same commit
+(`getAfter(trip).bookedSeats == get(trip).bookedSeats + 1`). This mirrors
+the occupied-doc `getAfter` (§8.5): the booking's right to be born confirmed
+is proven by the sibling seat move in the same atomic batch. It also closes
+the ghost-passenger residue BUG-006 flagged — a seat booking that moves no
+seat is now denied (`DENY the ghost passenger`). The hourly Instant-Book
+path is unchanged and still pinned by the existing `bookings.test.mjs`
+group.
+
+## BUG-023 — A booking can be born checked-in or pre-stamped
+
+**Severity:** minor (latent — cannot be converted to money without the trainer)
+**Found:** `test_rules/escrow.test.mjs` (documented, not asserted as denials)
+**File:** [firestore.rules](firestore.rules) — bookings `allow create`
+**Status:** reported only — not fixed
+
+The create rule constrains `kiterId`, `paymentStatus` and `status`, but not
+`checkedIn`, `startedAt`, `cancelledAt` or `cancelledBy`, so a rider can
+create a booking already carrying those. It is latent: `settle()` reads
+`cancelledAt` only when `status == 'cancelled'`, and no earnings or escrow
+path reads `checkedIn` — reaching money still needs a `completed` status the
+rider cannot write (`riderFieldsOnly`), which only the trainer can set, and
+the trainer's own check-in is idempotent against a pre-set flag. Not fixed
+because the booking `create` rule does not use `hasOnly` (a booking has ~25
+legitimate fields) and the harm is unreachable without a second party's
+cooperation. Flagged so a future `create` field-lockdown includes them.
+
+## BUG-024 — Publishing a safari trip skips the block-and-role gate
+
+**Severity:** major (a suspended account keeps publishing; junk-content surface)
+**Found:** `test_rules/escrow.test.mjs`, publishing group
+**File:** [firestore.rules](firestore.rules) — safari_trips `allow create`
+**Status:** FIXED — deploy pending
+
+`allow create: if signedIn() && hostId == uid()` was the whole rule. Every
+*other* user-content create in the file carries `notBlocked()` (BUG-007);
+safari trips did not, so a suspended business could keep publishing bookable
+trips while blocked from everything else. It also placed no role constraint,
+so any account — a rider, a `pending` or `rejected` business — could publish
+a commercial, reservable trip, though the app has no UI that creates trips
+(they are seeded), which held the blast radius to a raw SDK.
+
+### Fix
+
+`isActiveBusiness()` (`role == 'business' && status == 'active'`,
+`exists()`-guarded so it fails closed) is now required alongside
+`hostId == uid()`. This matches Explore's own membership rule (§8.8) and the
+suspension model: only an approved, live business publishes a trip. Denials
+pinned for blocked, rider and pending hosts; the active-business allow
+pinned.
+
+## NOTE — the rider cancellation timestamp is still trusted, deliberately
+
+Not fixed, because the code says so on purpose. `cancellation.dart` and the
+`riderStatusIsCancellation` comment both state that only the *presence* of
+`cancelledAt` is provable in rules and that "the timestamp's honesty is the
+processor's to verify when it executes the refund." A rider can therefore
+still backdate `cancelledAt` on a *live* booking to claim the free-cancel
+window (turning a `payoutDue` late cancel into a `refundDue` one). BUG-019's
+terminal guard closes the worst case (backdating a *completed* booking's
+cancel); what remains is the free-window edge on a confirmed booking, latent
+until a PSP executes refunds. Pinning it needs `cancelledAt == request.time`,
+which is a cheap and faithful change (the repository already writes
+`serverTimestamp()`), but it overrides an explicit, documented design
+decision — so it is surfaced here for the owner's call rather than changed
+unilaterally.
+
+## BUG-025 — A declined trainer is bounced off their own support ticket
+
+**Severity:** major (a support lifeline is half-broken; P12 regression)
+**Found:** full-audit pass 2026-08-13, reading the router gate against the
+routes P12 added
+**File:** [lib/router.dart](lib/router.dart) — `gateRedirect`, `rejected` case
+**Status:** FIXED — `test/gate_redirect_test.dart`
+
+The gate lets an `AppStage.rejected` user reach `/support` — a declined
+trainer must be able to talk to a human — but the allow-list matched the
+path *exactly* (`loc == '/support'`). P12 extracted the ticket thread into
+its own pushed route, `/support/ticket/:id`. So a declined trainer could
+open the support list, file a ticket, and be bounced straight back to
+`/rejected` the instant they tapped it to read the reply. The lifeline let
+them speak and not listen.
+
+### Reproduction
+
+Signed in as a `rejected` trainer, `gateRedirect(AppStage.rejected,
+'/support/ticket/abc', isTrainer: true)` returned `'/rejected'` instead of
+`null` — the redirect fires on every navigation, including a `push`, so the
+thread screen was replaced by the rejected gate before it painted.
+
+### Fix
+
+The redirect closure was inlined and untestable; extracted it to a pure
+`gateRedirect(stage, loc, {isTrainer})` — the whole route-authorization
+table in one place — and widened the `rejected` allow-list to
+`loc == '/support' || loc.startsWith('/support/')`. `gate_redirect_test.dart`
+now pins every stage's allow-list and a denial, including this thread route
+and a `/supportish` lookalike that must still bounce. Behaviour is otherwise
+identical to the inlined closure.
+
+## BUG-026 — "Tap to rate your trainer" lands on the wrong tab, in-app only
+
+**Severity:** minor (dead-ends the review prompt; breaks a documented invariant)
+**Found:** full-audit pass 2026-08-13, notification fan-out sub-audit
+**File:** [lib/features/notifications/notifications_screen.dart](lib/features/notifications/notifications_screen.dart) — `_open`, `NotificationKind.review`
+**Status:** FIXED
+
+A completed session writes a `type: 'review'` notification — "Session
+complete 🎉 / Tap to rate your trainer." — **carrying the bookingId**
+([booking_repository.dart:620-627](lib/data/repositories/booking_repository.dart#L620-L627)).
+The in-app tap handler ignored it and navigated to a bare `/sessions`, which
+opens on the Upcoming tab. The completed booking — and the only rate button
+(`SessionAction.rate`) — is on the History tab. So the notification that
+says "tap to rate" dropped the rider on a tab that neither contains the
+session nor offers a rating.
+
+The push handler routes the *same* notification correctly:
+[push_service.dart:132-139](lib/services/push_service.dart#L132-L139) keys off
+`bookingId.isNotEmpty`, not the type, so it lands on
+`/sessions?highlight=$bookingId`, which switches to History and scrolls the
+card in. push_service's own header (lines 103-104) states the invariant the
+two paths broke: *"Every branch mirrors `_NotificationTile._open` — the two
+views of one notification must not land in two places."*
+
+### Fix
+
+The `review` case now mirrors the booking cases beside it:
+`/sessions?highlight=${bookingId}` when present. In-app and push land in the
+same place again. No dedicated widget-nav test added — the fix makes the
+in-app branch identical to the push branch that already served as the
+reference, and to the adjacent booking cases the existing tests cover — but
+it is called out here so the parity is not silently re-broken.
+
+## BUG-027 — Revenue counts a refunded-but-completed session as earnings
+
+**Severity:** minor (latent — no UI path reaches it today)
+**Found:** full-audit pass 2026-08-13, reporting sub-audit
+**File:** [lib/providers/providers.dart](lib/providers/providers.dart) — `trainerRevenueProvider` (and month/week variants)
+**Status:** reported only — not fixed (approval-gated file; unreachable today)
+
+`trainerRevenueProvider`, `trainerMonthRevenueProvider` and
+`trainerEarningsWeekProvider` sum `totalPrice` over bookings whose *status*
+is `completed`, without consulting `payment.status`. A booking that is
+`completed` **and** `refunded` would be counted at full price and rendered
+in the completed-sessions list with no distinguishing pill.
+
+Not reachable through the app today: `markRefunded` has no UI caller, and
+the escrow derivation never yields `refundDue`/`refunded` for a `completed`
+booking (only for dead ones). It becomes live the moment a "Payment or
+refund" ticket is ever resolved by refunding a delivered session (staff or
+the future Functions/PSP layer) — exactly the flow P1 anticipates. The fix
+is a one-line guard per provider (`&& b.payment.status != refunded`), but
+`lib/providers/` is approval-gated (CLAUDE.md) and the issue is latent, so
+it is surfaced for the owner rather than changed unilaterally. Pair it with
+wiring the refund action.
+
+## BUG-028 — Weekly-earnings bars can shift a day across a midnight DST change
+
+**Severity:** minor (display distribution only; the week total is correct)
+**Found:** full-audit pass 2026-08-13, reporting sub-audit
+**File:** [lib/providers/providers.dart](lib/providers/providers.dart) — `trainerEarningsWeekProvider` (`.inDays` bucketing)
+**Status:** reported only — not fixed (approval-gated file; cosmetic, once-a-year edge)
+
+The provider buckets each completed booking into a weekday with
+`day.difference(weekStart).inDays`, and `Duration.inDays` truncates elapsed
+real time. The stated deploy timezone is Africa/Cairo, whose DST transitions
+fall at **midnight** — so in the single week containing a spring-forward, the
+interval from Monday-midnight is 24h·n − 1h and truncates one day short,
+moving that day's earnings into the previous weekday's bar and mis-placing
+the "today" highlight by one. The weekly **total** (a plain sum) is
+unaffected — only the per-bar distribution and highlight, for one week a
+year. Left as documented: the fix is calendar-date differencing rather than
+`Duration.inDays`, in an approval-gated file, for a cosmetic edge.

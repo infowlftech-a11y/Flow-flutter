@@ -87,6 +87,73 @@ CustomTransitionPage<void> _detailPage(GoRouterState state, Widget child) =>
       },
     );
 
+/// The gate, as a pure decision: given the session stage and where the user
+/// is trying to be, return the path to bounce them to, or null to allow it.
+///
+/// Extracted from the router's `redirect` closure so the whole table is
+/// unit-testable in one place — it is security-relevant (a hole here exposes
+/// a screen a gate is meant to withhold) and it spans stages that are easy to
+/// break one at a time. `test/gate_redirect_test.dart` pins every row.
+String? gateRedirect(AppStage stage, String loc, {required bool isTrainer}) {
+  switch (stage) {
+    case AppStage.loading:
+      return loc == '/' ? null : '/';
+    case AppStage.signedOut:
+      // Any /auth/* route is a legitimate place to be while signed out —
+      // pinning to a single path would bounce the user off Create
+      // account and Reset the moment they navigated there.
+      return loc == '/auth' || loc.startsWith('/auth/') ? null : '/auth';
+    case AppStage.chooseRole:
+      return loc.startsWith('/onboarding') ? null : '/onboarding/role';
+    case AppStage.awaitingApproval:
+      return loc == '/pending' ? null : '/pending';
+    case AppStage.blocked:
+      return loc == '/blocked' ? null : '/blocked';
+    case AppStage.rejected:
+      // Support and the correction form stay reachable: a declined
+      // trainer can fix what was wrong and go back in the queue, or talk
+      // to a human. Anything else would make a decline a dead end.
+      //
+      // `/support/` prefix, not `== '/support'`: the ticket thread is its
+      // own pushed route now (`/support/ticket/:id`, since P12), so an exact
+      // match bounced a declined trainer off their own ticket the instant
+      // they opened it — they could file a ticket and never read the reply.
+      return (loc == '/rejected' ||
+              loc == '/support' ||
+              loc.startsWith('/support/') ||
+              loc == '/onboarding/trainer/reapply')
+          ? null
+          : '/rejected';
+    case AppStage.staff:
+      // The console *is* the app for staff. Everything they legitimately
+      // do hangs off it, so the only other routes worth allowing are the
+      // ones the console pushes: a profile it is moderating, and the
+      // conversation behind a support ticket.
+      return (loc == '/admin' ||
+              loc.startsWith('/trainer/') ||
+              loc.startsWith('/station/') ||
+              loc == '/notifications')
+          ? null
+          : '/admin';
+    case AppStage.ready:
+      if (loc == '/' ||
+          loc == '/auth' ||
+          loc.startsWith('/auth/') ||
+          loc == '/pending' ||
+          loc == '/blocked' ||
+          loc == '/rejected' ||
+          loc.startsWith('/onboarding')) {
+        return '/home';
+      }
+      // Non-staff never reach the console. (Staff never reach *here* —
+      // they resolve to AppStage.staff above.)
+      if (loc == '/admin') return '/home';
+      // Trainers are never routed to the Sessions branch (§14.3).
+      if (isTrainer && loc.startsWith('/sessions')) return '/home';
+      return null;
+  }
+}
+
 final routerProvider = Provider<GoRouter>((ref) {
   final refresh = ValueNotifier(0);
   ref.onDispose(refresh.dispose);
@@ -99,59 +166,11 @@ final routerProvider = Provider<GoRouter>((ref) {
     refreshListenable: refresh,
     redirect: (context, state) {
       final session = ref.read(sessionProvider);
-      final loc = state.matchedLocation;
-
-      switch (session.stage) {
-        case AppStage.loading:
-          return loc == '/' ? null : '/';
-        case AppStage.signedOut:
-          // Any /auth/* route is a legitimate place to be while signed out —
-          // pinning to a single path would bounce the user off Create
-          // account and Reset the moment they navigated there.
-          return loc == '/auth' || loc.startsWith('/auth/') ? null : '/auth';
-        case AppStage.chooseRole:
-          return loc.startsWith('/onboarding') ? null : '/onboarding/role';
-        case AppStage.awaitingApproval:
-          return loc == '/pending' ? null : '/pending';
-        case AppStage.blocked:
-          return loc == '/blocked' ? null : '/blocked';
-        case AppStage.rejected:
-          // Support and the correction form stay reachable: a declined
-          // trainer can fix what was wrong and go back in the queue, or talk
-          // to a human. Anything else would make a decline a dead end.
-          return (loc == '/rejected' ||
-                  loc == '/support' ||
-                  loc == '/onboarding/trainer/reapply')
-              ? null
-              : '/rejected';
-        case AppStage.staff:
-          // The console *is* the app for staff. Everything they legitimately
-          // do hangs off it, so the only other routes worth allowing are the
-          // ones the console pushes: a profile it is moderating, and the
-          // conversation behind a support ticket.
-          return (loc == '/admin' ||
-                  loc.startsWith('/trainer/') ||
-                  loc.startsWith('/station/') ||
-                  loc == '/notifications')
-              ? null
-              : '/admin';
-        case AppStage.ready:
-          if (loc == '/' ||
-              loc == '/auth' ||
-              loc.startsWith('/auth/') ||
-              loc == '/pending' ||
-              loc == '/blocked' ||
-              loc == '/rejected' ||
-              loc.startsWith('/onboarding')) {
-            return '/home';
-          }
-          // Non-staff never reach the console. (Staff never reach *here* —
-          // they resolve to AppStage.staff above.)
-          if (loc == '/admin') return '/home';
-          // Trainers are never routed to the Sessions branch (§14.3).
-          if (session.isTrainer && loc.startsWith('/sessions')) return '/home';
-          return null;
-      }
+      return gateRedirect(
+        session.stage,
+        state.matchedLocation,
+        isTrainer: session.isTrainer,
+      );
     },
     routes: [
       GoRoute(
