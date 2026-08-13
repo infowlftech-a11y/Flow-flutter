@@ -3,11 +3,12 @@
  *
  * The parts of the application that cannot live in the client:
  *
- *   onNewNotification     (push.ts)      notification document → FCM push
- *   sendSessionReminders  (reminders.ts) nightly "your session is tomorrow"
+ *   onNewNotification          (push.ts)          notification document → FCM push
+ *   sendSessionReminders       (reminders.ts)     nightly "your session is tomorrow"
+ *   sendCancelWindowReminders  (cancel_window.ts) nightly "free cancellation ends tomorrow"
  *
- * They compose: the reminder job writes notification documents, which the
- * push trigger then delivers. Neither knows about the other.
+ * They compose: the reminder jobs write notification documents, which the
+ * push trigger then delivers. None of them knows about the others.
  *
  * Deploy:  npm --prefix functions run deploy
  * Logs:    npm --prefix functions run logs
@@ -43,3 +44,4 @@ setGlobalOptions({ maxInstances: 10 });
 // before it is configured.
 export { onNewNotification } from "./push";
 export { sendSessionReminders } from "./reminders";
+export { sendCancelWindowReminders } from "./cancel_window";
