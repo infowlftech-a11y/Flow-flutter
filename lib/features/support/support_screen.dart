@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/typography.dart';
 import '../../core/utils/date_x.dart';
@@ -46,8 +47,7 @@ class SupportScreen extends ConsumerWidget {
             return const EmptyView.scrollable(
               icon: Symbols.support_agent_rounded,
               title: 'How can we help?',
-              subtitle:
-                  'Open a ticket and our crew will get back to you here.',
+              subtitle: 'Open a ticket and our crew will get back to you here.',
             );
           }
           return ListView.separated(
@@ -59,46 +59,47 @@ class SupportScreen extends ConsumerWidget {
               final t = list[i];
               final tones = context.tones;
               return FlowCard(
-                onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => TicketThreadScreen(ticketId: t.id))),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => TicketThreadScreen(ticketId: t.id),
+                  ),
+                ),
                 child: Row(
-                      children: [
-                        Container(
-                          width: 10,
-                          height: 10,
-                          decoration: BoxDecoration(
-                            color:
-                                t.isOpen ? tones.success : tones.textFaint,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(t.subject,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleMedium),
-                              Text(
-                                [
-                                  t.isOpen ? 'Open' : 'Resolved',
-                                  ?t.sessionRef,
-                                  timeAgo(t.lastMessageAt),
-                                ].join(' · '),
-                                style: inter(12.5, 520,
-                                    color: tones.textFaint),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Icon(Symbols.chevron_right_rounded,
-                            color: tones.textFaint),
-                      ],
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: t.isOpen ? tones.success : tones.textFaint,
+                        shape: BoxShape.circle,
+                      ),
                     ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            t.subject,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          Text(
+                            [
+                              t.isOpen ? 'Open' : 'Resolved',
+                              ?t.topic,
+                              ?t.sessionRef,
+                              timeAgo(t.lastMessageAt),
+                            ].join(' · '),
+                            style: inter(12.5, 520, color: tones.textFaint),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(Symbols.chevron_right_rounded, color: tones.textFaint),
+                  ],
+                ),
               );
             },
           );
@@ -107,14 +108,16 @@ class SupportScreen extends ConsumerWidget {
     );
   }
 
-  /// New ticket: subject* + body*; the sheet owns the send, so it stays open
-  /// until it succeeds (§9.7, §10.5). A recent session can be attached, which
-  /// stamps the ticket with the `FLW-…` reference staff can search.
+  /// New ticket: topic* + subject* + body*; the sheet owns the send, so it
+  /// stays open until it succeeds (§9.7, §10.5). A recent session can be
+  /// attached, which stamps the ticket with the `FLW-…` reference staff can
+  /// search.
   void _openNewTicketSheet(BuildContext context, WidgetRef ref) {
     final subject = TextEditingController();
     final body = TextEditingController();
     var busy = false;
     var attempted = false;
+    String? topic;
     Booking? about;
 
     showFlowSheet<void>(
@@ -124,17 +127,22 @@ class SupportScreen extends ConsumerWidget {
         builder: (sheetContext, setSheet) {
           Future<void> submit() async {
             setSheet(() => attempted = true);
-            if (subject.text.trim().isEmpty || body.text.trim().isEmpty) {
+            if (topic == null ||
+                subject.text.trim().isEmpty ||
+                body.text.trim().isEmpty) {
               return;
             }
             setSheet(() => busy = true);
             try {
               final session = ref.read(sessionProvider);
-              await ref.read(supportRepositoryProvider).openTicket(
+              await ref
+                  .read(supportRepositoryProvider)
+                  .openTicket(
                     userId: session.uid,
                     userName: session.displayName,
                     subject: subject.text.trim(),
                     body: body.text.trim(),
+                    topic: topic,
                     sessionId: about?.id,
                     sessionRef: about == null
                         ? null
@@ -148,8 +156,10 @@ class SupportScreen extends ConsumerWidget {
             } catch (e) {
               if (sheetContext.mounted) {
                 setSheet(() => busy = false);
-                showFlowToast(sheetContext,
-                    "Couldn't open the ticket. ${ErrorView.friendly(e)}");
+                showFlowToast(
+                  sheetContext,
+                  "Couldn't open the ticket. ${ErrorView.friendly(e)}",
+                );
               }
             }
           }
@@ -158,6 +168,39 @@ class SupportScreen extends ConsumerWidget {
             shrinkWrap: true,
             padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
             children: [
+              // The topic comes first because it is the first thing support
+              // reads: the queue triages by it before anyone opens the
+              // thread. Required, same contract as the report sheet's reason.
+              Text(
+                'TOPIC',
+                style: microLabel(sheetContext.tones.textFaint, size: 10),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final t in FlowConst.ticketTopics)
+                    FlowChoiceChip(
+                      label: t,
+                      selected: topic == t,
+                      onTap: busy
+                          ? () {}
+                          : () {
+                              Haptics.select();
+                              setSheet(() => topic = t);
+                            },
+                    ),
+                ],
+              ),
+              if (attempted && topic == null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Pick a topic so the right person sees it first.',
+                  style: inter(12.5, 560, color: sheetContext.tones.danger),
+                ),
+              ],
+              const SizedBox(height: 16),
               TextField(
                 controller: subject,
                 enabled: !busy,
@@ -185,54 +228,67 @@ class SupportScreen extends ConsumerWidget {
               ),
               // The session the ticket is about, offered rather than asked:
               // most tickets concern no session, so nothing here is required.
-              Consumer(builder: (context, ref, _) {
-                final me = ref.watch(sessionProvider);
-                final recent = ref
-                        .watch(me.isTrainer
-                            ? trainerBookingsProvider
-                            : riderBookingsProvider)
-                        .value ??
-                    const <Booking>[];
-                if (recent.isEmpty) return const SizedBox.shrink();
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 16),
-                    Text('ABOUT A SESSION? — OPTIONAL',
-                        style: microLabel(context.tones.textFaint, size: 10)),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (final b in recent.take(6))
-                          FlowChoiceChip(
-                            label:
-                                '${prettyYmd(b.date)} · ${me.isTrainer ? b.studentName : b.instructorName}',
-                            selected: about?.id == b.id,
-                            onTap: busy
-                                ? () {}
-                                : () {
-                                    Haptics.select();
-                                    setSheet(() => about =
-                                        about?.id == b.id ? null : b);
-                                  },
-                          ),
-                      ],
-                    ),
-                    if (about != null) ...[
-                      const SizedBox(height: 8),
+              Consumer(
+                builder: (context, ref, _) {
+                  final me = ref.watch(sessionProvider);
+                  final recent =
+                      ref
+                          .watch(
+                            me.isTrainer
+                                ? trainerBookingsProvider
+                                : riderBookingsProvider,
+                          )
+                          .value ??
+                      const <Booking>[];
+                  if (recent.isEmpty) return const SizedBox.shrink();
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 16),
                       Text(
-                        'Attaches ${sessionRef(about!.id, about!.date)} so support can look it up.',
-                        style: inter(12, 500, color: context.tones.textFaint),
+                        'ABOUT A SESSION? — OPTIONAL',
+                        style: microLabel(context.tones.textFaint, size: 10),
                       ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final b in recent.take(6))
+                            FlowChoiceChip(
+                              label:
+                                  '${prettyYmd(b.date)} · ${me.isTrainer ? b.studentName : b.instructorName}',
+                              selected: about?.id == b.id,
+                              onTap: busy
+                                  ? () {}
+                                  : () {
+                                      Haptics.select();
+                                      setSheet(
+                                        () => about = about?.id == b.id
+                                            ? null
+                                            : b,
+                                      );
+                                    },
+                            ),
+                        ],
+                      ),
+                      if (about != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          'Attaches ${sessionRef(about!.id, about!.date)} so support can look it up.',
+                          style: inter(12, 500, color: context.tones.textFaint),
+                        ),
+                      ],
                     ],
-                  ],
-                );
-              }),
+                  );
+                },
+              ),
               const SizedBox(height: 18),
               PrimaryButton(
-                  label: 'Open ticket', busy: busy, onPressed: submit),
+                label: 'Open ticket',
+                busy: busy,
+                onPressed: submit,
+              ),
             ],
           );
         },
@@ -249,8 +305,7 @@ class TicketThreadScreen extends ConsumerStatefulWidget {
   final String ticketId;
 
   @override
-  ConsumerState<TicketThreadScreen> createState() =>
-      _TicketThreadScreenState();
+  ConsumerState<TicketThreadScreen> createState() => _TicketThreadScreenState();
 }
 
 class _TicketThreadScreenState extends ConsumerState<TicketThreadScreen> {
@@ -269,7 +324,9 @@ class _TicketThreadScreenState extends ConsumerState<TicketThreadScreen> {
     setState(() => _sending = true);
     _input.clear();
     try {
-      await ref.read(supportRepositoryProvider).replyToTicket(
+      await ref
+          .read(supportRepositoryProvider)
+          .replyToTicket(
             ticketId: widget.ticketId,
             userId: ref.read(sessionProvider).uid,
             text: text,
@@ -295,8 +352,11 @@ class _TicketThreadScreenState extends ConsumerState<TicketThreadScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(ticket?.subject ?? 'Ticket',
-            maxLines: 1, overflow: TextOverflow.ellipsis),
+        title: Text(
+          ticket?.subject ?? 'Ticket',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
         actions: [
           if (ticket != null)
             Padding(
@@ -312,19 +372,28 @@ class _TicketThreadScreenState extends ConsumerState<TicketThreadScreen> {
       ),
       body: Column(
         children: [
-          // The session this ticket is about, when one was attached — the
-          // same reference the session sheet and beach ticket print.
-          if (ticket?.sessionRef != null)
+          // What the ticket is filed under and the session it concerns — the
+          // same topic and `FLW-…` reference the staff queue triages by, so
+          // both sides of the conversation see the same header facts.
+          if (ticket != null &&
+              (ticket.topic != null || ticket.sessionRef != null))
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
               child: Row(
                 children: [
-                  Icon(Symbols.confirmation_number_rounded,
-                      size: 16, color: tones.textFaint),
+                  Icon(
+                    Symbols.confirmation_number_rounded,
+                    size: 16,
+                    color: tones.textFaint,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'About session ${ticket!.sessionRef}',
+                      [
+                        ?ticket.topic,
+                        if (ticket.sessionRef != null)
+                          'About session ${ticket.sessionRef}',
+                      ].join(' · '),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: inter(12.5, 600, color: tones.textFaint),
@@ -352,12 +421,20 @@ class _TicketThreadScreenState extends ConsumerState<TicketThreadScreen> {
                       mine: mine,
                       theirsColor: tones.card,
                       header: m.fromStaff
-                          ? Text('FLOW SUPPORT',
-                              style: inter(10, 800,
-                                  color: tones.azureBrand, spacing: 1))
+                          ? Text(
+                              'FLOW SUPPORT',
+                              style: inter(
+                                10,
+                                800,
+                                color: tones.azureBrand,
+                                spacing: 1,
+                              ),
+                            )
                           : null,
-                      footer: Text(timeAgo(m.createdAt),
-                          style: inter(10, 500, color: tones.textFaint)),
+                      footer: Text(
+                        timeAgo(m.createdAt),
+                        style: inter(10, 500, color: tones.textFaint),
+                      ),
                     ),
                   );
                 },
@@ -379,8 +456,7 @@ class _TicketThreadScreenState extends ConsumerState<TicketThreadScreen> {
                       Expanded(
                         child: Text(
                           'This ticket was resolved by support.',
-                          style:
-                              inter(14, 520, color: tones.textFaint),
+                          style: inter(14, 520, color: tones.textFaint),
                         ),
                       ),
                       MicroAction(

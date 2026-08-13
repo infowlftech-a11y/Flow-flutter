@@ -7,6 +7,7 @@ class SupportTicket {
     required this.userName,
     required this.subject,
     required this.isOpen,
+    this.topic,
     this.lastMessageAt,
     this.sessionId,
     this.sessionRef,
@@ -17,6 +18,11 @@ class SupportTicket {
   final String userName;
   final String subject;
   final bool isOpen;
+
+  /// One of `FlowConst.ticketTopics`, chosen at creation (P9). Nullable
+  /// because every ticket written before the picker existed has none —
+  /// display collapses rather than inventing a topic for them.
+  final String? topic;
   final DateTime? lastMessageAt;
 
   /// The booking this ticket is about, when the user attached one. The raw
@@ -34,6 +40,7 @@ class SupportTicket {
         subject: d.str('subject') ?? 'Support ticket',
         // Defaults to open when status is missing.
         isOpen: (d.str('status') ?? 'open') == 'open',
+        topic: d.str('topic'),
         lastMessageAt: d.date('lastMessageAt'),
         sessionId: d.str('sessionId'),
         sessionRef: d.str('sessionRef'),
@@ -91,17 +98,17 @@ class Appeal {
   final List<AppealMessage> messages;
 
   factory Appeal.fromDoc(String id, Map<String, dynamic> d) => Appeal(
-        id: id,
-        userId: d.str('userId') ?? '',
-        userName: d.str('userName') ?? '',
-        reason: d.str('reason') ?? '',
-        status: d.str('status') ?? 'pending',
-        attachments: d.strList('attachments'),
-        createdAt: d.date('createdAt'),
-        messages: [
-          for (final m in d.nestedList('messages')) AppealMessage.fromMap(m),
-        ],
-      );
+    id: id,
+    userId: d.str('userId') ?? '',
+    userName: d.str('userName') ?? '',
+    reason: d.str('reason') ?? '',
+    status: d.str('status') ?? 'pending',
+    attachments: d.strList('attachments'),
+    createdAt: d.date('createdAt'),
+    messages: [
+      for (final m in d.nestedList('messages')) AppealMessage.fromMap(m),
+    ],
+  );
 }
 
 class AppealMessage {
@@ -122,23 +129,23 @@ class AppealMessage {
   final DateTime? timestamp;
 
   factory AppealMessage.fromMap(Map<String, dynamic> d) => AppealMessage(
-        id: d.str('id') ?? '',
-        senderId: d.str('senderId') ?? '',
-        senderName: d.str('senderName') ?? '',
-        text: d.str('text') ?? '',
-        attachments: d.strList('attachments'),
-        timestamp: d.date('timestamp'),
-      );
+    id: d.str('id') ?? '',
+    senderId: d.str('senderId') ?? '',
+    senderName: d.str('senderName') ?? '',
+    text: d.str('text') ?? '',
+    attachments: d.strList('attachments'),
+    timestamp: d.date('timestamp'),
+  );
 
   /// Written as an ISO string, matching the web client (§5.6).
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'senderId': senderId,
-        'senderName': senderName,
-        'text': text,
-        'attachments': attachments,
-        'timestamp': (timestamp ?? DateTime.now()).toIso8601String(),
-      };
+    'id': id,
+    'senderId': senderId,
+    'senderName': senderName,
+    'text': text,
+    'attachments': attachments,
+    'timestamp': (timestamp ?? DateTime.now()).toIso8601String(),
+  };
 }
 
 /// Why someone deleted their account (§3.13).
@@ -170,13 +177,13 @@ class LeaveReason {
   final DateTime? createdAt;
 
   factory LeaveReason.fromDoc(String id, Map<String, dynamic> d) => LeaveReason(
-        id: id,
-        userId: d.str('userId') ?? '',
-        userName: d.str('userName') ?? 'Someone',
-        userEmail: d.str('userEmail') ?? '',
-        reason: d.str('reason') ?? '',
-        createdAt: d.date('createdAt'),
-      );
+    id: id,
+    userId: d.str('userId') ?? '',
+    userName: d.str('userName') ?? 'Someone',
+    userEmail: d.str('userEmail') ?? '',
+    reason: d.str('reason') ?? '',
+    createdAt: d.date('createdAt'),
+  );
 
   /// The sheet's placeholder is `'No reason given'` when they skipped it —
   /// worth distinguishing in the queue from an answer someone actually typed.

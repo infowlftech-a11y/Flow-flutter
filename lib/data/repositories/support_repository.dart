@@ -161,11 +161,16 @@ class SupportRepository {
   /// attached one — the raw id for anything that looks the booking up, the
   /// rendered `FLW-…` ref so screens can print it without a read. Optional:
   /// most tickets ("how do refunds work?") are about no session at all.
+  ///
+  /// [topic] is one of `FlowConst.ticketTopics` (P9) — what the queue
+  /// triages by. The sheet requires it; the parameter stays optional so the
+  /// write shape, like the model, tolerates tickets from before it existed.
   Future<String> openTicket({
     required String userId,
     required String userName,
     required String subject,
     required String body,
+    String? topic,
     String? sessionId,
     String? sessionRef,
   }) async {
@@ -175,6 +180,7 @@ class SupportRepository {
       'userName': userName,
       'subject': subject,
       'status': 'open',
+      'topic': ?topic,
       'createdAt': FieldValue.serverTimestamp(),
       'lastMessageAt': FieldValue.serverTimestamp(),
       'sessionId': ?sessionId,

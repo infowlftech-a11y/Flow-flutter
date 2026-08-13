@@ -333,4 +333,45 @@ void main() {
       );
     });
   });
+
+  // P9 (ordered): tickets carry a topic the queue triages by.
+  group('the ticket topic', () {
+    test('is written when given and read back off the doc', () async {
+      final id = await support.openTicket(
+        userId: 'rider1',
+        userName: 'Rider One',
+        subject: 'Charged twice',
+        body: 'The app took the payment two times.',
+        topic: 'Payment or refund',
+      );
+
+      final raw = await db.collection(Col.tickets).doc(id).get();
+      expect(raw.data()!['topic'], 'Payment or refund');
+
+      final ticket = await support.watchTicket(id).first;
+      expect(ticket!.topic, 'Payment or refund');
+    });
+
+    test(
+      'is absent, not defaulted, on tickets from before it existed',
+      () async {
+        // Written the pre-P9 way: no topic key at all.
+        await db.collection(Col.tickets).doc('old1').set({
+          'userId': 'rider1',
+          'userName': 'Rider One',
+          'subject': 'Old ticket',
+          'status': 'open',
+        });
+
+        final ticket = await support.watchTicket('old1').first;
+        expect(
+          ticket!.topic,
+          isNull,
+          reason:
+              'inventing a topic for an old ticket would file it '
+              'under a category nobody chose',
+        );
+      },
+    );
+  });
 }

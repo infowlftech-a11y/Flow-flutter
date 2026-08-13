@@ -6,6 +6,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/theme/radii.dart';
 import '../../core/theme/typography.dart';
 import '../../core/utils/date_x.dart';
+import '../../core/utils/refs.dart';
 import '../../core/widgets/buttons.dart';
 import '../../core/widgets/feedback.dart';
 import '../../core/widgets/flow_image.dart';
@@ -56,12 +57,25 @@ class TicketsTab extends ConsumerWidget {
             subtitle: 'Questions riders and trainers send you land here.',
           );
         }
+        // Roles come from the directory, not the ticket: the member ID's
+        // R/C half depends on who the opener is today (P9).
+        final coachUids = {
+          for (final u
+              in ref.watch(allUsersProvider).value ?? const <AppUser>[])
+            if (u.role == UserRole.business) u.uid,
+        };
         return ListView.separated(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(20),
           itemCount: list.length,
           separatorBuilder: (_, _) => const SizedBox(height: 12),
-          itemBuilder: (context, i) => _TicketCard(ticket: list[i]),
+          itemBuilder: (context, i) => _TicketCard(
+            ticket: list[i],
+            memberId: memberRef(
+              list[i].userId,
+              coach: coachUids.contains(list[i].userId),
+            ),
+          ),
         );
       },
     );
@@ -69,8 +83,12 @@ class TicketsTab extends ConsumerWidget {
 }
 
 class _TicketCard extends ConsumerWidget {
-  const _TicketCard({required this.ticket});
+  const _TicketCard({required this.ticket, this.memberId});
   final SupportTicket ticket;
+
+  /// The opener's `FLW-R-…`/`FLW-C-…`, resolved by the queue (P9) — pasteable
+  /// straight into the directory search.
+  final String? memberId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -101,7 +119,9 @@ class _TicketCard extends ConsumerWidget {
           const SizedBox(height: 6),
           Text(
             [
+              ?ticket.topic,
               ticket.userName,
+              ?memberId,
               // The session the ticket is about — paste it into the
               // Sessions tab's search to pull the booking.
               ?ticket.sessionRef,
@@ -124,7 +144,9 @@ class _TicketCard extends ConsumerWidget {
       context,
       title: ticket.subject,
       subtitle: [
+        ?ticket.topic,
         ticket.userName,
+        ?memberId,
         ?ticket.sessionRef,
         ticket.isOpen ? 'open' : 'closed',
       ].join(' · '),

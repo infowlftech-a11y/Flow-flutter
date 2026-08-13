@@ -894,6 +894,31 @@ start's wall-clock time one day earlier, so the copy needs no time
 arithmetic and is always still ahead when sent. Undeployed until Functions
 are enabled, like its siblings.
 
+## P9 — Tickets carry a topic and every ID (ordered 2026-08-13)
+
+The new-ticket sheet now requires a topic — one of six
+(`FlowConst.ticketTopics`, beside the report reasons it mirrors) — before
+subject and body, because it is the first thing support triages by. The
+doc gains `topic`; the model and repository keep it optional so every
+ticket from before the picker still parses, which makes the sheet's
+submit gate the only guard — pinned by test/ticket_topic_test.dart from
+the user's side of the glass. The report flow already had required
+reasons (P2-era) and is unchanged.
+
+IDs travel with the ticket everywhere it is read: the staff queue row and
+thread sheet lead with topic, opener, the opener's `FLW-R/C-…` (derived
+by the queue from the directory, never stored), and the session ref when
+one is attached; the user's own list rows and thread header show the same
+topic + session facts, so both sides of a support call read the same
+line. Rules untouched — the ticket field set was already open.
+
+Writing the first test that ever pumped the new-ticket sheet surfaced a
+pre-existing overflow: `FlowChoiceChip` never constrained its label, and
+a safari station's name overran the sheet by 96px. Fixed in
+`lib/core/widgets/misc.dart` — which sits in the parallel uncommitted
+theme work, so the fix ships with that commit; the test holds it in
+place either way.
+
 ## P8 — The booking record PDF (7fba505)
 
 Saved from the session sheet wherever there is a money story: the FLW
