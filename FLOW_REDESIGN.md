@@ -856,3 +856,48 @@ Surfaces: a bolt badge on the Explore card, an INSTANT BOOK pill on the
 trainer profile at rating rank, instant-aware review-sheet copy, and the
 profile-screen switch whose subtitle states the current consequence in
 words. Walk-ins and safari seats were already instant and are untouched.
+
+---
+
+## P6 — Security hardening (approved 2026-08-13 via MCQ)
+
+Three of the four P4 security rows; MFA was declined for now.
+
+**Email verification gate (f0fd34d).** The pay step — lesson booking and
+safari seat alike — proceeds only for an account whose inbox is proven. The
+sheet has already sent the link when it appears, offers resend, and
+re-checks against the server. Client-side by design: the rules cannot demand
+`email_verified` on the token without breaking every pinned emulator test;
+server-side enforcement joins the App Check / Functions layer.
+
+**Staff audit log (1eda357).** Suspensions, lifts, trainer decisions and
+report outcomes each append one attributed line to `audit_log`, written by
+the same call that performs the action. Append-only for everyone including
+staff, and each entry must sign its own author's uid. Ninth console tab
+renders the trail. An unattributed action writes nothing. Rules 360 (+8),
+Dart 766 (+3) at commit time.
+
+**App Check (785f6e2).** Play Integrity attestation on release builds, debug
+provider on debug builds (its logcat token needs allow-listing). Owner-side
+sequence, in this order: register the app under App Check in the console →
+roll this build out → then enable Firestore enforcement. Enforcing first
+cuts off every installed copy that predates the commit. Once enforced, the
+hand-rolled-client threat class — including P1's back-dated-stamp limit —
+is refused at the door.
+
+## P7 — Free-cancellation deadline reminder (96e8d0f)
+
+`sendCancelWindowReminders`, nightly 18:00 Cairo beside the session
+reminder: held, confirmed bookings starting the day after tomorrow get
+"free cancellation ends tomorrow at HH:MM" — the deadline shares the
+start's wall-clock time one day earlier, so the copy needs no time
+arithmetic and is always still ahead when sent. Undeployed until Functions
+are enabled, like its siblings.
+
+## P8 — The booking record PDF (7fba505)
+
+Saved from the session sheet wherever there is a money story: the FLW
+reference, who/when/what, the amount, the escrow state in sentences, and
+the cancellation terms. Deliberately a *booking record*, not an invoice —
+there is no processor charge to invoice yet. Pure-bytes builder, pinned by
+test across every escrow state.
