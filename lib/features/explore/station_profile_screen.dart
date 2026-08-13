@@ -38,7 +38,9 @@ class StationProfileScreen extends ConsumerWidget {
               title: 'Not found',
               subtitle: 'This operator may have been removed.',
               action: OutlinedButton(
-                  onPressed: () => context.pop(), child: const Text('Go back')),
+                onPressed: () => context.pop(),
+                child: const Text('Go back'),
+              ),
             );
           }
           return _StationBody(station: station);
@@ -59,13 +61,16 @@ class _StationBody extends ConsumerWidget {
         ref.watch(stationInstructorsProvider(station.uid)).value ?? const [];
     final services =
         ref.watch(stationServicesProvider(station.uid)).value ?? const [];
-    final trips =
-        ref.watch(safariTripsProvider(station.uid)).value ?? const [];
+    final trips = ref.watch(safariTripsProvider(station.uid)).value ?? const [];
 
-    final rentals =
-        [for (final s in services) if (s.kind == ServiceKind.rental) s];
-    final beach =
-        [for (final s in services) if (s.kind == ServiceKind.beachUse) s];
+    final rentals = [
+      for (final s in services)
+        if (s.kind == ServiceKind.rental) s,
+    ];
+    final beach = [
+      for (final s in services)
+        if (s.kind == ServiceKind.beachUse) s,
+    ];
 
     final tabs = safariOnly
         ? [Tab(text: 'EXPEDITIONS (${trips.length})')]
@@ -103,17 +108,36 @@ class _StationBody extends ConsumerWidget {
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  FlowImage(
+                  // No photo gets the brand gradient, not the placeholder —
+                  // same rule as LiveSessionCard: the placeholder centres its
+                  // glyph exactly where the title is pinned, so a station
+                  // with no photo drew its name straight through a giant
+                  // storefront icon.
+                  if (station.photoUrl != null && station.photoUrl!.isNotEmpty)
+                    FlowImage(
                       url: station.photoUrl,
-                      placeholderIcon: Symbols.storefront_rounded),
+                      placeholderIcon: Symbols.storefront_rounded,
+                    )
+                  else
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: context.tones.heroGradient,
+                      ),
+                    ),
                   DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
+                        // .7 from .55, starting a third down: the location
+                        // pill and title sit in the bottom band, and over a
+                        // bright beach photo the lighter scrim left them
+                        // borderline. Fixed dark on a photo in both themes —
+                        // the documented exception to scheme colours.
+                        stops: const [.3, 1],
                         colors: [
                           Colors.transparent,
-                          Colors.black.withValues(alpha: .55),
+                          Colors.black.withValues(alpha: .7),
                         ],
                       ),
                     ),
@@ -129,17 +153,25 @@ class _StationBody extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(station.name,
-                            style: display(26, 760,
-                                color: Colors.white, spacing: -.5)),
+                        Text(
+                          station.name,
+                          style: display(
+                            26,
+                            760,
+                            color: Colors.white,
+                            spacing: -.5,
+                          ),
+                        ),
                         const SizedBox(height: 8),
                         Wrap(
                           spacing: 8,
                           runSpacing: 6,
                           children: [
-                            TagPill(station.location ?? 'Red Sea',
-                                icon: Symbols.place_rounded,
-                                color: Colors.white),
+                            TagPill(
+                              station.location ?? 'Red Sea',
+                              icon: Symbols.place_rounded,
+                              color: Colors.white,
+                            ),
                             TagPill(
                               safariOnly ? 'SAFARI OPERATOR' : 'STATION',
                               icon: safariOnly
@@ -154,17 +186,29 @@ class _StationBody extends ConsumerWidget {
                 ],
               ),
             ),
-            bottom: tabBar,
+            // On its own surface, not painted over the hero: while the bar
+            // is expanded, `bottom` overlays the flexibleSpace, and the
+            // unselected grey labels sat directly on the photograph —
+            // navigation carried by whatever contrast the image happened to
+            // give it.
+            bottom: PreferredSize(
+              preferredSize: tabBar.preferredSize,
+              child: ColoredBox(
+                color: context.scheme.surface,
+                child: Align(alignment: Alignment.centerLeft, child: tabBar),
+              ),
+            ),
           ),
           if ((station.bio ?? '').isNotEmpty)
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
-                child: Text(station.bio!,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodyMedium!
-                        .copyWith(height: 1.5)),
+                child: Text(
+                  station.bio!,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium!.copyWith(height: 1.5),
+                ),
               ),
             ),
         ],
@@ -174,15 +218,17 @@ class _StationBody extends ConsumerWidget {
               : [
                   _LessonsTab(station: station, instructors: instructors),
                   _ServicesTab(
-                      station: station,
-                      services: rentals,
-                      bookingType: 'rental',
-                      emptyLabel: 'No rentals listed yet.'),
+                    station: station,
+                    services: rentals,
+                    bookingType: 'rental',
+                    emptyLabel: 'No rentals listed yet.',
+                  ),
                   _ServicesTab(
-                      station: station,
-                      services: beach,
-                      bookingType: 'beach_use',
-                      emptyLabel: 'No beach passes listed yet.'),
+                    station: station,
+                    services: beach,
+                    bookingType: 'beach_use',
+                    emptyLabel: 'No beach passes listed yet.',
+                  ),
                 ],
         ),
       ),
@@ -202,9 +248,10 @@ class _LessonsTab extends StatelessWidget {
   Widget build(BuildContext context) {
     if (instructors.isEmpty) {
       return const EmptyView(
-          icon: Symbols.school_rounded,
-          title: 'No instructors listed',
-          subtitle: 'Check back soon.');
+        icon: Symbols.school_rounded,
+        title: 'No instructors listed',
+        subtitle: 'Check back soon.',
+      );
     }
     return ListView.separated(
       padding: const EdgeInsets.all(20),
@@ -223,8 +270,10 @@ class _LessonsTab extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(ins.name,
-                        style: Theme.of(context).textTheme.titleMedium),
+                    Text(
+                      ins.name,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
                     const SizedBox(height: 3),
                     Text(
                       [
@@ -276,10 +325,11 @@ class _ServicesTab extends StatelessWidget {
   Widget build(BuildContext context) {
     if (services.isEmpty) {
       return EmptyView(
-          icon: bookingType == 'rental'
-              ? Symbols.surfing_rounded
-              : Symbols.beach_access_rounded,
-          title: emptyLabel);
+        icon: bookingType == 'rental'
+            ? Symbols.surfing_rounded
+            : Symbols.beach_access_rounded,
+        title: emptyLabel,
+      );
     }
     return ListView.separated(
       padding: const EdgeInsets.all(20),
@@ -296,12 +346,16 @@ class _ServicesTab extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(s.name,
-                        style: Theme.of(context).textTheme.titleMedium),
+                    Text(
+                      s.name,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
                     if ((s.description ?? '').isNotEmpty) ...[
                       const SizedBox(height: 4),
-                      Text(s.description!,
-                          style: Theme.of(context).textTheme.bodySmall),
+                      Text(
+                        s.description!,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
                     ],
                     const SizedBox(height: 8),
                     Text(
@@ -348,9 +402,10 @@ class _ExpeditionsTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     if (trips.isEmpty) {
       return const EmptyView(
-          icon: Symbols.sailing_rounded,
-          title: 'No expeditions scheduled',
-          subtitle: 'New trips appear here as soon as they open.');
+        icon: Symbols.sailing_rounded,
+        title: 'No expeditions scheduled',
+        subtitle: 'New trips appear here as soon as they open.',
+      );
     }
     return ListView.separated(
       padding: const EdgeInsets.all(20),
@@ -391,7 +446,9 @@ class _TripCardState extends ConsumerState<_TripCard> {
     setState(() => _busy = true);
     try {
       final session = ref.read(sessionProvider);
-      await ref.read(bookingRepositoryProvider).reserveSafariSeat(
+      await ref
+          .read(bookingRepositoryProvider)
+          .reserveSafariSeat(
             trip: trip,
             hostName: widget.station.name,
             riderUid: session.uid,
@@ -426,8 +483,10 @@ class _TripCardState extends ConsumerState<_TripCard> {
           Row(
             children: [
               Expanded(
-                child: Text(trip.title,
-                    style: Theme.of(context).textTheme.titleLarge),
+                child: Text(
+                  trip.title,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
               ),
               if (trip.duration != null)
                 TagPill(trip.duration!, icon: Symbols.schedule_rounded),
@@ -442,22 +501,29 @@ class _TripCardState extends ConsumerState<_TripCard> {
               // price both grow with the text scale, and a Spacer can only
               // give away slack that exists. This lets the date yield.
               Expanded(
-                child: Text('Departs ${prettyYmd(trip.startDate)}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: inter(14, 540, color: tones.textFaint)),
+                child: Text(
+                  'Departs ${prettyYmd(trip.startDate)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: inter(14, 540, color: tones.textFaint),
+                ),
               ),
               const SizedBox(width: 8),
-              Text(money(trip.price),
-                  style: interNum(17, 760, color: tones.azureBrand)),
+              Text(
+                money(trip.price),
+                style: interNum(17, 760, color: tones.azureBrand),
+              ),
               Text(' / seat', style: inter(12.5, 540, color: tones.textFaint)),
             ],
           ),
           if ((trip.description ?? '').isNotEmpty) ...[
             const SizedBox(height: 10),
-            Text(trip.description!,
-                style:
-                    Theme.of(context).textTheme.bodyMedium!.copyWith(height: 1.5)),
+            Text(
+              trip.description!,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium!.copyWith(height: 1.5),
+            ),
           ],
           const SizedBox(height: 14),
           Row(
@@ -477,8 +543,11 @@ class _TripCardState extends ConsumerState<_TripCard> {
                 trip.isSoldOut
                     ? 'Manifest full'
                     : '${trip.seatsLeft} seat${trip.seatsLeft == 1 ? '' : 's'} left',
-                style: inter(12.5, 640,
-                    color: trip.isSoldOut ? tones.danger : tones.success),
+                style: inter(
+                  12.5,
+                  640,
+                  color: trip.isSoldOut ? tones.danger : tones.success,
+                ),
               ),
             ],
           ),

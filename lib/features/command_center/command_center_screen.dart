@@ -36,8 +36,11 @@ import 'qr_scanner_screen.dart';
 Future<void> runCheckInScan(BuildContext context, WidgetRef ref) async {
   final trainerId = ref.read(sessionProvider).uid;
   final bookingId = await Navigator.of(context, rootNavigator: true)
-      .push<String>(MaterialPageRoute(
-          builder: (_) => QrScannerScreen(trainerId: trainerId)));
+      .push<String>(
+        MaterialPageRoute(
+          builder: (_) => QrScannerScreen(trainerId: trainerId),
+        ),
+      );
   if (bookingId == null || !context.mounted) return;
   try {
     await ref
@@ -128,10 +131,12 @@ class _CommandCenterScreenState extends ConsumerState<CommandCenterScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final ctx = _requestsKey.currentContext;
       if (ctx != null && ctx.mounted) {
-        Scrollable.ensureVisible(ctx,
-            duration: const Duration(milliseconds: 350),
-            alignment: .05,
-            curve: Curves.easeOutCubic);
+        Scrollable.ensureVisible(
+          ctx,
+          duration: const Duration(milliseconds: 350),
+          alignment: .05,
+          curve: Curves.easeOutCubic,
+        );
       }
     });
   }
@@ -333,27 +338,33 @@ class _StatTile extends StatelessWidget {
               color: emphasized ? null : tones.card,
               borderRadius: FlowRadii.card,
               border: Border.all(
-                  color: emphasized
-                      ? tones.azureBrand.withValues(alpha: .5)
-                      : tones.line),
+                color: emphasized
+                    ? tones.azureBrand.withValues(alpha: .5)
+                    : tones.line,
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(icon,
-                    size: 19,
-                    color: emphasized
-                        ? tones.azureBrand
-                        : tones.textFaint),
+                Icon(
+                  icon,
+                  size: 19,
+                  color: emphasized ? tones.azureBrand : tones.textFaint,
+                ),
                 const SizedBox(height: 10),
                 FittedBox(
                   fit: BoxFit.scaleDown,
-                  child: Text(value,
-                      style: display(22, 760,
-                          color: emphasized
-                              ? Colors.white
-                              : context.scheme.onSurface,
-                          spacing: -.5)),
+                  child: Text(
+                    value,
+                    style: display(
+                      22,
+                      760,
+                      color: emphasized
+                          ? Colors.white
+                          : context.scheme.onSurface,
+                      spacing: -.5,
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 2),
                 // Scaled down like the value above it. A third of a 360px row
@@ -362,13 +373,16 @@ class _StatTile extends StatelessWidget {
                 // `TOTAL EARNED` by enough to read as `TOTAL EA…`.
                 FittedBox(
                   fit: BoxFit.scaleDown,
-                  child: Text(label.toUpperCase(),
-                      maxLines: 1,
-                      style: microLabel(
-                          emphasized
-                              ? Colors.white.withValues(alpha: .75)
-                              : tones.textFaint,
-                          size: 10)),
+                  child: Text(
+                    label.toUpperCase(),
+                    maxLines: 1,
+                    style: microLabel(
+                      emphasized
+                          ? Colors.white.withValues(alpha: .75)
+                          : tones.textFaint,
+                      size: 10,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -395,11 +409,15 @@ class _EmptyToday extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('No sessions today',
-                    style: Theme.of(context).textTheme.titleMedium),
+                Text(
+                  'No sessions today',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
                 const SizedBox(height: 2),
-                Text('Enjoy the wind.',
-                    style: Theme.of(context).textTheme.bodyMedium),
+                Text(
+                  'Enjoy the wind.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
               ],
             ),
           ),
@@ -432,7 +450,8 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
     final ok = await confirmAction(
       context,
       title: 'Approve this booking?',
-      body: '${b.studentName} · ${b.startTime}–${b.endTime} · '
+      body:
+          '${b.studentName} · ${b.startTime}–${b.endTime} · '
           '${money(b.totalPrice)}. They are notified and the hours are '
           'committed to your calendar.',
       confirmLabel: 'Approve',
@@ -472,7 +491,7 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
       title: 'Decline this request?',
       subtitle: widget.booking.payment.status.isHeldByApp
           ? 'The rider is refunded in full and notified — a reason softens '
-              'the blow.'
+                'the blow.'
           : 'The rider is notified — a reason softens the blow.',
       builder: (sheetContext) => Padding(
         padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
@@ -484,7 +503,8 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
               maxLines: 3,
               minLines: 2,
               decoration: const InputDecoration(
-                  hintText: 'Reason (optional) — e.g. "No wind forecast"'),
+                hintText: 'Reason (optional) — e.g. "No wind forecast"',
+              ),
             ),
             const SizedBox(height: 16),
             PrimaryButton(
@@ -507,9 +527,13 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
     setState(() => _busy = true);
     try {
       Haptics.medium();
-      await ref.read(bookingRepositoryProvider).setStatus(
-          widget.booking, BookingStatus.rejected,
-          declineReason: reason.text);
+      await ref
+          .read(bookingRepositoryProvider)
+          .setStatus(
+            widget.booking,
+            BookingStatus.rejected,
+            declineReason: reason.text,
+          );
       if (mounted) showFlowToast(context, 'Request declined');
     } on StatusConflictFailure catch (e) {
       if (mounted) showFlowToast(context, e.message);
@@ -562,20 +586,28 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(b.studentName,
-                        style: Theme.of(context).textTheme.titleMedium),
+                    Text(
+                      b.studentName,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
                     Text(
                       [
                         if (b.studentLevel != null) b.studentLevel!,
-                        '${prettyYmd(b.date)} · ${b.timeRange}',
+                        // The word joiner (U+2060) after the en dash removes
+                        // the break opportunity inside the range: at 1.3x the
+                        // line wrapped to "…10:00–" with "12:00" orphaned on
+                        // its own line. The range now wraps as one token.
+                        '${prettyYmd(b.date)} · ${b.timeRange.replaceAll('–', '–\u2060')}',
                       ].join(' · '),
                       style: inter(12.5, 500, color: tones.textFaint),
                     ),
                   ],
                 ),
               ),
-              Text(money(b.totalPrice),
-                  style: interNum(17, 760, color: tones.azureBrand)),
+              Text(
+                money(b.totalPrice),
+                style: interNum(17, 760, color: tones.azureBrand),
+              ),
             ],
           ),
           if ((b.message ?? '').isNotEmpty) ...[
@@ -584,20 +616,25 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
               padding: const EdgeInsets.all(12),
               width: double.infinity,
               decoration: BoxDecoration(
-                color: context.scheme.surfaceContainerHighest
-                    .withValues(alpha: .5),
+                color: context.scheme.surfaceContainerHighest.withValues(
+                  alpha: .5,
+                ),
                 borderRadius: FlowRadii.chip,
               ),
-              child: Text('"${b.message}"',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium!
-                      .copyWith(fontStyle: FontStyle.italic)),
+              child: Text(
+                '"${b.message}"',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium!.copyWith(fontStyle: FontStyle.italic),
+              ),
             ),
           ],
           if (b.gearNeeded) ...[
             const SizedBox(height: 10),
-            const TagPill('NEEDS GEAR', icon: Symbols.settings_input_component_rounded),
+            const TagPill(
+              'NEEDS GEAR',
+              icon: Symbols.settings_input_component_rounded,
+            ),
           ],
           const SizedBox(height: 14),
           Row(
@@ -643,74 +680,80 @@ class _ManifestCard extends ConsumerWidget {
           : null,
       onTap: () => _openDetails(context, ref),
       child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: tones.azureBrand.withValues(alpha: .1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  b.startTime ?? '--:--',
+                  style: interNum(14, 740, color: tones.azureBrand),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: tones.azureBrand.withValues(alpha: .1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(b.startTime ?? '--:--',
-                          style: interNum(14, 740,
-                              color: tones.azureBrand)),
+                    Text(
+                      b.studentName,
+                      style: Theme.of(context).textTheme.titleMedium,
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(b.studentName,
-                              style:
-                                  Theme.of(context).textTheme.titleMedium),
-                          Row(
-                            children: [
-                              Text(b.timeRange,
-                                  style: inter(12.5, 500,
-                                      color: tones.textFaint)),
-                              if (b.isManual) ...[
-                                const SizedBox(width: 8),
-                                const TagPill('WALK-IN'),
-                              ],
-                              if (b.gearNeeded) ...[
-                                const SizedBox(width: 6),
-                                const TagPill('GEAR'),
-                              ],
-                            ],
-                          ),
+                    Row(
+                      children: [
+                        Text(
+                          b.timeRange,
+                          style: inter(12.5, 500, color: tones.textFaint),
+                        ),
+                        if (b.isManual) ...[
+                          const SizedBox(width: 8),
+                          const TagPill('WALK-IN'),
                         ],
-                      ),
+                        if (b.gearNeeded) ...[
+                          const SizedBox(width: 6),
+                          const TagPill('GEAR'),
+                        ],
+                      ],
                     ),
-                    Text(money(b.totalPrice),
-                        style:
-                            interNum(15, 760, color: tones.azureBrand)),
                   ],
                 ),
-                const SizedBox(height: 12),
-                if (b.status == BookingStatus.confirmed)
-                  SizedBox(
-                    width: double.infinity,
-                    child: MicroAction(
-                      label: 'SCAN TO START',
-                      icon: Symbols.qr_code_scanner_rounded,
-                      onPressed: () => runCheckInScan(context, ref),
-                    ),
-                  )
-                else if (b.status == BookingStatus.inProgress)
-                  SizedBox(
-                    width: double.infinity,
-                    child: MicroAction(
-                      label: 'FINISH SESSION',
-                      icon: Symbols.flag_rounded,
-                      color: tones.success,
-                      onPressed: () => _finish(context, ref),
-                    ),
-                  ),
-              ],
+              ),
+              Text(
+                money(b.totalPrice),
+                style: interNum(15, 760, color: tones.azureBrand),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (b.status == BookingStatus.confirmed)
+            SizedBox(
+              width: double.infinity,
+              child: MicroAction(
+                label: 'SCAN TO START',
+                icon: Symbols.qr_code_scanner_rounded,
+                onPressed: () => runCheckInScan(context, ref),
+              ),
+            )
+          else if (b.status == BookingStatus.inProgress)
+            SizedBox(
+              width: double.infinity,
+              child: MicroAction(
+                label: 'FINISH SESSION',
+                icon: Symbols.flag_rounded,
+                color: tones.success,
+                onPressed: () => _finish(context, ref),
+              ),
             ),
+        ],
+      ),
     );
   }
 
@@ -723,7 +766,8 @@ class _ManifestCard extends ConsumerWidget {
       final sure = await confirmAction(
         context,
         title: 'Finish this session?',
-        body: 'FLOW holds $amount for it. Finishing marks the session '
+        body:
+            'FLOW holds $amount for it. Finishing marks the session '
             'delivered and queues your payout.',
         confirmLabel: 'Finish session',
         cancelLabel: 'Not yet',
@@ -780,18 +824,19 @@ class _ManifestCard extends ConsumerWidget {
     // of lie that makes people tap the button twice.
     if (paid) {
       try {
-        await ref.read(bookingRepositoryProvider).markPaid(
-              booking.id,
-              trainerId: booking.instructorId,
-            );
+        await ref
+            .read(bookingRepositoryProvider)
+            .markPaid(booking.id, trainerId: booking.instructorId);
       } on PaymentFailure catch (e) {
         if (context.mounted) showFlowToast(context, e.message);
         return;
       } catch (_) {
         if (context.mounted) {
-          showFlowToast(context,
-              'Session finished, but the payment did not save. '
-              'Mark it paid from your earnings.');
+          showFlowToast(
+            context,
+            'Session finished, but the payment did not save. '
+            'Mark it paid from your earnings.',
+          );
         }
         return;
       }
@@ -799,11 +844,12 @@ class _ManifestCard extends ConsumerWidget {
 
     if (context.mounted) {
       showFlowToast(
-          context,
-          paid
-              ? '${money(booking.amountDue)} collected 💶'
-              : '${money(booking.amountDue)} still owing — '
-                  'settle it from your earnings.');
+        context,
+        paid
+            ? '${money(booking.amountDue)} collected 💶'
+            : '${money(booking.amountDue)} still owing — '
+                  'settle it from your earnings.',
+      );
     }
   }
 
@@ -823,8 +869,12 @@ class _ManifestCard extends ConsumerWidget {
           children: [
             Text(
               'Did you take the $amount?',
-              style: inter(14, 520,
-                  color: sheetContext.tones.textFaint, height: 1.4),
+              style: inter(
+                14,
+                520,
+                color: sheetContext.tones.textFaint,
+                height: 1.4,
+              ),
             ),
             const SizedBox(height: 16),
             FilledButton.icon(
@@ -859,64 +909,69 @@ class _ManifestCard extends ConsumerWidget {
 /// [AgendaRow] has no card of its own to hang this off, and both need to open
 /// the same sheet.
 void openManifestDetails(BuildContext context, WidgetRef ref, Booking b) {
-    showFlowSheet<void>(
-      context,
-      title: b.studentName,
-      subtitle: '${longYmd(b.date)} · ${b.timeRange}',
-      builder: (sheetContext) => Padding(
-        padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                StatusPill(status: b.status),
-                const SizedBox(width: 8),
-                if (b.studentLevel != null) TagPill(b.studentLevel!),
-                if (b.gearNeeded) ...[
-                  const SizedBox(width: 6),
-                  const TagPill('NEEDS GEAR'),
-                ],
-                const Spacer(),
-                Text(money(b.totalPrice),
-                    style: interNum(17, 760,
-                        color: sheetContext.tones.azureBrand)),
+  showFlowSheet<void>(
+    context,
+    title: b.studentName,
+    subtitle: '${longYmd(b.date)} · ${b.timeRange}',
+    builder: (sheetContext) => Padding(
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              StatusPill(status: b.status),
+              const SizedBox(width: 8),
+              if (b.studentLevel != null) TagPill(b.studentLevel!),
+              if (b.gearNeeded) ...[
+                const SizedBox(width: 6),
+                const TagPill('NEEDS GEAR'),
               ],
-            ),
-            if ((b.message ?? '').isNotEmpty) ...[
-              const SizedBox(height: 16),
-              Text('MESSAGE',
-                  style: microLabel(sheetContext.tones.textFaint)),
-              const SizedBox(height: 6),
-              Text('"${b.message}"',
-                  style: Theme.of(sheetContext)
-                      .textTheme
-                      .bodyLarge!
-                      .copyWith(fontStyle: FontStyle.italic, height: 1.5)),
-            ],
-            const SizedBox(height: 20),
-            if (!b.isManual && b.kiterId.isNotEmpty)
-              PrimaryButton(
-                label: 'Message rider',
-                icon: Symbols.chat_bubble_outline_rounded,
-                onPressed: () {
-                  final session = ref.read(sessionProvider);
-                  ref.read(chatRepositoryProvider).openThread(
-                        me: session.uid,
-                        myName: session.displayName,
-                        partnerId: b.kiterId,
-                        partnerName: b.studentName,
-                      );
-                  Navigator.pop(sheetContext);
-                  sheetContext.push(
-                      '/chat/${b.kiterId}?name=${Uri.encodeComponent(b.studentName)}');
-                },
+              const Spacer(),
+              Text(
+                money(b.totalPrice),
+                style: interNum(17, 760, color: sheetContext.tones.azureBrand),
               ),
+            ],
+          ),
+          if ((b.message ?? '').isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text('MESSAGE', style: microLabel(sheetContext.tones.textFaint)),
+            const SizedBox(height: 6),
+            Text(
+              '"${b.message}"',
+              style: Theme.of(sheetContext).textTheme.bodyLarge!.copyWith(
+                fontStyle: FontStyle.italic,
+                height: 1.5,
+              ),
+            ),
           ],
-        ),
+          const SizedBox(height: 20),
+          if (!b.isManual && b.kiterId.isNotEmpty)
+            PrimaryButton(
+              label: 'Message rider',
+              icon: Symbols.chat_bubble_outline_rounded,
+              onPressed: () {
+                final session = ref.read(sessionProvider);
+                ref
+                    .read(chatRepositoryProvider)
+                    .openThread(
+                      me: session.uid,
+                      myName: session.displayName,
+                      partnerId: b.kiterId,
+                      partnerName: b.studentName,
+                    );
+                Navigator.pop(sheetContext);
+                sheetContext.push(
+                  '/chat/${b.kiterId}?name=${Uri.encodeComponent(b.studentName)}',
+                );
+              },
+            ),
+        ],
       ),
-    );
+    ),
+  );
 }
 
 class _ComingUpRow extends StatelessWidget {
@@ -940,19 +995,25 @@ class _ComingUpRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(booking.studentName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleSmall),
-                Text(booking.timeRange,
-                    style: inter(11.5, 500, color: tones.textFaint)),
+                Text(
+                  booking.studentName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                Text(
+                  booking.timeRange,
+                  style: inter(11.5, 500, color: tones.textFaint),
+                ),
               ],
             ),
           ),
           StatusPill(status: booking.status),
           const SizedBox(width: 10),
-          Text(money(booking.totalPrice),
-              style: interNum(14, 720, color: tones.azureBrand)),
+          Text(
+            money(booking.totalPrice),
+            style: interNum(14, 720, color: tones.azureBrand),
+          ),
         ],
       ),
     );
@@ -966,22 +1027,22 @@ Future<void> showTrainerTour(BuildContext context) {
     (
       Symbols.space_dashboard_rounded,
       'Your Command Center',
-      'Everything for the day in one place: requests, the manifest and your earnings.'
+      'Everything for the day in one place: requests, the manifest and your earnings.',
     ),
     (
       Symbols.how_to_reg_rounded,
       'Approve or decline',
-      'New requests appear under "Action required". Approve in one tap — undo is right there in the toast.'
+      'New requests appear under "Action required". Approve in one tap — undo is right there in the toast.',
     ),
     (
       Symbols.qr_code_scanner_rounded,
       'Scan riders in',
-      'Sessions only start when you scan the rider\'s QR ticket on the beach. Tap CHECK IN from anywhere.'
+      'Sessions only start when you scan the rider\'s QR ticket on the beach. Tap CHECK IN from anywhere.',
     ),
     (
       Symbols.edit_calendar_rounded,
       'Own your calendar',
-      'Block hours, add walk-ins and set time off in the Schedule tab. Riders only ever see true availability.'
+      'Block hours, add walk-ins and set time off in the Schedule tab. Riders only ever see true availability.',
     ),
   ];
 
@@ -999,13 +1060,17 @@ Future<void> showTrainerTour(BuildContext context) {
               children: [
                 FlowIconChip(icon: icon, size: 72),
                 const SizedBox(height: 18),
-                Text(title,
-                    style: Theme.of(dialogContext).textTheme.headlineSmall,
-                    textAlign: TextAlign.center),
+                Text(
+                  title,
+                  style: Theme.of(dialogContext).textTheme.headlineSmall,
+                  textAlign: TextAlign.center,
+                ),
                 const SizedBox(height: 10),
-                Text(body,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(dialogContext).textTheme.bodyMedium),
+                Text(
+                  body,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(dialogContext).textTheme.bodyMedium,
+                ),
                 const SizedBox(height: 20),
                 PageDots(count: steps.length, index: step),
                 const SizedBox(height: 16),

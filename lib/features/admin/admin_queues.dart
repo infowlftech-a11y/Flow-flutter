@@ -83,14 +83,18 @@ class _TicketCard extends ConsumerWidget {
           Row(
             children: [
               Expanded(
-                child: Text(ticket.subject,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleMedium),
+                child: Text(
+                  ticket.subject,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
               ),
               const SizedBox(width: 10),
-              TagPill(ticket.isOpen ? 'OPEN' : 'CLOSED',
-                  color: ticket.isOpen ? tones.warning : tones.textFaint),
+              TagPill(
+                ticket.isOpen ? 'OPEN' : 'CLOSED',
+                color: ticket.isOpen ? tones.warning : tones.textFaint,
+              ),
             ],
           ),
           const SizedBox(height: 6),
@@ -138,27 +142,28 @@ class _TicketCard extends ConsumerWidget {
             Flexible(
               child: ConstrainedBox(
                 constraints: BoxConstraints(
-                    maxHeight: MediaQuery.of(sheetContext).size.height * .4),
+                  maxHeight: MediaQuery.of(sheetContext).size.height * .4,
+                ),
                 child: Consumer(
                   builder: (context, ref, _) {
-                    final messages =
-                        ref.watch(ticketMessagesProvider(ticket.id));
+                    final messages = ref.watch(
+                      ticketMessagesProvider(ticket.id),
+                    );
                     return switch (messages) {
                       AsyncData(:final value) when value.isEmpty => Text(
-                          'No messages on this ticket.',
-                          style:
-                              inter(14, 460, color: context.tones.textFaint)),
+                        'No messages on this ticket.',
+                        style: inter(14, 460, color: context.tones.textFaint),
+                      ),
                       // Reversed, so it opens showing the newest message —
                       // the one being replied to.
                       AsyncData(:final value) => ListView.separated(
-                          shrinkWrap: true,
-                          reverse: true,
-                          itemCount: value.length,
-                          separatorBuilder: (_, _) =>
-                              const SizedBox(height: 10),
-                          itemBuilder: (context, i) => _TicketBubble(
-                              message: value[value.length - 1 - i]),
-                        ),
+                        shrinkWrap: true,
+                        reverse: true,
+                        itemCount: value.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 10),
+                        itemBuilder: (context, i) =>
+                            _TicketBubble(message: value[value.length - 1 - i]),
+                      ),
                       AsyncError() => const Text('Could not load the thread.'),
                       _ => const Center(child: FlowLoader(size: 30)),
                     };
@@ -171,8 +176,9 @@ class _TicketCard extends ConsumerWidget {
               controller: reply,
               minLines: 2,
               maxLines: 5,
-              decoration:
-                  const InputDecoration(hintText: 'Reply as FLOW support…'),
+              decoration: const InputDecoration(
+                hintText: 'Reply as FLOW support…',
+              ),
             ),
             const SizedBox(height: 12),
             Row(
@@ -212,7 +218,9 @@ class _TicketCard extends ConsumerWidget {
                     onPressed: () async {
                       final text = reply.text.trim();
                       if (text.isEmpty) return;
-                      await ref.read(supportRepositoryProvider).replyAsStaff(
+                      await ref
+                          .read(supportRepositoryProvider)
+                          .replyAsStaff(
                             ticketId: ticket.id,
                             staffId: ref.read(sessionProvider).uid,
                             text: text,
@@ -241,8 +249,9 @@ class _TicketBubble extends StatelessWidget {
     return Align(
       alignment: staff ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        constraints:
-            BoxConstraints(maxWidth: MediaQuery.of(context).size.width * .68),
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * .68,
+        ),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           color: staff ? tones.azureBrand.withValues(alpha: .14) : tones.card,
@@ -250,16 +259,25 @@ class _TicketBubble extends StatelessWidget {
           border: Border.all(color: tones.line),
         ),
         child: Column(
-          crossAxisAlignment:
-              staff ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          crossAxisAlignment: staff
+              ? CrossAxisAlignment.end
+              : CrossAxisAlignment.start,
           children: [
-            Text(message.text,
-                style: inter(14, 460,
-                    color: context.scheme.onSurface, height: 1.45)),
+            Text(
+              message.text,
+              style: inter(
+                14,
+                460,
+                color: context.scheme.onSurface,
+                height: 1.45,
+              ),
+            ),
             if (message.createdAt != null) ...[
               const SizedBox(height: 3),
-              Text(timeAgo(message.createdAt!),
-                  style: inter(11, 500, color: tones.textFaint)),
+              Text(
+                timeAgo(message.createdAt!),
+                style: inter(11, 500, color: tones.textFaint),
+              ),
             ],
           ],
         ),
@@ -325,12 +343,18 @@ class _SuspendedCard extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(user.name,
-                        style: Theme.of(context).textTheme.titleMedium),
-                    Text(user.email,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: inter(12.5, 480, color: tones.textFaint)),
+                    Text(
+                      user.name,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    // Two lines — same reason as the approval card: at 1.3x
+                    // one line cut the email at the domain.
+                    Text(
+                      user.email,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: inter(12.5, 480, color: tones.textFaint),
+                    ),
                   ],
                 ),
               ),
@@ -342,11 +366,12 @@ class _SuspendedCard extends ConsumerWidget {
             runSpacing: 6,
             children: [
               TagPill(
-                  user.isPermanentlyBlocked
-                      ? 'PERMANENT'
-                      : 'UNTIL ${user.blockedUntilRaw ?? '—'}',
-                  icon: Symbols.gavel_rounded,
-                  color: tones.danger),
+                user.isPermanentlyBlocked
+                    ? 'PERMANENT'
+                    : 'UNTIL ${user.blockedUntilRaw ?? '—'}',
+                icon: Symbols.gavel_rounded,
+                color: tones.danger,
+              ),
               TagPill(user.isTrainer ? 'TRAINER' : 'RIDER'),
             ],
           ),
@@ -369,7 +394,8 @@ class _SuspendedCard extends ConsumerWidget {
     final ok = await confirmAction(
       context,
       title: 'Lift the suspension on ${user.name}?',
-      body: 'They get their account back exactly as it was before the ban, '
+      body:
+          'They get their account back exactly as it was before the ban, '
           'and are told it was lifted.',
       confirmLabel: 'Lift suspension',
       cancelLabel: 'Keep suspended',
@@ -408,7 +434,8 @@ class LeaveReasonsTab extends ConsumerWidget {
           return const EmptyView.scrollable(
             icon: Symbols.waving_hand_rounded,
             title: 'Nobody has left yet',
-            subtitle: 'When someone deletes their account, what they tell us '
+            subtitle:
+                'When someone deletes their account, what they tell us '
                 'on the way out shows up here.',
           );
         }
@@ -438,30 +465,40 @@ class _LeaveReasonCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Text(reason.userName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleMedium),
+                child: Text(
+                  reason.userName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
               ),
               if (reason.createdAt != null)
-                Text(timeAgo(reason.createdAt!),
-                    style: inter(12, 500, color: tones.textFaint)),
+                Text(
+                  timeAgo(reason.createdAt!),
+                  style: inter(12, 500, color: tones.textFaint),
+                ),
             ],
           ),
           if (reason.userEmail.isNotEmpty) ...[
             const SizedBox(height: 2),
-            Text(reason.userEmail,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: inter(12.5, 480, color: tones.textFaint)),
+            Text(
+              reason.userEmail,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: inter(12.5, 480, color: tones.textFaint),
+            ),
           ],
           const SizedBox(height: 10),
           Text(
             reason.isBlank ? 'They left without saying why.' : reason.reason,
             style: reason.isBlank
                 ? inter(14, 440, color: tones.textFaint, height: 1.45)
-                : inter(14.5, 460,
-                    color: context.scheme.onSurface, height: 1.5),
+                : inter(
+                    14.5,
+                    460,
+                    color: context.scheme.onSurface,
+                    height: 1.5,
+                  ),
           ),
         ],
       ),

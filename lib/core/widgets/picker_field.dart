@@ -75,7 +75,11 @@ class FlowPickerField extends StatelessWidget {
         child: AnimatedContainer(
           curve: FlowMotion.curve,
           duration: FlowMotion.fast,
-          padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+          // Vertical 15 mirrors the InputDecorationTheme's contentPadding:
+          // this field sits in Rows beside plain TextFields (nationality /
+          // age on two forms), and at 12 it rendered ~9px shorter, so the
+          // pair never shared a bottom edge.
+          padding: const EdgeInsets.fromLTRB(14, 15, 10, 15),
           decoration: BoxDecoration(
             borderRadius: FlowRadii.control,
             border: Border.all(color: borderColor, width: 1.2),
@@ -85,14 +89,23 @@ class FlowPickerField extends StatelessWidget {
             children: [
               Expanded(
                 child: empty
-                    ? Text(hintText,
-                        style: inter(15, 460, color: tones.textFaint))
+                    ? Text(
+                        hintText,
+                        style: inter(15, 460, color: tones.textFaint),
+                      )
                     : (multiSelect
-                        ? _Tags(values: values, onRemove: enabled ? _remove : null)
-                        : Text(values.first,
-                            style: inter(15, 560,
-                                color:
-                                    Theme.of(context).colorScheme.onSurface))),
+                          ? _Tags(
+                              values: values,
+                              onRemove: enabled ? _remove : null,
+                            )
+                          : Text(
+                              values.first,
+                              style: inter(
+                                15,
+                                560,
+                                color: Theme.of(context).colorScheme.onSurface,
+                              ),
+                            )),
               ),
               Icon(
                 multiSelect ? Symbols.add_rounded : Symbols.expand_more_rounded,
@@ -106,8 +119,10 @@ class FlowPickerField extends StatelessWidget {
     );
   }
 
-  void _remove(String value) =>
-      onChanged([for (final v in values) if (v != value) v]);
+  void _remove(String value) => onChanged([
+    for (final v in values)
+      if (v != value) v,
+  ]);
 }
 
 /// Selected values as removable tags — the whole point of multi-select being
@@ -138,15 +153,20 @@ class _Tags extends StatelessWidget {
                 Text(v, style: inter(14, 600, color: tones.azureBrand)),
                 const SizedBox(width: 3),
                 InkWell(
-                  onTap: onRemove == null ? null : () {
-                    Haptics.select();
-                    onRemove!(v);
-                  },
+                  onTap: onRemove == null
+                      ? null
+                      : () {
+                          Haptics.select();
+                          onRemove!(v);
+                        },
                   borderRadius: FlowRadii.card,
                   child: Padding(
                     padding: const EdgeInsets.all(2),
-                    child: Icon(Symbols.close_rounded,
-                        size: 14, color: tones.azureBrand),
+                    child: Icon(
+                      Symbols.close_rounded,
+                      size: 14,
+                      color: tones.azureBrand,
+                    ),
                   ),
                 ),
               ],
@@ -213,10 +233,10 @@ class _PickerBodyState extends State<_PickerBody> {
   /// Previously-added custom values are kept visible alongside the suggested
   /// ones, so a user can untick their own entry instead of only ever adding.
   List<String> get _all => [
-        ...widget.options,
-        for (final s in _selected)
-          if (!widget.options.contains(s)) s,
-      ];
+    ...widget.options,
+    for (final s in _selected)
+      if (!widget.options.contains(s)) s,
+  ];
 
   List<String> get _visible {
     if (_query.isEmpty) return _all;
@@ -300,8 +320,10 @@ class _PickerBodyState extends State<_PickerBody> {
           child: visible.isEmpty && !_canAddCustom
               ? Padding(
                   padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
-                  child: Text('Nothing matches “$_query”.',
-                      style: inter(14, 460, color: tones.textFaint)),
+                  child: Text(
+                    'Nothing matches “$_query”.',
+                    style: inter(14, 460, color: tones.textFaint),
+                  ),
                 )
               : ListView(
                   shrinkWrap: true,
@@ -309,11 +331,14 @@ class _PickerBodyState extends State<_PickerBody> {
                   children: [
                     if (_canAddCustom)
                       ListTile(
-                        leading: Icon(Symbols.add_circle_outline_rounded,
-                            color: tones.azureBrand),
-                        title: Text('Add “$_query”',
-                            style:
-                                inter(15, 620, color: tones.azureBrand)),
+                        leading: Icon(
+                          Symbols.add_circle_outline_rounded,
+                          color: tones.azureBrand,
+                        ),
+                        title: Text(
+                          'Add “$_query”',
+                          style: inter(15, 620, color: tones.azureBrand),
+                        ),
                         onTap: _addCustom,
                       ),
                     for (final o in visible)
@@ -335,9 +360,11 @@ class _PickerBodyState extends State<_PickerBody> {
               width: double.infinity,
               child: FilledButton(
                 onPressed: () => Navigator.pop(context, _selected),
-                child: Text(_selected.isEmpty
-                    ? 'Done'
-                    : 'Done · ${_selected.length} selected'),
+                child: Text(
+                  _selected.isEmpty
+                      ? 'Done'
+                      : 'Done · ${_selected.length} selected',
+                ),
               ),
             ),
           ),
@@ -367,10 +394,13 @@ class _Row extends StatelessWidget {
       dense: true,
       title: Text(
         label,
-        style: inter(15, selected ? 620 : 460,
-            color: selected
-                ? tones.azureBrand
-                : Theme.of(context).colorScheme.onSurface),
+        style: inter(
+          15,
+          selected ? 620 : 460,
+          color: selected
+              ? tones.azureBrand
+              : Theme.of(context).colorScheme.onSurface,
+        ),
       ),
       trailing: selected
           ? Icon(
@@ -381,9 +411,12 @@ class _Row extends StatelessWidget {
               size: 21,
             )
           : (multiSelect
-              ? Icon(Symbols.check_box_outline_blank_rounded,
-                  color: tones.line, size: 22)
-              : null),
+                ? Icon(
+                    Symbols.check_box_outline_blank_rounded,
+                    color: tones.line,
+                    size: 22,
+                  )
+                : null),
     );
   }
 }

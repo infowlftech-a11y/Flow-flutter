@@ -52,7 +52,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     super.initState();
     // Opening a thread creates the doc if needed and clears my unread count.
     final session = ref.read(sessionProvider);
-    ref.read(chatRepositoryProvider).openThread(
+    ref
+        .read(chatRepositoryProvider)
+        .openThread(
           me: session.uid,
           myName: session.displayName,
           partnerId: widget.partnerId,
@@ -82,9 +84,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     if (!_scroll.hasClients) return;
     final target = _scroll.position.maxScrollExtent;
     if (animate) {
-      _scroll.animateTo(target,
-          duration: const Duration(milliseconds: 280),
-          curve: Curves.easeOutCubic);
+      _scroll.animateTo(
+        target,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
+      );
     } else {
       _scroll.jumpTo(target);
     }
@@ -132,7 +136,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     try {
       // Fire-and-forget: latency compensation paints the bubble instantly
       // (§10.6). A failure restores the text to the composer.
-      await ref.read(chatRepositoryProvider).send(
+      await ref
+          .read(chatRepositoryProvider)
+          .send(
             me: session.uid,
             myName: session.displayName,
             partnerId: widget.partnerId,
@@ -157,14 +163,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        titleSpacing: 0,
+        // 4, not 0: zero sat the avatar flush against whatever is to its
+        // left — the back arrow on device, the raw screen edge anywhere the
+        // route cannot pop — and the avatar's corner read as clipped.
+        titleSpacing: 4,
         title: Row(
           children: [
             FlowAvatar(name: widget.partnerName, size: 36),
             const SizedBox(width: 10),
             Expanded(
-              child: Text(widget.partnerName,
-                  maxLines: 1, overflow: TextOverflow.ellipsis),
+              child: Text(
+                widget.partnerName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ],
         ),
@@ -176,8 +188,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               children: [
                 AsyncView<List<ChatMessage>>(
                   value: messages,
-                  onRetry: () =>
-                      ref.invalidate(chatMessagesProvider(_chatId)),
+                  onRetry: () => ref.invalidate(chatMessagesProvider(_chatId)),
                   skeleton: const _ChatSkeleton(),
                   data: (list) {
                     if (list.isEmpty) {
@@ -195,11 +206,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       itemBuilder: (context, i) {
                         final m = list[i];
                         final prev = i > 0 ? list[i - 1] : null;
-                        final next =
-                            i < list.length - 1 ? list[i + 1] : null;
+                        final next = i < list.length - 1 ? list[i + 1] : null;
                         // Absolute timestamp only when there's a >10-minute
                         // gap (§3.11).
-                        final showTimestamp = prev == null ||
+                        final showTimestamp =
+                            prev == null ||
                             (m.createdAt != null &&
                                 prev.createdAt != null &&
                                 m.createdAt!
@@ -240,17 +251,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           onTap: _jumpToLatest,
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 8),
+                              horizontal: 14,
+                              vertical: 8,
+                            ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Symbols.arrow_downward_rounded,
-                                    size: 16, color: Colors.white),
+                                const Icon(
+                                  Symbols.arrow_downward_rounded,
+                                  size: 16,
+                                  color: Colors.white,
+                                ),
                                 const SizedBox(width: 6),
                                 Text(
                                   '$_missedWhileAway new',
-                                  style: inter(12.5, 680,
-                                      color: Colors.white),
+                                  style: inter(12.5, 680, color: Colors.white),
                                 ),
                               ],
                             ),
@@ -263,11 +278,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ],
             ),
           ),
-          MessageComposer(
-            controller: _input,
-            canSend: _canSend,
-            onSend: _send,
-          ),
+          MessageComposer(controller: _input, canSend: _canSend, onSend: _send),
         ],
       ),
     );
@@ -295,8 +306,9 @@ class _Bubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment:
-          mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      crossAxisAlignment: mine
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
       children: [
         if (showTimestamp && message.createdAt != null)
           Padding(
@@ -306,8 +318,12 @@ class _Bubble extends StatelessWidget {
                 '${message.createdAt!.day} '
                 '${monthsLong[message.createdAt!.month - 1].substring(0, 3)}'
                 ' · ${_clock(message.createdAt!)}',
-                style: inter(11.5, 600,
-                    color: context.tones.textFaint, spacing: .4),
+                style: inter(
+                  11.5,
+                  600,
+                  color: context.tones.textFaint,
+                  spacing: .4,
+                ),
               ),
             ),
           ),
@@ -337,12 +353,12 @@ class _ChatSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Widget bubble(bool mine, double width) => Align(
-          alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: SkeletonPulse(width: width, height: 40, radius: 16),
-          ),
-        );
+      alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: SkeletonPulse(width: width, height: 40, radius: 16),
+      ),
+    );
     return ListView(
       padding: const EdgeInsets.all(16),
       physics: const NeverScrollableScrollPhysics(),

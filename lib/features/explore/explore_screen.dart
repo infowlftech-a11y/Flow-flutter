@@ -83,11 +83,15 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Hey ${session.displayName.split(' ').first} 🤙',
-                            style: Theme.of(context).textTheme.bodyMedium),
+                        Text(
+                          'Hey ${session.displayName.split(' ').first} 🤙',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
                         const SizedBox(height: 2),
-                        Text('Find your trainer',
-                            style: Theme.of(context).textTheme.displaySmall),
+                        Text(
+                          'Find your trainer',
+                          style: Theme.of(context).textTheme.displaySmall,
+                        ),
                       ],
                     ),
                   ),
@@ -96,22 +100,24 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                   // rather than a destination because a rider messages a
                   // trainer far less often than they browse or check a
                   // booking, and it was taking a quarter of the bar.
-                  Consumer(builder: (context, ref, _) {
-                    final unreadChats = ref.watch(unreadChatCountProvider);
-                    return Semantics(
-                      button: true,
-                      child: IconButton.outlined(
-                        onPressed: () => context.push('/inbox'),
-                        tooltip: 'Messages',
-                        icon: BadgedIcon(
-                          count: unreadChats,
-                          icon: Symbols.forum_rounded,
-                          semanticLabelBuilder: (n) =>
-                              '$n unread message${n == 1 ? '' : 's'}',
+                  Consumer(
+                    builder: (context, ref, _) {
+                      final unreadChats = ref.watch(unreadChatCountProvider);
+                      return Semantics(
+                        button: true,
+                        child: IconButton.outlined(
+                          onPressed: () => context.push('/inbox'),
+                          tooltip: 'Messages',
+                          icon: BadgedIcon(
+                            count: unreadChats,
+                            icon: Symbols.forum_rounded,
+                            semanticLabelBuilder: (n) =>
+                                '$n unread message${n == 1 ? '' : 's'}',
+                          ),
                         ),
-                      ),
-                    );
-                  }),
+                      );
+                    },
+                  ),
                   const SizedBox(width: 8),
                   Semantics(
                     label: unread > 0
@@ -148,16 +154,24 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                         onChanged: _onQueryChanged,
                         textInputAction: TextInputAction.search,
                         decoration: InputDecoration(
-                          hintText: 'Search trainers, spots…',
-                          prefixIcon:
-                              const Icon(Symbols.search_rounded, size: 22),
+                          // Just "Search" — the longer hint listed what could
+                          // be searched, and at 1.3x on a narrow phone the
+                          // list itself was cut to "Search train…", which
+                          // reads as a glitch, not a hint.
+                          hintText: 'Search',
+                          prefixIcon: const Icon(
+                            Symbols.search_rounded,
+                            size: 22,
+                          ),
                           suffixIcon: value.text.isEmpty
                               ? null
                               : IconButton(
                                   tooltip: 'Clear search',
                                   onPressed: _clearQuery,
-                                  icon:
-                                      const Icon(Symbols.close_rounded, size: 20),
+                                  icon: const Icon(
+                                    Symbols.close_rounded,
+                                    size: 20,
+                                  ),
                                 ),
                         ),
                       ),
@@ -264,11 +278,11 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                           : 'Try widening your filters or clearing the search.',
                       action:
                           (filter.activeCount > 0 || filter.query.isNotEmpty)
-                              ? OutlinedButton(
-                                  onPressed: _resetAll,
-                                  child: const Text('RESET'),
-                                )
-                              : null,
+                          ? OutlinedButton(
+                              onPressed: _resetAll,
+                              child: const Text('RESET'),
+                            )
+                          : null,
                     );
                   }
                   return CustomScrollView(
@@ -308,8 +322,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                               const SizedBox(height: 10),
                           itemBuilder: (context, i) {
                             final t = list[i];
-                            final r =
-                                ratings[t.uid] ?? RatingSummary.none;
+                            final r = ratings[t.uid] ?? RatingSummary.none;
                             return ProviderCard(
                               name: t.name,
                               photoUrl: t.photoUrl,
@@ -320,12 +333,15 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                                   ? null
                                   : money(t.hourlyRate!),
                               badge: t.isStation || t.isSafariOperator
-                                  ? const _KindBadge(icon: Symbols.storefront_rounded)
+                                  ? const _KindBadge(
+                                      icon: Symbols.storefront_rounded,
+                                    )
                                   : null,
                               onTap: () => context.push(
-                                  t.isStation || t.isSafariOperator
-                                      ? '/station/${t.uid}'
-                                      : '/trainer/${t.uid}'),
+                                t.isStation || t.isSafariOperator
+                                    ? '/station/${t.uid}'
+                                    : '/trainer/${t.uid}',
+                              ),
                             );
                           },
                         ),
@@ -447,7 +463,10 @@ class _GridSkeleton extends StatelessWidget {
           children: [
             Expanded(
               child: SkeletonPulse(
-                  width: double.infinity, height: 999, radius: 12),
+                width: double.infinity,
+                height: 999,
+                radius: 12,
+              ),
             ),
             SizedBox(height: 12),
             SkeletonPulse(width: 110),

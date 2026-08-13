@@ -99,10 +99,21 @@ class ProviderCard extends StatelessWidget {
                       children: [
                         Text(
                           name,
-                          maxLines: 1,
+                          // Two lines, not one. This card exists because grid
+                          // tiles forced names to ellipse — and then it did
+                          // the same thing itself: `Hurghada–Magawish
+                          // Watersports` was cut at 1.0x, and a 320px phone
+                          // at 1.3x cut `Anna Bergström`. The name is the one
+                          // fact that must never be dropped; the card may
+                          // grow past the photo instead.
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: display(17, 700,
-                              color: scheme.onSurface, spacing: -.2),
+                          style: display(
+                            17,
+                            700,
+                            color: scheme.onSurface,
+                            spacing: -.2,
+                          ),
                         ),
                         if (rating != null) ...[
                           const SizedBox(height: 6),
@@ -124,16 +135,22 @@ class ProviderCard extends StatelessWidget {
                                   flex: 3,
                                   child: Row(
                                     children: [
-                                      Icon(Symbols.place_rounded,
-                                          size: 13, color: tones.textFaint),
+                                      Icon(
+                                        Symbols.place_rounded,
+                                        size: 13,
+                                        color: tones.textFaint,
+                                      ),
                                       const SizedBox(width: 4),
                                       Flexible(
                                         child: Text(
                                           location!,
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
-                                          style: inter(13, 500,
-                                              color: scheme.onSurfaceVariant),
+                                          style: inter(
+                                            13,
+                                            500,
+                                            color: scheme.onSurfaceVariant,
+                                          ),
                                         ),
                                       ),
                                     ],
@@ -155,18 +172,26 @@ class ProviderCard extends StatelessWidget {
                                     fit: BoxFit.scaleDown,
                                     alignment: Alignment.centerRight,
                                     child: Text.rich(
-                                      TextSpan(children: [
-                                        TextSpan(
-                                          text: priceLabel,
-                                          style: interNum(16, 760,
-                                              color: scheme.onSurface),
-                                        ),
-                                        TextSpan(
-                                          text: ' / $priceUnit',
-                                          style: inter(11.5, 500,
-                                              color: tones.textFaint),
-                                        ),
-                                      ]),
+                                      TextSpan(
+                                        children: [
+                                          TextSpan(
+                                            text: priceLabel,
+                                            style: interNum(
+                                              16,
+                                              760,
+                                              color: scheme.onSurface,
+                                            ),
+                                          ),
+                                          TextSpan(
+                                            text: ' / $priceUnit',
+                                            style: inter(
+                                              11.5,
+                                              500,
+                                              color: tones.textFaint,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                       textAlign: TextAlign.right,
                                       maxLines: 1,
                                     ),
@@ -225,8 +250,7 @@ class _Photo extends StatelessWidget {
               ),
             ),
           ),
-          if (badge != null)
-            Positioned(right: 6, bottom: 6, child: badge!),
+          if (badge != null) Positioned(right: 6, bottom: 6, child: badge!),
         ],
       ),
     );
@@ -249,10 +273,17 @@ class _Rating extends StatelessWidget {
       excludeSemantics: true,
       child: Row(
         children: [
-          Icon(Symbols.star_rounded, size: 15, fill: 1, color: tones.azureBrand),
+          Icon(
+            Symbols.star_rounded,
+            size: 15,
+            fill: 1,
+            color: tones.azureBrand,
+          ),
           const SizedBox(width: 4),
-          Text(value.toStringAsFixed(1),
-              style: interNum(13.5, 700, color: tones.azureBrand)),
+          Text(
+            value.toStringAsFixed(1),
+            style: interNum(13.5, 700, color: tones.azureBrand),
+          ),
           if (count != null) ...[
             const SizedBox(width: 4),
             // The review count is the one part of this row that may be

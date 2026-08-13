@@ -95,62 +95,78 @@ class _BlockedScreenState extends ConsumerState<BlockedScreen> {
       padding: EdgeInsets.zero,
       ownsScroll: true,
       child: ListView(
-            padding: const EdgeInsets.all(28),
-            children: [
-              Center(
-                child: FlowIconChip(
-                  icon: Symbols.front_hand_rounded,
-                  color: context.tones.danger,
-                  size: 88,
-                  tintOpacity: .14,
-                ),
+        padding: const EdgeInsets.all(28),
+        children: [
+          Center(
+            child: FlowIconChip(
+              icon: Symbols.front_hand_rounded,
+              color: context.tones.danger,
+              size: 88,
+              tintOpacity: .14,
+            ),
+          ),
+          const SizedBox(height: 28),
+          Center(
+            // textAlign, not just Center: at 1.3x the title wraps, and a
+            // wrapped Text left-aligns its own lines — "Account /
+            // suspended" sat flush left on an otherwise centred screen.
+            child: Text(
+              'Account suspended',
+              textAlign: TextAlign.center,
+              style: display(
+                26,
+                760,
+                color: context.scheme.onSurface,
+                spacing: -.5,
               ),
-              const SizedBox(height: 28),
-              Center(
-                child: Text('Account suspended',
-                    style: display(26, 760, color: context.scheme.onSurface, spacing: -.5)),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: context.tones.card.withValues(alpha: .8),
+                borderRadius: FlowRadii.chip,
               ),
-              const SizedBox(height: 10),
-              Center(
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: context.tones.card.withValues(alpha: .8),
-                    borderRadius: FlowRadii.chip,
-                  ),
-                  child: Text(untilLabel,
-                      style: inter(14, 640, color: context.tones.warning)),
-                ),
+              child: Text(
+                untilLabel,
+                style: inter(14, 640, color: context.tones.warning),
               ),
-              const SizedBox(height: 16),
-              Text(
-                'Your account was suspended by our moderation team. If you '
-                'believe this is a mistake, you can appeal the decision and '
-                'talk to us directly below.',
-                textAlign: TextAlign.center,
-                style: inter(14, 440, color: context.scheme.onSurfaceVariant, height: 1.55),
-              ),
-              const SizedBox(height: 28),
-              switch (appeal) {
-                AsyncValue(hasValue: true, value: final a) => a == null
-                    ? PrimaryButton(
-                        label: 'Appeal this decision',
-                        icon: Symbols.gavel_rounded,
-                        onPressed: () => _openAppealSheet(context),
-                      )
-                    : _AppealThread(appeal: a),
-                AsyncValue(hasError: true, :final error?) => ErrorView(
-                    error: error,
-                    onRetry: () => ref.invalidate(myAppealProvider)),
-                _ => const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(24),
-                      child: FlowLoader(),
-                    ),
-                  ),
-              },
-            ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Your account was suspended by our moderation team. If you '
+            'believe this is a mistake, you can appeal the decision and '
+            'talk to us directly below.',
+            textAlign: TextAlign.center,
+            style: inter(
+              14,
+              440,
+              color: context.scheme.onSurfaceVariant,
+              height: 1.55,
+            ),
+          ),
+          const SizedBox(height: 28),
+          switch (appeal) {
+            AsyncValue(hasValue: true, value: final a) =>
+              a == null
+                  ? PrimaryButton(
+                      label: 'Appeal this decision',
+                      icon: Symbols.gavel_rounded,
+                      onPressed: () => _openAppealSheet(context),
+                    )
+                  : _AppealThread(appeal: a),
+            AsyncValue(hasError: true, :final error?) => ErrorView(
+              error: error,
+              onRetry: () => ref.invalidate(myAppealProvider),
+            ),
+            _ => const Center(
+              child: Padding(padding: EdgeInsets.all(24), child: FlowLoader()),
+            ),
+          },
+        ],
       ),
     );
   }
@@ -179,12 +195,16 @@ class _BlockedScreenState extends ConsumerState<BlockedScreen> {
             setSheet(() => busy = true);
             try {
               final session = ref.read(sessionProvider);
-              final urls = await ref.read(storageRepositoryProvider).uploadAll(
+              final urls = await ref
+                  .read(storageRepositoryProvider)
+                  .uploadAll(
                     folder: StorageFolder.appeals,
                     files: evidence,
                     ownerId: session.uid,
                   );
-              await ref.read(supportRepositoryProvider).submitAppeal(
+              await ref
+                  .read(supportRepositoryProvider)
+                  .submitAppeal(
                     userId: session.uid,
                     userName: session.displayName,
                     reason: reason,
@@ -203,8 +223,10 @@ class _BlockedScreenState extends ConsumerState<BlockedScreen> {
               // Keep the sheet (and the typed text) — let them retry.
               if (sheetContext.mounted) {
                 setSheet(() => busy = false);
-                showFlowToast(sheetContext,
-                    "Couldn't send your appeal. ${ErrorView.friendly(e)}");
+                showFlowToast(
+                  sheetContext,
+                  "Couldn't send your appeal. ${ErrorView.friendly(e)}",
+                );
               }
             }
           }
@@ -219,7 +241,8 @@ class _BlockedScreenState extends ConsumerState<BlockedScreen> {
                 minLines: 3,
                 enabled: !busy,
                 decoration: const InputDecoration(
-                    hintText: 'Why should we lift this suspension?'),
+                  hintText: 'Why should we lift this suspension?',
+                ),
               ),
               const SizedBox(height: 14),
               Wrap(
@@ -241,21 +264,27 @@ class _BlockedScreenState extends ConsumerState<BlockedScreen> {
                             // No crop: this is appeal evidence, and trimming
                             // it is the last thing a moderator wants.
                             final picked = await ImageService.pickWithSheet(
-                                sheetContext,
-                                shape: null);
+                              sheetContext,
+                              shape: null,
+                            );
                             if (picked != null) {
                               setSheet(() => evidence.add(picked));
                             }
                           },
-                    icon: const Icon(Symbols.add_photo_alternate_rounded,
-                        size: 20),
+                    icon: const Icon(
+                      Symbols.add_photo_alternate_rounded,
+                      size: 20,
+                    ),
                     label: const Text('Evidence'),
                   ),
                 ],
               ),
               const SizedBox(height: 20),
               PrimaryButton(
-                  label: 'Send appeal', busy: busy, onPressed: submit),
+                label: 'Send appeal',
+                busy: busy,
+                onPressed: submit,
+              ),
               const SizedBox(height: 8),
               TextButton(
                 onPressed: busy ? null : () => Navigator.pop(sheetContext),
@@ -295,7 +324,9 @@ class _AppealThreadState extends ConsumerState<_AppealThread> {
     setState(() => _sending = true);
     final session = ref.read(sessionProvider);
     try {
-      await ref.read(supportRepositoryProvider).replyToAppeal(
+      await ref
+          .read(supportRepositoryProvider)
+          .replyToAppeal(
             widget.appeal.id,
             AppealMessage(
               id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -338,16 +369,19 @@ class _AppealThreadState extends ConsumerState<_AppealThread> {
           Row(
             children: [
               Expanded(
-                child: Text('YOUR APPEAL',
-                    style: microLabel(context.tones.textFaint)),
+                child: Text(
+                  'YOUR APPEAL',
+                  style: microLabel(context.tones.textFaint),
+                ),
               ),
-              TagPill(a.status.toUpperCase(),
-                  color: statusColor, dense: true),
+              TagPill(a.status.toUpperCase(), color: statusColor, dense: true),
             ],
           ),
           const SizedBox(height: 12),
-          Text(a.reason,
-              style: inter(14, 460, color: context.scheme.onSurface, height: 1.5)),
+          Text(
+            a.reason,
+            style: inter(14, 460, color: context.scheme.onSurface, height: 1.5),
+          ),
           if (a.messages.isNotEmpty) ...[
             const SizedBox(height: 16),
             for (final m in a.messages) _AppealBubble(message: m),

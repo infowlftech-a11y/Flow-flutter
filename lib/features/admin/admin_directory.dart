@@ -44,16 +44,20 @@ enum UserFilter {
   final String label;
 
   bool matches(AppUser u) => switch (this) {
-        all => true,
-        riders => u.role == UserRole.kiter,
-        business => u.role == UserRole.business,
-        pending => u.status == AccountStatus.pending,
-        suspended => u.status == AccountStatus.blocked,
-      };
+    all => true,
+    riders => u.role == UserRole.kiter,
+    business => u.role == UserRole.business,
+    pending => u.status == AccountStatus.pending,
+    suspended => u.status == AccountStatus.blocked,
+  };
 }
 
 /// Case-insensitive name/email search over a role/status filter.
-List<AppUser> filterUsers(List<AppUser> users, UserFilter filter, String query) {
+List<AppUser> filterUsers(
+  List<AppUser> users,
+  UserFilter filter,
+  String query,
+) {
   final q = query.trim().toLowerCase();
   return [
     for (final u in users)
@@ -67,7 +71,10 @@ List<AppUser> filterUsers(List<AppUser> users, UserFilter filter, String query) 
 
 /// Status filter + name search over every booking.
 List<Booking> filterBookings(
-    List<Booking> bookings, BookingStatus? status, String query) {
+  List<Booking> bookings,
+  BookingStatus? status,
+  String query,
+) {
   final q = query.trim().toLowerCase();
   return [
     for (final b in bookings)
@@ -200,15 +207,22 @@ class _UserCard extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(user.name.isEmpty ? '(no name yet)' : user.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleMedium),
+                Text(
+                  user.name.isEmpty ? '(no name yet)' : user.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
                 const SizedBox(height: 3),
-                Text(user.email,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: inter(12.5, 480, color: tones.textFaint)),
+                // Two lines — same reason as the approval card: the domain
+                // half of an email is what staff search by, and one line
+                // dropped it at 1.3x.
+                Text(
+                  user.email,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: inter(12.5, 480, color: tones.textFaint),
+                ),
               ],
             ),
           ),
@@ -218,8 +232,11 @@ class _UserCard extends ConsumerWidget {
             children: [
               TagPill(_roleLabel(user), dense: true),
               const SizedBox(height: 4),
-              TagPill(user.status.name.toUpperCase(),
-                  color: statusColor, dense: true),
+              TagPill(
+                user.status.name.toUpperCase(),
+                color: statusColor,
+                dense: true,
+              ),
             ],
           ),
         ],
@@ -234,8 +251,8 @@ String _roleLabel(AppUser u) {
     return u.isStation
         ? 'STATION'
         : u.isSafariOperator
-            ? 'SAFARI'
-            : 'TRAINER';
+        ? 'SAFARI'
+        : 'TRAINER';
   }
   return 'RIDER';
 }
@@ -261,15 +278,16 @@ class _UserSheetBody extends ConsumerWidget {
     // The user's footprint, from streams the console already holds open.
     final bookings = ref.watch(allBookingsProvider).value ?? const <Booking>[];
     final asRider = bookings.where((b) => b.kiterId == user.uid).length;
-    final asTrainer =
-        bookings.where((b) => b.instructorId == user.uid).length;
-    final openTickets = ref
+    final asTrainer = bookings.where((b) => b.instructorId == user.uid).length;
+    final openTickets =
+        ref
             .watch(allTicketsProvider)
             .value
             ?.where((t) => t.userId == user.uid && t.isOpen)
             .length ??
         0;
-    final reportsAgainst = ref
+    final reportsAgainst =
+        ref
             .watch(reportsProvider)
             .value
             ?.where((r) => r.reportedUserId == user.uid && r.isOpen)
@@ -285,8 +303,7 @@ class _UserSheetBody extends ConsumerWidget {
         ('Rate', '${money(user.displayRate)}/h'),
       if (user.ikoId != null) ('Credential', user.ikoId!),
       ('Sessions as rider', '$asRider'),
-      if (user.role == UserRole.business)
-        ('Sessions as trainer', '$asTrainer'),
+      if (user.role == UserRole.business) ('Sessions as trainer', '$asTrainer'),
       ('Open tickets', '$openTickets'),
       ('Open reports against them', '$reportsAgainst'),
       if (user.status == AccountStatus.blocked)
@@ -295,8 +312,8 @@ class _UserSheetBody extends ConsumerWidget {
           user.isPermanentlyBlocked
               ? 'forever'
               : user.blockedUntilRaw == null
-                  ? 'unknown'
-                  : prettyYmd(user.blockedUntilRaw!),
+              ? 'unknown'
+              : prettyYmd(user.blockedUntilRaw!),
         ),
     ];
 
@@ -312,13 +329,20 @@ class _UserSheetBody extends ConsumerWidget {
               children: [
                 SizedBox(
                   width: 132,
-                  child: Text(label.toUpperCase(),
-                      style: microLabel(tones.textFaint, size: 10)),
+                  child: Text(
+                    label.toUpperCase(),
+                    style: microLabel(tones.textFaint, size: 10),
+                  ),
                 ),
                 Expanded(
-                  child: Text(value,
-                      style: inter(13.5, 560,
-                          color: Theme.of(context).colorScheme.onSurface)),
+                  child: Text(
+                    value,
+                    style: inter(
+                      13.5,
+                      560,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -328,9 +352,10 @@ class _UserSheetBody extends ConsumerWidget {
             user.status == AccountStatus.active) ...[
           OutlinedButton.icon(
             onPressed: () => context.push(
-                user.isStation || user.isSafariOperator
-                    ? '/station/${user.uid}'
-                    : '/trainer/${user.uid}'),
+              user.isStation || user.isSafariOperator
+                  ? '/station/${user.uid}'
+                  : '/trainer/${user.uid}',
+            ),
             icon: const Icon(Symbols.visibility_rounded, size: 20),
             label: const Text('View public profile'),
           ),
@@ -362,9 +387,11 @@ class _UserSheetBody extends ConsumerWidget {
     // model for "suspend", wherever staff reach it from.
     final sure = await confirmAction(
       context,
-      title: 'Suspend ${user.name.isEmpty ? 'this account' : user.name} '
+      title:
+          'Suspend ${user.name.isEmpty ? 'this account' : user.name} '
           'for 7 days?',
-      body: 'They lose access immediately and are shown the suspension gate. '
+      body:
+          'They lose access immediately and are shown the suspension gate. '
           'They can appeal, and you can lift it from the Suspended tab.',
       confirmLabel: 'Suspend',
       cancelLabel: 'Not yet',
@@ -376,7 +403,10 @@ class _UserSheetBody extends ConsumerWidget {
       await ref.read(adminRepositoryProvider).blockUser(user.uid, until: until);
       if (context.mounted) {
         Navigator.pop(context);
-        showFlowToast(context, '${user.name} suspended until ${prettyYmd(until)}');
+        showFlowToast(
+          context,
+          '${user.name} suspended until ${prettyYmd(until)}',
+        );
       }
     } catch (_) {
       if (context.mounted) {
@@ -389,7 +419,8 @@ class _UserSheetBody extends ConsumerWidget {
     final sure = await confirmAction(
       context,
       title: 'Lift this suspension?',
-      body: '${user.name.isEmpty ? 'The account' : user.name} regains full '
+      body:
+          '${user.name.isEmpty ? 'The account' : user.name} regains full '
           'access immediately.',
       confirmLabel: 'Lift suspension',
     );
@@ -564,14 +595,20 @@ void _openSessionSheet(BuildContext context, Booking b) {
                 children: [
                   SizedBox(
                     width: 110,
-                    child: Text(label.toUpperCase(),
-                        style: microLabel(tones.textFaint, size: 10)),
+                    child: Text(
+                      label.toUpperCase(),
+                      style: microLabel(tones.textFaint, size: 10),
+                    ),
                   ),
                   Expanded(
-                    child: Text(value,
-                        style: inter(13.5, 560,
-                            color:
-                                Theme.of(sheetContext).colorScheme.onSurface)),
+                    child: Text(
+                      value,
+                      style: inter(
+                        13.5,
+                        560,
+                        color: Theme.of(sheetContext).colorScheme.onSurface,
+                      ),
+                    ),
                   ),
                 ],
               ),

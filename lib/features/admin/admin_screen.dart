@@ -323,7 +323,12 @@ class _ApplicantCardState extends ConsumerState<_ApplicantCard> {
                     ),
                     Text(
                       t.email,
-                      maxLines: 1,
+                      // Two lines: an email is the one field staff copy into
+                      // other systems, and at 1.3x one line kept
+                      // "mostafa@example.…" — the part after the @ is what
+                      // distinguishes accounts. Flutter breaks the unspaced
+                      // string mid-word, which is fine; complete beats pretty.
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: inter(12.5, 480, color: tones.textFaint),
                     ),

@@ -20,50 +20,62 @@ class RoleSelectScreen extends ConsumerWidget {
     return GateScaffold(
       onSignOut: () => ref.read(signOutProvider)(),
       child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const SizedBox(height: 12),
-                Text('Who are you\non the beach?',
-                    style:
-                        display(32, 780, color: context.scheme.onSurface, spacing: -1, height: 1.1)),
-                const SizedBox(height: 12),
-                Text(
-                  'This decides what FLOW looks like for you. You only pick once.',
-                  style: inter(15, 440, color: context.scheme.onSurfaceVariant, height: 1.5),
-                ),
-                const SizedBox(height: 32),
-                _RoleCard(
-                  icon: Symbols.kitesurfing_rounded,
-                  title: "I'm a Kiter",
-                  body:
-                      'Find certified trainers, book hours on the water and check in with a QR ticket.',
-                  cta: 'Ride with FLOW',
-                  onTap: () {
-                    Haptics.select();
-                    // push, not go: `go` replaces the location outright, so
-                    // the form had nothing to pop back to and a mistapped
-                    // role was a dead end short of signing out.
-                    context.push('/onboarding/rider');
-                  },
-                ),
-                const SizedBox(height: 18),
-                _RoleCard(
-                  icon: Symbols.storefront_rounded,
-                  title: "I'm a Trainer",
-                  body:
-                      'Run your calendar, approve requests, scan riders in and track earnings.',
-                  cta: 'Work with FLOW',
-                  footnote:
-                      'Trainer accounts are reviewed by our team before going live.',
-                  onTap: () {
-                    Haptics.select();
-                    // See the rider branch — pushed so Back returns here.
-                    context.push('/onboarding/trainer');
-                  },
-                ),
-                const Spacer(),
-              ],
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: 12),
+          Text(
+            'Who are you\non the beach?',
+            style: display(
+              32,
+              780,
+              color: context.scheme.onSurface,
+              spacing: -1,
+              height: 1.1,
             ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'This decides what FLOW looks like for you. You only pick once.',
+            style: inter(
+              15,
+              440,
+              color: context.scheme.onSurfaceVariant,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 32),
+          _RoleCard(
+            icon: Symbols.kitesurfing_rounded,
+            title: "I'm a Kiter",
+            body:
+                'Find certified trainers, book hours on the water and check in with a QR ticket.',
+            cta: 'Ride with FLOW',
+            onTap: () {
+              Haptics.select();
+              // push, not go: `go` replaces the location outright, so
+              // the form had nothing to pop back to and a mistapped
+              // role was a dead end short of signing out.
+              context.push('/onboarding/rider');
+            },
+          ),
+          const SizedBox(height: 18),
+          _RoleCard(
+            icon: Symbols.storefront_rounded,
+            title: "I'm a Trainer",
+            body:
+                'Run your calendar, approve requests, scan riders in and track earnings.',
+            cta: 'Work with FLOW',
+            footnote:
+                'Trainer accounts are reviewed by our team before going live.',
+            onTap: () {
+              Haptics.select();
+              // See the rider branch — pushed so Back returns here.
+              context.push('/onboarding/trainer');
+            },
+          ),
+          const Spacer(),
+        ],
+      ),
     );
   }
 }
@@ -115,35 +127,69 @@ class _RoleCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 16),
                   Expanded(
-                    child: Text(title,
-                        style: display(20, 720,
-                            color: context.scheme.onSurface, spacing: -.3)),
+                    child: Text(
+                      title,
+                      style: display(
+                        20,
+                        720,
+                        color: context.scheme.onSurface,
+                        spacing: -.3,
+                      ),
+                    ),
                   ),
-                  Icon(Symbols.arrow_forward_rounded,
-                      color: context.scheme.primary),
+                  Icon(
+                    Symbols.arrow_forward_rounded,
+                    color: context.scheme.primary,
+                  ),
                 ],
               ),
               const SizedBox(height: 14),
-              Text(body,
-                  style:
-                      inter(14, 440, color: context.scheme.onSurfaceVariant, height: 1.5)),
+              Text(
+                body,
+                style: inter(
+                  14,
+                  440,
+                  color: context.scheme.onSurfaceVariant,
+                  height: 1.5,
+                ),
+              ),
               if (footnote != null) ...[
                 const SizedBox(height: 12),
                 Row(
+                  // Top-aligned: centring the icon against the text block
+                  // looks right at two lines, but at 1.3x the note runs to
+                  // three and the shield floats beside the middle one,
+                  // attached to nothing. Pinned to the first line instead.
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Symbols.verified_user_rounded,
-                        size: 15, color: context.tones.textFaint),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Icon(
+                        Symbols.verified_user_rounded,
+                        size: 15,
+                        color: context.tones.textFaint,
+                      ),
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text(footnote!,
-                          style: inter(12.5, 500, color: context.tones.textFaint)),
+                      child: Text(
+                        footnote!,
+                        style: inter(12.5, 500, color: context.tones.textFaint),
+                      ),
                     ),
                   ],
                 ),
               ],
               const SizedBox(height: 6),
-              Text(cta.toUpperCase(),
-                  style: inter(12.5, 760, color: context.scheme.primary, spacing: 1.4)),
+              Text(
+                cta.toUpperCase(),
+                style: inter(
+                  12.5,
+                  760,
+                  color: context.scheme.primary,
+                  spacing: 1.4,
+                ),
+              ),
             ],
           ),
         ),

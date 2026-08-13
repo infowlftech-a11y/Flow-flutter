@@ -38,63 +38,76 @@ class WelcomeScreen extends ConsumerWidget {
           // work at every size where it fits.
           child: ScrollableFill(
             child: Padding(
-            padding: const EdgeInsets.fromLTRB(28, 24, 28, 28),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Spacer(flex: 2),
-                const Center(child: FlowLogo(size: 92)),
-                const SizedBox(height: 24),
-                const Center(child: FlowWordmark()),
-                const SizedBox(height: 18),
-                Text(
-                  'Kitesurfing lessons on the Egyptian Red Sea.\n'
-                  'Find a certified trainer, book hours on the water, '
-                  'check in on the beach.',
-                  textAlign: TextAlign.center,
-                  style: inter(14, 460,
-                      color: scheme.onSurfaceVariant, height: 1.55),
-                ),
-                const Spacer(flex: 3),
-                PrimaryButton(
-                  label: 'Create an account',
-                  icon: Symbols.kitesurfing_rounded,
-                  onPressed: () {
-                    Haptics.select();
-                    // Each entry point starts from a clean slate — an error
-                    // from a previous attempt must not greet a fresh form.
-                    ref.read(authControllerProvider.notifier).reset();
-                    context.push('/auth/sign-up');
-                  },
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton(
-                  onPressed: () {
-                    Haptics.select();
-                    ref.read(authControllerProvider.notifier).reset();
-                    context.push('/auth/sign-in');
-                  },
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(54),
-                    side: BorderSide(
-                        color: scheme.onSurface.withValues(alpha: .28)),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: FlowRadii.control),
+              padding: const EdgeInsets.fromLTRB(28, 24, 28, 28),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Spacer(flex: 2),
+                  const Center(child: FlowLogo(size: 92)),
+                  const SizedBox(height: 24),
+                  const Center(child: FlowWordmark()),
+                  const SizedBox(height: 18),
+                  Text(
+                    // The no-break space in "Red Sea." keeps the pair together: at 1.0x
+                    // the line broke after "Red", leaving "Sea." centred alone.
+                    'Kitesurfing lessons on the Egyptian Red Sea.\n'
+                    'Find a certified trainer, book hours on the water, '
+                    'check in on the beach.',
+                    textAlign: TextAlign.center,
+                    style: inter(
+                      14,
+                      460,
+                      color: scheme.onSurfaceVariant,
+                      height: 1.55,
+                    ),
                   ),
-                  child: Text('I already have an account',
-                      style: inter(15, 640, color: scheme.onSurface)),
-                ),
-                const SizedBox(height: 18),
-                Text(
-                  'By continuing you agree to ride within your limits and '
-                  'follow your trainer’s safety briefing.',
-                  textAlign: TextAlign.center,
-                  style: inter(11.5, 440,
+                  const Spacer(flex: 3),
+                  PrimaryButton(
+                    label: 'Create an account',
+                    icon: Symbols.kitesurfing_rounded,
+                    onPressed: () {
+                      Haptics.select();
+                      // Each entry point starts from a clean slate — an error
+                      // from a previous attempt must not greet a fresh form.
+                      ref.read(authControllerProvider.notifier).reset();
+                      context.push('/auth/sign-up');
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton(
+                    onPressed: () {
+                      Haptics.select();
+                      ref.read(authControllerProvider.notifier).reset();
+                      context.push('/auth/sign-in');
+                    },
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(54),
+                      side: BorderSide(
+                        color: scheme.onSurface.withValues(alpha: .28),
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: FlowRadii.control,
+                      ),
+                    ),
+                    child: Text(
+                      'I already have an account',
+                      style: inter(15, 640, color: scheme.onSurface),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    'By continuing you agree to ride within your limits and '
+                    'follow your trainer’s safety briefing.',
+                    textAlign: TextAlign.center,
+                    style: inter(
+                      11.5,
+                      440,
                       color: scheme.onSurfaceVariant.withValues(alpha: .75),
-                      height: 1.45),
-                ),
-              ],
-            ),
+                      height: 1.45,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

@@ -110,13 +110,21 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   /// If a selected hour became unavailable while the screen is open, drop it
   /// on the next frame — but only once real data has arrived (§8.4).
   void _pruneSelection(DayAvailability day) {
-    if ([for (final s in _selection) if (!day.isFree(s)) s].isEmpty) return;
+    if ([
+      for (final s in _selection)
+        if (!day.isFree(s)) s,
+    ].isEmpty) {
+      return;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       // Re-check against the live selection: several builds can schedule this
       // before the first callback runs, and that one may already have pruned.
       // Without this the rider gets the same toast two or three times.
-      final stale = [for (final s in _selection) if (!day.isFree(s)) s];
+      final stale = [
+        for (final s in _selection)
+          if (!day.isFree(s)) s,
+      ];
       if (stale.isEmpty) return;
 
       var split = false;
@@ -139,7 +147,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         context,
         split
             ? 'An hour you picked was just taken, so the hours after the gap '
-                'were dropped — sessions run back-to-back.'
+                  'were dropped — sessions run back-to-back.'
             : 'An hour you picked was just taken and has been removed.',
         icon: split ? Symbols.link_off_rounded : null,
       );
@@ -149,8 +157,9 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   @override
   Widget build(BuildContext context) {
     final target = widget.target;
-    final availability = ref.watch(dayAvailabilityProvider(
-        (instructorId: target.providerId, date: _date)));
+    final availability = ref.watch(
+      dayAvailabilityProvider((instructorId: target.providerId, date: _date)),
+    );
 
     if (availability case AsyncData(:final value)) {
       _pruneSelection(value);
@@ -172,18 +181,14 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                   selected: _date,
                   onChanged: _changeDay,
                 ),
-                _WindSummary(
-                  instructorId: target.providerId,
-                  date: _date,
-                ),
+                _WindSummary(instructorId: target.providerId, date: _date),
                 const SizedBox(height: 24),
                 SectionHeader(
                   'Available hours',
                   trailing: _selection.isEmpty
                       ? null
                       : TextButton(
-                          onPressed: () =>
-                              setState(() => _selection.clear()),
+                          onPressed: () => setState(() => _selection.clear()),
                           child: const Text('CLEAR'),
                         ),
                 ),
@@ -200,8 +205,12 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                 ),
                 AsyncView<DayAvailability>(
                   value: availability,
-                  onRetry: () => ref.invalidate(dayAvailabilityProvider(
-                      (instructorId: target.providerId, date: _date))),
+                  onRetry: () => ref.invalidate(
+                    dayAvailabilityProvider((
+                      instructorId: target.providerId,
+                      date: _date,
+                    )),
+                  ),
                   // The grid must not default to "free" before data arrives —
                   // loading never lies (§10.2).
                   skeleton: const _SlotGridSkeleton(),
@@ -234,8 +243,8 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                               maxLines: 3,
                               minLines: 2,
                               decoration: const InputDecoration(
-                                  hintText:
-                                      'Message to your trainer (optional)'),
+                                hintText: 'Message to your trainer (optional)',
+                              ),
                             ),
                             const SizedBox(height: 10),
                             SwitchListTile(
@@ -245,10 +254,12 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                                 setState(() => _gearNeeded = v);
                               },
                               contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 6),
+                                horizontal: 6,
+                              ),
                               title: const Text('I need gear'),
                               subtitle: const Text(
-                                  'Kite, board and harness provided at the centre'),
+                                'Kite, board and harness provided at the centre',
+                              ),
                             ),
                           ],
                         ),
@@ -281,13 +292,20 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
             shrinkWrap: true,
             padding: const EdgeInsets.fromLTRB(24, 14, 24, 24),
             children: [
-              _ReviewRow('Service',
-                  target.subTarget ?? '${target.title} · kitesurf lesson'),
+              _ReviewRow(
+                'Service',
+                target.subTarget ?? '${target.title} · kitesurf lesson',
+              ),
               _ReviewRow('Date', longYmd(_date)),
               _ReviewRow('Time', '${start.value}–${end.value}'),
-              _ReviewRow('Duration',
-                  '${slots.length} hour${slots.length == 1 ? '' : 's'}'),
-              _ReviewRow('Gear', _gearNeeded ? 'Provided by centre' : 'Own gear'),
+              _ReviewRow(
+                'Duration',
+                '${slots.length} hour${slots.length == 1 ? '' : 's'}',
+              ),
+              _ReviewRow(
+                'Gear',
+                _gearNeeded ? 'Provided by centre' : 'Own gear',
+              ),
               const SizedBox(height: 14),
               Container(
                 padding: const EdgeInsets.all(16),
@@ -295,8 +313,8 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                   color: sheetContext.tones.azureBrand.withValues(alpha: .08),
                   borderRadius: FlowRadii.inset,
                   border: Border.all(
-                      color:
-                          sheetContext.tones.azureBrand.withValues(alpha: .3)),
+                    color: sheetContext.tones.azureBrand.withValues(alpha: .3),
+                  ),
                 ),
                 child: Column(
                   children: [
@@ -304,28 +322,42 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                            '${money(target.rate)} × ${slots.length}h',
-                            style: inter(14, 540,
-                                color:
-                                    sheetContext.scheme.onSurfaceVariant)),
-                        Text(money(_total),
-                            style: display(22, 760,
-                                color: sheetContext.tones.azureBrand)),
+                          '${money(target.rate)} × ${slots.length}h',
+                          style: inter(
+                            14,
+                            540,
+                            color: sheetContext.scheme.onSurfaceVariant,
+                          ),
+                        ),
+                        Text(
+                          money(_total),
+                          style: display(
+                            22,
+                            760,
+                            color: sheetContext.tones.azureBrand,
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        Icon(Symbols.account_balance_wallet_rounded,
-                            size: 15,
-                            color: sheetContext.tones.textFaint),
+                        Icon(
+                          Symbols.account_balance_wallet_rounded,
+                          size: 15,
+                          color: sheetContext.tones.textFaint,
+                        ),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                              'You pay FLOW now — your trainer is paid '
-                              'after the session',
-                              style: inter(12.5, 540,
-                                  color: sheetContext.tones.textFaint)),
+                            'You pay FLOW now — your trainer is paid '
+                            'after the session',
+                            style: inter(
+                              12.5,
+                              540,
+                              color: sheetContext.tones.textFaint,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -357,15 +389,16 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     );
   }
 
-  Future<void> _confirm(
-      BuildContext sheetContext, StateSetter setSheet) async {
+  Future<void> _confirm(BuildContext sheetContext, StateSetter setSheet) async {
     if (_submitting) return;
     setSheet(() => _submitting = true);
     setState(() {});
     try {
       final session = ref.read(sessionProvider);
       final rider = ref.read(currentUserProvider).value;
-      await ref.read(bookingRepositoryProvider).createBooking(
+      await ref
+          .read(bookingRepositoryProvider)
+          .createBooking(
             target: widget.target,
             riderUid: session.uid,
             riderName: session.displayName,
@@ -374,7 +407,8 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
             slots: _sortedSelection,
             gearNeeded: _gearNeeded,
             message: _message.text.trim(),
-            bufferMinutes: rider?.bufferMinutes ?? FlowConst.defaultBufferMinutes,
+            bufferMinutes:
+                rider?.bufferMinutes ?? FlowConst.defaultBufferMinutes,
           );
       Haptics.medium();
       if (sheetContext.mounted) Navigator.pop(sheetContext);
@@ -394,8 +428,10 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       if (sheetContext.mounted) {
         setSheet(() => _submitting = false);
         setState(() {});
-        showFlowToast(sheetContext,
-            "Couldn't send your request. ${ErrorView.friendly(e)}");
+        showFlowToast(
+          sheetContext,
+          "Couldn't send your request. ${ErrorView.friendly(e)}",
+        );
       }
     }
   }
@@ -421,8 +457,10 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                   borderRadius: const BorderRadius.all(Radius.circular(38)),
                 ),
                 const SizedBox(height: 20),
-                Text('Request sent!',
-                    style: Theme.of(dialogContext).textTheme.headlineMedium),
+                Text(
+                  'Request sent!',
+                  style: Theme.of(dialogContext).textTheme.headlineMedium,
+                ),
                 const SizedBox(height: 10),
                 Text(
                   '${money(_total)} is held by FLOW — refunded in full if '
@@ -462,7 +500,8 @@ class _PolicyLine extends StatelessWidget {
   final Slot start;
 
   static String _fmt(DateTime t) {
-    final ymd = '${t.year.toString().padLeft(4, '0')}-'
+    final ymd =
+        '${t.year.toString().padLeft(4, '0')}-'
         '${t.month.toString().padLeft(2, '0')}-'
         '${t.day.toString().padLeft(2, '0')}';
     final hh = t.hour.toString().padLeft(2, '0');
@@ -492,11 +531,11 @@ class _PolicyLine extends StatelessWidget {
           child: Text(
             free
                 ? 'Free cancellation until ${_fmt(deadline)}. After that '
-                    "you're charged in full. Declined or unanswered requests "
-                    'are always refunded.'
+                      "you're charged in full. Declined or unanswered requests "
+                      'are always refunded.'
                 : 'Starts within 24 hours — cancelling after you pay is '
-                    'charged in full. Declined or unanswered requests are '
-                    'always refunded.',
+                      'charged in full. Declined or unanswered requests are '
+                      'always refunded.',
             style: inter(12.5, 520, color: tones.textFaint, height: 1.4),
           ),
         ),
@@ -520,12 +559,13 @@ class _ReviewRow extends StatelessWidget {
         children: [
           SizedBox(
             width: 92,
-            child: Text(label.toUpperCase(),
-                style: microLabel(context.tones.textFaint, size: 10)),
+            child: Text(
+              label.toUpperCase(),
+              style: microLabel(context.tones.textFaint, size: 10),
+            ),
           ),
           Expanded(
-            child: Text(value,
-                style: Theme.of(context).textTheme.titleSmall),
+            child: Text(value, style: Theme.of(context).textTheme.titleSmall),
           ),
         ],
       ),
@@ -554,7 +594,11 @@ class _ProviderCard extends StatelessWidget {
                   target.subTarget == null
                       ? target.title
                       : '${target.title} — ${target.subTarget}',
-                  maxLines: 1,
+                  // Two lines, like ProviderCard: on a 320px phone at 1.3x
+                  // one line cut the name to "Anna Bergst…" hard against the
+                  // price. The name is who the rider is paying — it wraps
+                  // before it drops.
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
@@ -562,15 +606,19 @@ class _ProviderCard extends StatelessWidget {
                   const SizedBox(height: 3),
                   Row(
                     children: [
-                      Icon(Symbols.place_rounded,
-                          size: 13, color: tones.textFaint),
+                      Icon(
+                        Symbols.place_rounded,
+                        size: 13,
+                        color: tones.textFaint,
+                      ),
                       const SizedBox(width: 3),
                       Flexible(
-                        child: Text(target.subtitle!,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style:
-                                inter(12.5, 500, color: tones.textFaint)),
+                        child: Text(
+                          target.subtitle!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: inter(12.5, 500, color: tones.textFaint),
+                        ),
                       ),
                     ],
                   ),
@@ -578,13 +626,20 @@ class _ProviderCard extends StatelessWidget {
               ],
             ),
           ),
+          // The gap is load-bearing: without it the ellipsized name at 1.3x
+          // sat a hair off the €-figure and the two read as one string.
+          const SizedBox(width: 10),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(money(target.rate),
-                  style: interNum(17, 760, color: tones.azureBrand)),
-              Text('/ ${target.unit}',
-                  style: inter(11.5, 540, color: tones.textFaint)),
+              Text(
+                money(target.rate),
+                style: interNum(17, 760, color: tones.azureBrand),
+              ),
+              Text(
+                '/ ${target.unit}',
+                style: inter(11.5, 540, color: tones.textFaint),
+              ),
             ],
           ),
         ],
@@ -646,7 +701,8 @@ class _DayStrip extends ConsumerWidget {
           // Today stops being bookable once the lead-time rule has eaten
           // every remaining hour — flag it like an away day rather than
           // letting it read as open.
-          final over = i == 0 &&
+          final over =
+              i == 0 &&
               BookingMath.pastSlots(date, now: today).length >=
                   BookingMath.slots().length;
           final muted = (away || over) && !active;
@@ -659,22 +715,33 @@ class _DayStrip extends ConsumerWidget {
           return Semantics(
             button: true,
             selected: active,
-            label: '${weekdaysLong[day.weekday - 1]} ${day.day} '
+            label:
+                '${weekdaysLong[day.weekday - 1]} ${day.day} '
                 '${monthsLong[day.month - 1]}'
                 '${i == 0 ? ', today' : ''}'
-                '${away ? ', trainer away' : over ? ', no hours left' : ''}'
+                '${away
+                    ? ', trainer away'
+                    : over
+                    ? ', no hours left'
+                    : ''}'
                 // Spoken in full: "18 knots, Good" reads, "18kt" does not.
                 '${gust == null ? '' : ', ${gust.displayKnots} knots, '
-                    '${gust.rating.label}'}',
+                          '${gust.rating.label}'}',
             child: AnimatedContainer(
               duration: FlowMotion.fast,
               curve: FlowMotion.curve,
-              width: 62,
+              // 58, not 62: at 62 a 320px phone fit exactly four tiles with
+              // the fifth starting precisely at the clip edge, so the strip
+              // read as complete — no hint that seventeen more days exist.
+              // 58 keeps a 16px sliver of the fifth tile peeking at 320px,
+              // which is the whole scroll affordance.
+              width: 58,
               decoration: BoxDecoration(
                 color: active ? tones.azureBrand : tones.card,
                 borderRadius: FlowRadii.inset,
-                border:
-                    Border.all(color: active ? tones.azureBrand : tones.line),
+                border: Border.all(
+                  color: active ? tones.azureBrand : tones.line,
+                ),
               ),
               child: Material(
                 color: Colors.transparent,
@@ -705,8 +772,10 @@ class _DayStrip extends ConsumerWidget {
                               decorationThickness: 2,
                             ),
                           ),
-                          Text(monthsShort[day.month - 1],
-                              style: inter(10, 640, color: subFg, spacing: .6)),
+                          Text(
+                            monthsShort[day.month - 1],
+                            style: inter(10, 640, color: subFg, spacing: .6),
+                          ),
                           // Fixed-height row whether or not there is a
                           // forecast, so tiles inside and beyond the horizon
                           // stay the same size and the strip does not jitter
@@ -718,10 +787,13 @@ class _DayStrip extends ConsumerWidget {
                                 : Center(
                                     child: Text(
                                       '${gust.displayKnots}kt',
-                                      style: interNum(11.5, 760,
-                                          color: active
-                                              ? Colors.white
-                                              : windColor(gust.rating)),
+                                      style: interNum(
+                                        11.5,
+                                        760,
+                                        color: active
+                                            ? Colors.white
+                                            : windColor(gust.rating),
+                                      ),
                                     ),
                                   ),
                           ),
@@ -745,12 +817,12 @@ class _DayStrip extends ConsumerWidget {
 /// Deliberately not a gradient: the bands are decisions ("can I ride this"),
 /// and a continuous ramp would imply a precision the forecast does not have.
 Color windColor(WindRating rating) => switch (rating) {
-      WindRating.calm => FlowColors.slate,
-      WindRating.light => FlowColors.amber,
-      WindRating.good => FlowColors.emerald,
-      WindRating.strong => FlowColors.amber,
-      WindRating.extreme => FlowColors.coral,
-    };
+  WindRating.calm => FlowColors.slate,
+  WindRating.light => FlowColors.amber,
+  WindRating.good => FlowColors.emerald,
+  WindRating.strong => FlowColors.amber,
+  WindRating.extreme => FlowColors.coral,
+};
 
 /// The forecast for the day the rider is actually looking at.
 ///
@@ -766,7 +838,10 @@ class _WindSummary extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tones = context.tones;
-    final day = ref.watch(providerWindProvider(instructorId)).value?.forDate(date);
+    final day = ref
+        .watch(providerWindProvider(instructorId))
+        .value
+        ?.forDate(date);
 
     // No forecast, or a date past the horizon — collapse entirely rather than
     // leave an empty band where information used to be.
@@ -784,12 +859,16 @@ class _WindSummary extends ConsumerWidget {
                 color: windColor(day.rating).withValues(alpha: .10),
                 borderRadius: FlowRadii.chip,
                 border: Border.all(
-                    color: windColor(day.rating).withValues(alpha: .35)),
+                  color: windColor(day.rating).withValues(alpha: .35),
+                ),
               ),
               child: Row(
                 children: [
-                  Icon(Symbols.air_rounded,
-                      size: 18, color: windColor(day.rating)),
+                  Icon(
+                    Symbols.air_rounded,
+                    size: 18,
+                    color: windColor(day.rating),
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(
@@ -799,9 +878,13 @@ class _WindSummary extends ConsumerWidget {
                           '${day.rating.label} · ${day.displayKnots}kt '
                           '${day.compass}'
                           '${day.hasUsefulGust ? ' · gusts '
-                              '${day.displayGustKnots}' : ''}',
-                          style: inter(14, 700,
-                              color: windColor(day.rating), height: 1.25),
+                                    '${day.displayGustKnots}' : ''}',
+                          style: inter(
+                            14,
+                            700,
+                            color: windColor(day.rating),
+                            height: 1.25,
+                          ),
                         ),
                         const SizedBox(height: 2),
                         Text(
@@ -849,7 +932,7 @@ class _SlotArea extends StatelessWidget {
         title: over ? "That's a wrap for today" : 'Fully booked',
         body: over
             ? 'Sessions need an hour of notice, so today is done. Pick a '
-                'day from the strip above.'
+                  'day from the strip above.'
             : 'Every hour is taken. Another day might be wide open.',
       );
     }
@@ -949,12 +1032,14 @@ class _SummaryCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('${start.value}–${end.value}',
-                    style: interNum(17, 720,
-                        color: context.scheme.onSurface)),
                 Text(
-                    '${slots.length} hour${slots.length == 1 ? '' : 's'} · ${prettyYmd(date)}',
-                    style: inter(12.5, 500, color: tones.textFaint)),
+                  '${start.value}–${end.value}',
+                  style: interNum(17, 720, color: context.scheme.onSurface),
+                ),
+                Text(
+                  '${slots.length} hour${slots.length == 1 ? '' : 's'} · ${prettyYmd(date)}',
+                  style: inter(12.5, 500, color: tones.textFaint),
+                ),
               ],
             ),
           ),
@@ -989,36 +1074,69 @@ class _StickyBar extends StatelessWidget {
         // came out as `Review & co…`. The label is now short enough to fit
         // regardless, and the 2:3 split keeps it that way at 1.3x.
         children: [
-          Flexible(
+          Expanded(
             flex: 2,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                    hours == 0
-                        ? 'No hours selected'
-                        : '$hours hour${hours == 1 ? '' : 's'}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: inter(12.5, 580, color: tones.textFaint)),
-                const SizedBox(height: 2),
-                AnimatedSwitcher(
-                  duration: FlowMotion.fast,
-                  switchInCurve: FlowMotion.curve,
-                  switchOutCurve: FlowMotion.curve,
-                  transitionBuilder: (child, anim) => SlideTransition(
-                    position: Tween(
-                            begin: const Offset(0, .5), end: Offset.zero)
-                        .animate(anim),
-                    child: FadeTransition(opacity: anim, child: child),
-                  ),
-                  child: Text(
-                    total == null ? '—' : money(total),
-                    key: ValueKey(total),
-                    style: display(22, 780, color: context.scheme.onSurface),
-                  ),
-                ),
-              ],
+            child: AnimatedSwitcher(
+              duration: FlowMotion.base,
+              switchInCurve: FlowMotion.curve,
+              switchOutCurve: FlowMotion.curve,
+              layoutBuilder: (current, previous) => Stack(
+                alignment: Alignment.centerLeft,
+                children: [...previous, ?current],
+              ),
+              child: hours == 0
+                  // A vertically-centred hint, not a label over a lone "—":
+                  // the dash floated in the bar's bottom corner aligned to
+                  // nothing, and a greyed Continue next to it gave no clue
+                  // what would wake it up. Three words, because a 320px
+                  // phone at 1.3x clips a fourth.
+                  ? Text(
+                      'Pick your hours',
+                      key: const ValueKey('hint'),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: inter(13.5, 560, color: tones.textFaint),
+                    )
+                  : Column(
+                      key: const ValueKey('priced'),
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Scaled, not ellipsized — "8 hours · 28 Aug" at
+                        // 1.3x came out "No hours sel…"-style shredded.
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            '$hours hour${hours == 1 ? '' : 's'}',
+                            maxLines: 1,
+                            style: inter(12.5, 580, color: tones.textFaint),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        AnimatedSwitcher(
+                          duration: FlowMotion.fast,
+                          switchInCurve: FlowMotion.curve,
+                          switchOutCurve: FlowMotion.curve,
+                          transitionBuilder: (child, anim) => SlideTransition(
+                            position: Tween(
+                              begin: const Offset(0, .5),
+                              end: Offset.zero,
+                            ).animate(anim),
+                            child: FadeTransition(opacity: anim, child: child),
+                          ),
+                          child: Text(
+                            total == null ? '' : money(total),
+                            key: ValueKey(total),
+                            style: display(
+                              22,
+                              780,
+                              color: context.scheme.onSurface,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
             ),
           ),
           const SizedBox(width: 12),

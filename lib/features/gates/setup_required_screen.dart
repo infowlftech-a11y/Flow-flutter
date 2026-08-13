@@ -28,7 +28,7 @@ class SetupRequiredScreen extends StatelessWidget {
     (
       '2',
       'Run flutterfire configure',
-      'flutterfire configure --project=wlf-flow  regenerates '
+      'flutterfire configure --project=wlf-flow regenerates '
           'lib/firebase_options.dart with the new appId and the real API key, '
           'and writes android/app/google-services.json for push delivery.',
     ),
@@ -54,23 +54,35 @@ class SetupRequiredScreen extends StatelessWidget {
                 const Center(child: FlowLogo(size: 72)),
                 const SizedBox(height: 28),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: context.tones.warning.withValues(alpha: .16),
                     borderRadius: FlowRadii.pill,
                   ),
-                  child: Text('SETUP REQUIRED',
-                      textAlign: TextAlign.center,
-                      style: inter(11.5, 800,
-                          color: context.tones.warning, spacing: 1.4)),
+                  child: Text(
+                    'SETUP REQUIRED',
+                    textAlign: TextAlign.center,
+                    style: inter(
+                      11.5,
+                      800,
+                      color: context.tones.warning,
+                      spacing: 1.4,
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 18),
                 Text(
                   'Firebase is not configured',
                   textAlign: TextAlign.center,
-                  style:
-                      display(26, 760, color: context.scheme.onSurface, spacing: -.5),
+                  style: display(
+                    26,
+                    760,
+                    color: context.scheme.onSurface,
+                    spacing: -.5,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -78,8 +90,12 @@ class SetupRequiredScreen extends StatelessWidget {
                   'API key, so every sign-in, registration and database read '
                   'will fail with API_KEY_INVALID.',
                   textAlign: TextAlign.center,
-                  style: inter(14, 440,
-                      color: context.scheme.onSurfaceVariant, height: 1.55),
+                  style: inter(
+                    14,
+                    440,
+                    color: context.scheme.onSurfaceVariant,
+                    height: 1.55,
+                  ),
                 ),
                 const SizedBox(height: 28),
                 for (final (number, title, body) in _steps)
@@ -87,13 +103,20 @@ class SetupRequiredScreen extends StatelessWidget {
                 const SizedBox(height: 12),
                 Center(
                   child: TextButton.icon(
-                    onPressed: () => Clipboard.setData(const ClipboardData(
-                        text:
-                            'flutterfire configure --project=wlf-flow')),
-                    icon: Icon(Symbols.content_copy_rounded,
-                        size: 17, color: context.scheme.primary),
-                    label: Text('Copy the configure command',
-                        style: inter(14, 620, color: context.scheme.primary)),
+                    onPressed: () => Clipboard.setData(
+                      const ClipboardData(
+                        text: 'flutterfire configure --project=wlf-flow',
+                      ),
+                    ),
+                    icon: Icon(
+                      Symbols.content_copy_rounded,
+                      size: 17,
+                      color: context.scheme.primary,
+                    ),
+                    label: Text(
+                      'Copy the configure command',
+                      style: inter(14, 620, color: context.scheme.primary),
+                    ),
                   ),
                 ),
               ],
@@ -106,11 +129,7 @@ class SetupRequiredScreen extends StatelessWidget {
 }
 
 class _Step extends StatelessWidget {
-  const _Step({
-    required this.number,
-    required this.title,
-    required this.body,
-  });
+  const _Step({required this.number, required this.title, required this.body});
 
   final String number;
   final String title;
@@ -131,20 +150,30 @@ class _Step extends StatelessWidget {
               color: context.scheme.primary.withValues(alpha: .16),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Text(number,
-                style: interNum(14, 760, color: context.scheme.primary)),
+            child: Text(
+              number,
+              style: interNum(14, 760, color: context.scheme.primary),
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title,
-                    style: inter(15, 660, color: context.scheme.onSurface)),
+                Text(
+                  title,
+                  style: inter(15, 660, color: context.scheme.onSurface),
+                ),
                 const SizedBox(height: 4),
-                Text(body,
-                    style: inter(14, 440,
-                        color: context.scheme.onSurfaceVariant, height: 1.5)),
+                Text(
+                  body,
+                  style: inter(
+                    14,
+                    440,
+                    color: context.scheme.onSurfaceVariant,
+                    height: 1.5,
+                  ),
+                ),
               ],
             ),
           ),

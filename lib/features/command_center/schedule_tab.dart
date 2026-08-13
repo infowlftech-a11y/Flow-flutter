@@ -31,8 +31,7 @@ class ScheduleTab extends ConsumerStatefulWidget {
 class _ScheduleTabState extends ConsumerState<ScheduleTab> {
   late String _date = todayYmd();
 
-  DayKey get _key =>
-      (instructorId: ref.read(sessionProvider).uid, date: _date);
+  DayKey get _key => (instructorId: ref.read(sessionProvider).uid, date: _date);
 
   void _shiftDay(int delta) {
     final d = parseYmd(_date)!.add(Duration(days: delta));
@@ -67,8 +66,7 @@ class _ScheduleTabState extends ConsumerState<ScheduleTab> {
       context: context,
       // Clamped: showDatePicker asserts initialDate is not before firstDate,
       // and a stale `_date` from before midnight is exactly that.
-      initialDate:
-          (current == null || current.isBefore(min)) ? min : current,
+      initialDate: (current == null || current.isBefore(min)) ? min : current,
       firstDate: min,
       lastDate: now.add(const Duration(days: 365)),
     );
@@ -128,9 +126,10 @@ class _ScheduleTabState extends ConsumerState<ScheduleTab> {
                                 : Theme.of(context).textTheme.titleMedium,
                           ),
                           if (_date == todayYmd())
-                            Text(longYmd(_date),
-                                style:
-                                    Theme.of(context).textTheme.titleMedium),
+                            Text(
+                              longYmd(_date),
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
                         ],
                       ),
                     ),
@@ -172,7 +171,8 @@ class _ScheduleTabState extends ConsumerState<ScheduleTab> {
               child: FlowNotice(
                 icon: Symbols.beach_access_rounded,
                 title: vacationForDay.label ?? 'Time off',
-                body: 'You are away this whole day. '
+                body:
+                    'You are away this whole day. '
                     'Riders see nothing bookable.',
               ),
             ),
@@ -181,8 +181,9 @@ class _ScheduleTabState extends ConsumerState<ScheduleTab> {
             trailing: switch (availability) {
               // Counter hidden while loading — never a misleading 0 (§3.9).
               AsyncData(:final value) when value.blocked.isNotEmpty => Text(
-                  '${value.blocked.length} blocked',
-                  style: microLabel(tones.warning)),
+                '${value.blocked.length} blocked',
+                style: microLabel(tones.warning),
+              ),
               _ => null,
             },
           ),
@@ -222,7 +223,9 @@ class _ScheduleTabState extends ConsumerState<ScheduleTab> {
     // belongs to a live booking, and deleting it would re-open hours that a
     // session still holds.
     final existing = blocks
-        .where((b) => b.status == 'host-blocked' && b.expandBlock().contains(slot))
+        .where(
+          (b) => b.status == 'host-blocked' && b.expandBlock().contains(slot),
+        )
         .firstOrNull;
     Haptics.select();
     try {
@@ -246,8 +249,10 @@ class _ScheduleTabState extends ConsumerState<ScheduleTab> {
   /// pre-filled with rate × 1, falls back to rate × hours if unparseable.
   void _openWalkInSheet(BuildContext context) {
     final day = ref.read(dayAvailabilityProvider(_key)).value;
-    final freeSlots =
-        [for (final s in BookingMath.slots()) if (day?.isFree(s) ?? false) s];
+    final freeSlots = [
+      for (final s in BookingMath.slots())
+        if (day?.isFree(s) ?? false) s,
+    ];
 
     if (freeSlots.isEmpty) {
       showFlowToast(context, 'No free hours left on ${prettyYmd(_date)}.');
@@ -280,19 +285,22 @@ class _ScheduleTabState extends ConsumerState<ScheduleTab> {
             return true;
           }
 
-          final offered =
-              [for (final s in freeSlots) if (slotRangeFree(s, duration)) s];
+          final offered = [
+            for (final s in freeSlots)
+              if (slotRangeFree(s, duration)) s,
+          ];
           if (start != null && !offered.contains(start)) start = null;
 
           Future<void> submit() async {
             setSheet(() => attempted = true);
             if (name.text.trim().isEmpty || start == null) return;
             setSheet(() => busy = true);
-            final total = double.tryParse(price.text.trim()) ??
-                rate * duration;
+            final total = double.tryParse(price.text.trim()) ?? rate * duration;
             try {
               final session = ref.read(sessionProvider);
-              await ref.read(bookingRepositoryProvider).createWalkIn(
+              await ref
+                  .read(bookingRepositoryProvider)
+                  .createWalkIn(
                     instructorId: session.uid,
                     instructorName: session.displayName,
                     studentName: name.text.trim(),
@@ -309,14 +317,18 @@ class _ScheduleTabState extends ConsumerState<ScheduleTab> {
             } on SlotTakenFailure {
               if (sheetContext.mounted) {
                 setSheet(() => busy = false);
-                showFlowToast(sheetContext,
-                    'That hour was just taken. Pick another start.');
+                showFlowToast(
+                  sheetContext,
+                  'That hour was just taken. Pick another start.',
+                );
               }
             } catch (_) {
               if (sheetContext.mounted) {
                 setSheet(() => busy = false);
                 showFlowToast(
-                    sheetContext, "Couldn't add the walk-in. Try again.");
+                  sheetContext,
+                  "Couldn't add the walk-in. Try again.",
+                );
               }
             }
           }
@@ -338,8 +350,10 @@ class _ScheduleTabState extends ConsumerState<ScheduleTab> {
                 onChanged: (_) => setSheet(() {}),
               ),
               const SizedBox(height: 18),
-              Text('START TIME',
-                  style: microLabel(sheetContext.tones.textFaint)),
+              Text(
+                'START TIME',
+                style: microLabel(sheetContext.tones.textFaint),
+              ),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
@@ -359,13 +373,13 @@ class _ScheduleTabState extends ConsumerState<ScheduleTab> {
               if (attempted && start == null)
                 Padding(
                   padding: const EdgeInsets.only(top: 6),
-                  child: Text('Pick a start time',
-                      style: inter(12.5, 560,
-                          color: sheetContext.tones.danger)),
+                  child: Text(
+                    'Pick a start time',
+                    style: inter(12.5, 560, color: sheetContext.tones.danger),
+                  ),
                 ),
               const SizedBox(height: 18),
-              Text('DURATION',
-                  style: microLabel(sheetContext.tones.textFaint)),
+              Text('DURATION', style: microLabel(sheetContext.tones.textFaint)),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
@@ -391,11 +405,16 @@ class _ScheduleTabState extends ConsumerState<ScheduleTab> {
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 decoration: const InputDecoration(
-                    prefixText: '€ ', labelText: 'Total price'),
+                  prefixText: '€ ',
+                  labelText: 'Total price',
+                ),
               ),
               const SizedBox(height: 20),
               PrimaryButton(
-                  label: 'Add to my day', busy: busy, onPressed: submit),
+                label: 'Add to my day',
+                busy: busy,
+                onPressed: submit,
+              ),
             ],
           );
         },
@@ -446,7 +465,9 @@ class _ScheduleTabState extends ConsumerState<ScheduleTab> {
           Future<void> submit() async {
             setSheet(() => busy = true);
             try {
-              await ref.read(scheduleRepositoryProvider).addVacation(
+              await ref
+                  .read(scheduleRepositoryProvider)
+                  .addVacation(
                     instructorId: ref.read(sessionProvider).uid,
                     startDate: ymd(from),
                     endDate: ymd(to),
@@ -462,7 +483,9 @@ class _ScheduleTabState extends ConsumerState<ScheduleTab> {
               if (sheetContext.mounted) {
                 setSheet(() => busy = false);
                 showFlowToast(
-                    sheetContext, "Couldn't schedule that. Try again.");
+                  sheetContext,
+                  "Couldn't schedule that. Try again.",
+                );
               }
             }
           }
@@ -475,31 +498,37 @@ class _ScheduleTabState extends ConsumerState<ScheduleTab> {
                 controller: reason,
                 enabled: !busy,
                 decoration: const InputDecoration(
-                    hintText: 'Reason (e.g. "Safari week")'),
+                  hintText: 'Reason (e.g. "Safari week")',
+                ),
               ),
               const SizedBox(height: 16),
               Row(
                 children: [
                   Expanded(
                     child: InfoTile(
-                        label: 'FROM',
-                        value: prettyYmd(ymd(from)),
-                        trailingIcon: Symbols.edit_calendar_rounded,
-                        onTap: busy ? null : () => pick(true)),
+                      label: 'FROM',
+                      value: prettyYmd(ymd(from)),
+                      trailingIcon: Symbols.edit_calendar_rounded,
+                      onTap: busy ? null : () => pick(true),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: InfoTile(
-                        label: 'TO',
-                        value: prettyYmd(ymd(to)),
-                        trailingIcon: Symbols.edit_calendar_rounded,
-                        onTap: busy ? null : () => pick(false)),
+                      label: 'TO',
+                      value: prettyYmd(ymd(to)),
+                      trailingIcon: Symbols.edit_calendar_rounded,
+                      onTap: busy ? null : () => pick(false),
+                    ),
                   ),
                 ],
               ),
               const SizedBox(height: 20),
               PrimaryButton(
-                  label: 'Schedule time off', busy: busy, onPressed: submit),
+                label: 'Schedule time off',
+                busy: busy,
+                onPressed: submit,
+              ),
             ],
           );
         },
@@ -524,7 +553,8 @@ class _Timeline extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final bookings = ref
+    final bookings =
+        ref
             .watch(trainerBookingsProvider)
             .value
             ?.where((b) => b.date == date && b.status.isLive)
@@ -542,106 +572,134 @@ class _Timeline extends ConsumerWidget {
     return Column(
       children: [
         for (final slot in BookingMath.slots())
-          Builder(builder: (context) {
-            final booking = bookingAt(slot);
-            final isPast = day.past.contains(slot);
-            final isBlocked = day.blocked.contains(slot);
-            final away = day.onVacation;
+          Builder(
+            builder: (context) {
+              final booking = bookingAt(slot);
+              final isPast = day.past.contains(slot);
+              final isBlocked = day.blocked.contains(slot);
+              final away = day.onVacation;
 
-            final String state;
-            final Color color;
-            if (booking != null) {
-              state = booking.studentName;
-              color = tones.azureBrand;
-            } else if (away) {
-              state = 'Away';
-              color = tones.warning;
-            } else if (isPast) {
-              state = 'Past';
-              color = tones.textFaint;
-            } else if (isBlocked) {
-              state = 'Blocked';
-              color = tones.warning;
-            } else {
-              state = 'Available';
-              color = tones.success;
-            }
+              final String state;
+              final Color color;
+              if (booking != null) {
+                state = booking.studentName;
+                color = tones.azureBrand;
+              } else if (away) {
+                state = 'Away';
+                color = tones.warning;
+              } else if (isPast) {
+                state = 'Past';
+                color = tones.textFaint;
+              } else if (isBlocked) {
+                state = 'Blocked';
+                color = tones.warning;
+              } else {
+                state = 'Available';
+                color = tones.success;
+              }
 
-            final tappable = booking == null && !isPast && !away;
+              final tappable = booking == null && !isPast && !away;
 
-            return Semantics(
-              button: tappable,
-              label:
-                  '${slot.value}: $state${tappable ? isBlocked ? ', tap to release' : ', tap to block' : ''}',
-              child: GestureDetector(
-                onTap: tappable ? () => onToggle(slot) : null,
-                child: Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-                  decoration: BoxDecoration(
-                    color: booking != null
-                        ? tones.azureBrand.withValues(alpha: .08)
-                        : isBlocked
-                            ? tones.warningTint
-                            : tones.card,
-                    borderRadius: FlowRadii.control,
-                    border: Border.all(
+              return Semantics(
+                button: tappable,
+                label:
+                    '${slot.value}: $state${tappable
+                        ? isBlocked
+                              ? ', tap to release'
+                              : ', tap to block'
+                        : ''}',
+                child: GestureDetector(
+                  onTap: tappable ? () => onToggle(slot) : null,
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 13,
+                    ),
+                    decoration: BoxDecoration(
+                      color: booking != null
+                          ? tones.azureBrand.withValues(alpha: .08)
+                          : isBlocked
+                          ? tones.warningTint
+                          : tones.card,
+                      borderRadius: FlowRadii.control,
+                      border: Border.all(
                         color: booking != null
                             ? tones.azureBrand.withValues(alpha: .4)
-                            : tones.line),
-                  ),
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: 52,
-                        child: Text(slot.value,
-                            style: interNum(14, 680,
+                            : tones.line,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 52,
+                          // Scaled, not wrapped: the fixed column keeps every
+                          // row's hour aligned, but at 1.3x "08:00" needs ~58px
+                          // and wrapped to "08:0 / 0" — an hour split across
+                          // two lines on every row of the timeline.
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              slot.value,
+                              style: interNum(
+                                14,
+                                680,
                                 color: isPast
                                     ? tones.textFaint
-                                    : context.scheme.onSurface)),
-                      ),
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration:
-                            BoxDecoration(color: color, shape: BoxShape.circle),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Row(
-                          children: [
-                            Flexible(
-                              child: Text(state,
+                                    : context.scheme.onSurface,
+                              ),
+                            ),
+                          ),
+                        ),
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: color,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  state,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: inter(
-                                      13.5, booking != null ? 660 : 520,
-                                      color: booking != null
-                                          ? context.scheme.onSurface
-                                          : color)),
-                            ),
-                            if (booking?.isManual ?? false) ...[
-                              const SizedBox(width: 8),
-                              const TagPill('WALK-IN'),
+                                    13.5,
+                                    booking != null ? 660 : 520,
+                                    color: booking != null
+                                        ? context.scheme.onSurface
+                                        : color,
+                                  ),
+                                ),
+                              ),
+                              if (booking?.isManual ?? false) ...[
+                                const SizedBox(width: 8),
+                                const TagPill('WALK-IN'),
+                              ],
                             ],
-                          ],
+                          ),
                         ),
-                      ),
-                      if (tappable)
-                        Icon(
-                          isBlocked
-                              ? Symbols.lock_open_rounded
-                              : Symbols.block_rounded,
-                          size: 17,
-                          color: tones.textFaint,
-                        ),
-                    ],
+                        if (tappable)
+                          Icon(
+                            isBlocked
+                                ? Symbols.lock_open_rounded
+                                : Symbols.block_rounded,
+                            size: 17,
+                            color: tones.textFaint,
+                          ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            );
-          }),
+              );
+            },
+          ),
       ],
     );
   }
@@ -671,15 +729,20 @@ class _VacationList extends ConsumerWidget {
             borderRadius: FlowRadii.control,
             child: Row(
               children: [
-                Icon(Symbols.beach_access_rounded,
-                    size: 19, color: tones.warning),
+                Icon(
+                  Symbols.beach_access_rounded,
+                  size: 19,
+                  color: tones.warning,
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(v.label ?? 'Time off',
-                          style: Theme.of(context).textTheme.titleSmall),
+                      Text(
+                        v.label ?? 'Time off',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
                       Text(
                         v.startDate == v.endDate
                             ? prettyYmd(v.startDate)
@@ -701,7 +764,9 @@ class _VacationList extends ConsumerWidget {
                       // from nothing having been tapped.
                       if (context.mounted) {
                         showFlowToast(
-                            context, "Couldn't remove that time off. Try again.");
+                          context,
+                          "Couldn't remove that time off. Try again.",
+                        );
                       }
                       return;
                     }

@@ -50,8 +50,9 @@ class TrainerProfileScreen extends ConsumerWidget {
               title: 'Trainer not found',
               subtitle: 'This profile may have been removed.',
               action: OutlinedButton(
-                  onPressed: () => context.pop(),
-                  child: const Text('Go back')),
+                onPressed: () => context.pop(),
+                child: const Text('Go back'),
+              ),
             );
           }
           return _TrainerProfileBody(trainer: trainer);
@@ -100,7 +101,9 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
       final booking = await ref
           .read(reviewRepositoryProvider)
           .findReviewableBooking(
-              trainerId: widget.trainer.uid, riderId: session.uid);
+            trainerId: widget.trainer.uid,
+            riderId: session.uid,
+          );
       if (mounted) {
         setState(() {
           _reviewableBooking = booking;
@@ -113,9 +116,9 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
   }
 
   List<String> get _images => [
-        if (widget.trainer.photoUrl != null) widget.trainer.photoUrl!,
-        ...widget.trainer.gallery,
-      ];
+    if (widget.trainer.photoUrl != null) widget.trainer.photoUrl!,
+    ...widget.trainer.gallery,
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -189,28 +192,46 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
                       if (isSelf)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 10),
-                          child: TagPill('YOUR PUBLIC PROFILE',
-                              icon: Symbols.visibility_rounded),
+                          child: TagPill(
+                            'YOUR PUBLIC PROFILE',
+                            icon: Symbols.visibility_rounded,
+                          ),
                         ),
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
-                            child: Row(
-                              children: [
-                                Flexible(
-                                  child: Text(trainer.name,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .displaySmall),
-                                ),
-                                const SizedBox(width: 8),
-                                Tooltip(
-                                  message: 'Verified trainer',
-                                  child: Icon(Symbols.verified_rounded,
-                                      fill: 1, color: tones.azureBrand, size: 24),
-                                ),
-                              ],
+                            // The tick rides the text as a WidgetSpan, not a
+                            // Row sibling: a sibling centres on the whole
+                            // block, so when the name wrapped at 1.3x the
+                            // badge floated in the gap between "Anna" and
+                            // "Bergström", attached to neither. In the span
+                            // it sits after the last word wherever that
+                            // line lands.
+                            child: Text.rich(
+                              TextSpan(
+                                children: [
+                                  TextSpan(
+                                    text: trainer.name,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.displaySmall,
+                                  ),
+                                  const WidgetSpan(child: SizedBox(width: 8)),
+                                  WidgetSpan(
+                                    alignment: PlaceholderAlignment.middle,
+                                    child: Tooltip(
+                                      message: 'Verified trainer',
+                                      child: Icon(
+                                        Symbols.verified_rounded,
+                                        fill: 1,
+                                        color: tones.azureBrand,
+                                        size: 24,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                           // Capped and scaled down, so the rate cannot take
@@ -226,13 +247,23 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
-                                  Text(money(trainer.displayRate),
-                                      style: display(24, 760,
-                                          color: tones.azureBrand,
-                                          spacing: -.5)),
-                                  Text('per hour',
-                                      style: inter(11.5, 560,
-                                          color: tones.textFaint)),
+                                  Text(
+                                    money(trainer.displayRate),
+                                    style: display(
+                                      24,
+                                      760,
+                                      color: tones.azureBrand,
+                                      spacing: -.5,
+                                    ),
+                                  ),
+                                  Text(
+                                    'per hour',
+                                    style: inter(
+                                      11.5,
+                                      560,
+                                      color: tones.textFaint,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -244,9 +275,14 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
                         children: [
                           Stars(value: rating.average, size: 17),
                           const SizedBox(width: 8),
-                          Text(rating.display,
-                              style: interNum(14, 720,
-                                  color: context.scheme.onSurface)),
+                          Text(
+                            rating.display,
+                            style: interNum(
+                              14,
+                              720,
+                              color: context.scheme.onSurface,
+                            ),
+                          ),
                           Flexible(
                             child: Text(
                               '  ·  ${rating.count} review${rating.count == 1 ? '' : 's'}',
@@ -269,17 +305,20 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
                         value: trainer.location ?? 'Red Sea',
                         onTap: trainer.mapsLink == null
                             ? null
-                            : () => launchUrl(Uri.parse(trainer.mapsLink!),
-                                mode: LaunchMode.externalApplication),
+                            : () => launchUrl(
+                                Uri.parse(trainer.mapsLink!),
+                                mode: LaunchMode.externalApplication,
+                              ),
                       ),
                       if ((trainer.bio ?? '').isNotEmpty) ...[
                         const SizedBox(height: 24),
                         const SectionHeader('About'),
-                        Text(trainer.bio!,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyLarge!
-                                .copyWith(height: 1.55)),
+                        Text(
+                          trainer.bio!,
+                          style: Theme.of(
+                            context,
+                          ).textTheme.bodyLarge!.copyWith(height: 1.55),
+                        ),
                       ],
                       if (trainer.languages.isNotEmpty) ...[
                         const SizedBox(height: 24),
@@ -304,8 +343,9 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
                   child: _ReviewsSection(
                     trainer: trainer,
                     reviews: reviews,
-                    reviewableBooking:
-                        _reviewEligibilityChecked ? _reviewableBooking : null,
+                    reviewableBooking: _reviewEligibilityChecked
+                        ? _reviewableBooking
+                        : null,
                     onReviewed: () {
                       setState(() => _reviewableBooking = null);
                       _checkReviewEligibility();
@@ -322,9 +362,12 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
     );
   }
 
-  void _openViewer(BuildContext context) =>
-      showFullScreenImages(context, _images, initialIndex: _pageIndex,
-          maxScale: 4);
+  void _openViewer(BuildContext context) => showFullScreenImages(
+    context,
+    _images,
+    initialIndex: _pageIndex,
+    maxScale: 4,
+  );
 
   /// Reason (fixed list) + free-text details + optional screenshots (§3.4).
   /// A session with this trainer can be attached, stamping the report with
@@ -365,47 +408,54 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
               controller: details,
               maxLines: 4,
               enabled: !busy,
-              decoration:
-                  const InputDecoration(hintText: 'What happened? (optional)'),
+              decoration: const InputDecoration(
+                hintText: 'What happened? (optional)',
+              ),
             ),
             // The complaint's session, when it is about one — only sessions
             // with this trainer are offered, and none is required.
-            Consumer(builder: (context, ref, _) {
-              final mine =
-                  ref.watch(riderBookingsProvider).value ?? const <Booking>[];
-              final withThem = [
-                for (final b in mine)
-                  if (b.instructorId == trainer.uid) b
-              ];
-              if (withThem.isEmpty) return const SizedBox.shrink();
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 14),
-                  Text('ABOUT A SESSION? — OPTIONAL',
-                      style: microLabel(context.tones.textFaint, size: 10)),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final b in withThem.take(6))
-                        FlowChoiceChip(
-                          label: '${prettyYmd(b.date)} · ${b.timeRange}',
-                          selected: about?.id == b.id,
-                          onTap: busy
-                              ? () {}
-                              : () {
-                                  Haptics.select();
-                                  setSheet(() =>
-                                      about = about?.id == b.id ? null : b);
-                                },
-                        ),
-                    ],
-                  ),
-                ],
-              );
-            }),
+            Consumer(
+              builder: (context, ref, _) {
+                final mine =
+                    ref.watch(riderBookingsProvider).value ?? const <Booking>[];
+                final withThem = [
+                  for (final b in mine)
+                    if (b.instructorId == trainer.uid) b,
+                ];
+                if (withThem.isEmpty) return const SizedBox.shrink();
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 14),
+                    Text(
+                      'ABOUT A SESSION? — OPTIONAL',
+                      style: microLabel(context.tones.textFaint, size: 10),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final b in withThem.take(6))
+                          FlowChoiceChip(
+                            label: '${prettyYmd(b.date)} · ${b.timeRange}',
+                            selected: about?.id == b.id,
+                            onTap: busy
+                                ? () {}
+                                : () {
+                                    Haptics.select();
+                                    setSheet(
+                                      () =>
+                                          about = about?.id == b.id ? null : b,
+                                    );
+                                  },
+                          ),
+                      ],
+                    ),
+                  ],
+                );
+              },
+            ),
             const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: busy
@@ -417,9 +467,11 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
                       }
                     },
               icon: const Icon(Symbols.attach_file_rounded, size: 20),
-              label: Text(shots.isEmpty
-                  ? 'Attach screenshots (optional)'
-                  : '${shots.length} attachment${shots.length == 1 ? '' : 's'}'),
+              label: Text(
+                shots.isEmpty
+                    ? 'Attach screenshots (optional)'
+                    : '${shots.length} attachment${shots.length == 1 ? '' : 's'}',
+              ),
             ),
             const SizedBox(height: 18),
             PrimaryButton(
@@ -436,10 +488,13 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
                         final urls = await ref
                             .read(storageRepositoryProvider)
                             .uploadAll(
-                                folder: StorageFolder.reports,
-                                files: shots,
-                                ownerId: session.uid);
-                        await ref.read(supportRepositoryProvider).reportUser(
+                              folder: StorageFolder.reports,
+                              files: shots,
+                              ownerId: session.uid,
+                            );
+                        await ref
+                            .read(supportRepositoryProvider)
+                            .reportUser(
                               reporterId: session.uid,
                               reporterName: session.displayName,
                               reportedUserId: trainer.uid,
@@ -454,14 +509,18 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
                             );
                         if (sheetContext.mounted) {
                           Navigator.pop(sheetContext);
-                          showFlowToast(context,
-                              'Report sent. Thanks for keeping FLOW safe.');
+                          showFlowToast(
+                            context,
+                            'Report sent. Thanks for keeping FLOW safe.',
+                          );
                         }
                       } catch (e) {
                         if (sheetContext.mounted) {
                           setSheet(() => busy = false);
-                          showFlowToast(sheetContext,
-                              "Couldn't send the report. ${ErrorView.friendly(e)}");
+                          showFlowToast(
+                            sheetContext,
+                            "Couldn't send the report. ${ErrorView.friendly(e)}",
+                          );
                         }
                       }
                     },
@@ -616,8 +675,11 @@ class _CertBadge extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Symbols.workspace_premium_rounded,
-                size: 15, color: Colors.white),
+            const Icon(
+              Symbols.workspace_premium_rounded,
+              size: 15,
+              color: Colors.white,
+            ),
             const SizedBox(width: 6),
             Flexible(
               child: Text(
@@ -663,58 +725,61 @@ class _ReviewsSection extends ConsumerWidget {
           const SizedBox(height: 14),
         ],
         switch (reviews) {
-          AsyncValue(hasValue: true, value: final list?) => list.isEmpty
-              ? Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Text(
-                    'No reviews yet — be the first after your session.',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                )
-              : Column(
-                  children: [
-                    for (final r in list)
-                      _ReviewTile(
-                        review: r,
-                        canDelete: r.userId == session.uid,
-                        onDelete: () async {
-                          final ok = await confirmAction(
-                            context,
-                            title: 'Delete your review?',
-                            body: 'This removes your rating and comment.',
-                            confirmLabel: 'Delete',
-                            destructive: true,
-                          );
-                          if (!ok) return;
-                          try {
-                            await ref
-                                .read(reviewRepositoryProvider)
-                                .delete(r.id);
-                          } catch (_) {
-                            if (context.mounted) {
-                              showFlowToast(context,
-                                  "Couldn't delete your review. Try again.");
+          AsyncValue(hasValue: true, value: final list?) =>
+            list.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Text(
+                      'No reviews yet — be the first after your session.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  )
+                : Column(
+                    children: [
+                      for (final r in list)
+                        _ReviewTile(
+                          review: r,
+                          canDelete: r.userId == session.uid,
+                          onDelete: () async {
+                            final ok = await confirmAction(
+                              context,
+                              title: 'Delete your review?',
+                              body: 'This removes your rating and comment.',
+                              confirmLabel: 'Delete',
+                              destructive: true,
+                            );
+                            if (!ok) return;
+                            try {
+                              await ref
+                                  .read(reviewRepositoryProvider)
+                                  .delete(r.id);
+                            } catch (_) {
+                              if (context.mounted) {
+                                showFlowToast(
+                                  context,
+                                  "Couldn't delete your review. Try again.",
+                                );
+                              }
+                              return;
                             }
-                            return;
-                          }
-                          // Two async gaps sit between the tap and here, and
-                          // onReviewed() drives setState on the parent — a
-                          // rider who backs out to Explore while the delete
-                          // is in flight would hit "setState() called after
-                          // dispose()".
-                          if (context.mounted) onReviewed();
-                        },
-                      ),
-                  ],
-                ),
+                            // Two async gaps sit between the tap and here, and
+                            // onReviewed() drives setState on the parent — a
+                            // rider who backs out to Explore while the delete
+                            // is in flight would hit "setState() called after
+                            // dispose()".
+                            if (context.mounted) onReviewed();
+                          },
+                        ),
+                    ],
+                  ),
           AsyncValue(hasError: true) => Text(
-              "Couldn't load reviews.",
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
+            "Couldn't load reviews.",
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
           _ => const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: SkeletonCard(height: 72),
-            ),
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: SkeletonCard(height: 72),
+          ),
         },
       ],
     );
@@ -748,10 +813,14 @@ class _ReviewTile extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(review.userName,
-                        style: Theme.of(context).textTheme.titleSmall),
-                    Text(timeAgo(review.createdAt),
-                        style: inter(11.5, 480, color: tones.textFaint)),
+                    Text(
+                      review.userName,
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    Text(
+                      timeAgo(review.createdAt),
+                      style: inter(11.5, 480, color: tones.textFaint),
+                    ),
                   ],
                 ),
               ),
@@ -767,11 +836,12 @@ class _ReviewTile extends StatelessWidget {
           ),
           if ((review.comment ?? '').isNotEmpty) ...[
             const SizedBox(height: 10),
-            Text(review.comment!,
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyMedium!
-                    .copyWith(height: 1.5)),
+            Text(
+              review.comment!,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium!.copyWith(height: 1.5),
+            ),
           ],
         ],
       ),
@@ -817,10 +887,14 @@ class _BottomBar extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(money(trainer.displayRate),
-                            style: display(20, 760, color: tones.azureBrand)),
-                        Text('per hour',
-                            style: inter(11.5, 540, color: tones.textFaint)),
+                        Text(
+                          money(trainer.displayRate),
+                          style: display(20, 760, color: tones.azureBrand),
+                        ),
+                        Text(
+                          'per hour',
+                          style: inter(11.5, 540, color: tones.textFaint),
+                        ),
                       ],
                     ),
                   ),
@@ -832,18 +906,23 @@ class _BottomBar extends ConsumerWidget {
                   child: IconButton.outlined(
                     onPressed: () {
                       final session = ref.read(sessionProvider);
-                      ref.read(chatRepositoryProvider).openThread(
+                      ref
+                          .read(chatRepositoryProvider)
+                          .openThread(
                             me: session.uid,
                             myName: session.displayName,
                             partnerId: trainer.uid,
                             partnerName: trainer.name,
                           );
                       context.push(
-                          '/chat/${trainer.uid}?name=${Uri.encodeComponent(trainer.name)}');
+                        '/chat/${trainer.uid}?name=${Uri.encodeComponent(trainer.name)}',
+                      );
                     },
                     tooltip: 'Message',
-                    icon: const Icon(Symbols.chat_bubble_outline_rounded,
-                        size: 20),
+                    icon: const Icon(
+                      Symbols.chat_bubble_outline_rounded,
+                      size: 20,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),

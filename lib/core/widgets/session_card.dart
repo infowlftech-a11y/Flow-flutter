@@ -186,22 +186,32 @@ class LiveSessionCard extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (badgeLabel != null)
-                      TagPill(badgeLabel!,
-                          color: tones.danger,
-                          icon: Symbols.circle,
-                          iconFill: 1,
-                          dense: true),
+                      TagPill(
+                        badgeLabel!,
+                        color: tones.danger,
+                        icon: Symbols.circle,
+                        iconFill: 1,
+                        dense: true,
+                      ),
                     const SizedBox(height: 40),
                     Text(
                       title,
-                      style: display(18, 740,
-                          color: Colors.white, spacing: -.2, height: 1.25),
+                      style: display(
+                        18,
+                        740,
+                        color: Colors.white,
+                        spacing: -.2,
+                        height: 1.25,
+                      ),
                     ),
                     const SizedBox(height: 6),
                     Text(
                       subtitle,
-                      style:
-                          inter(13, 500, color: Colors.white.withValues(alpha: .82)),
+                      style: inter(
+                        13,
+                        500,
+                        color: Colors.white.withValues(alpha: .82),
+                      ),
                     ),
                     if (countdownTo != null) ...[
                       const SizedBox(height: 14),
@@ -223,9 +233,11 @@ class LiveSessionCard extends StatelessWidget {
                                 countdownLabel,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: inter(11.5, 560,
-                                    color:
-                                        Colors.white.withValues(alpha: .72)),
+                                style: inter(
+                                  11.5,
+                                  560,
+                                  color: Colors.white.withValues(alpha: .72),
+                                ),
                               ),
                             ),
                           ),
@@ -294,7 +306,11 @@ class SessionRow extends StatelessWidget {
                 ClipRRect(
                   borderRadius: FlowRadii.chip,
                   child: FlowImage(
-                      url: imageUrl, width: 52, height: 52, fit: BoxFit.cover),
+                    url: imageUrl,
+                    width: 52,
+                    height: 52,
+                    fit: BoxFit.cover,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -314,17 +330,25 @@ class SessionRow extends StatelessWidget {
                       // token looks like a rendering fault rather than a
                       // shortage of room. Now each line has exactly one child
                       // that can give way, and it is never the pill.
-                      Text(when,
+                      // Scaled, not ellipsized — see PrimaryButton. The date
+                      // and hours are the fact this row exists to state, and
+                      // at 1.3x the ellipsis ate the end time: `Sat 29 Aug ·
+                      // 14:00…`. A slightly smaller full line keeps both.
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          when,
                           maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: inter(13.5, 700, color: scheme.onSurface)),
+                          style: inter(13.5, 700, color: scheme.onSurface),
+                        ),
+                      ),
                       const SizedBox(height: 4),
                       Text(
                         location == null ? who : '$who · $location',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style:
-                            inter(12.5, 500, color: scheme.onSurfaceVariant),
+                        style: inter(12.5, 500, color: scheme.onSurfaceVariant),
                       ),
                       // The pill gets a line of its own rather than a share of
                       // one. Once a thumbnail and an `EGP 95` are taken out of
@@ -338,8 +362,11 @@ class SessionRow extends StatelessWidget {
                         const SizedBox(height: 6),
                         Align(
                           alignment: Alignment.centerLeft,
-                          child: TagPill(statusLabel!,
-                              color: statusColor, dense: true),
+                          child: TagPill(
+                            statusLabel!,
+                            color: statusColor,
+                            dense: true,
+                          ),
                         ),
                       ],
                     ],
@@ -347,8 +374,10 @@ class SessionRow extends StatelessWidget {
                 ),
                 if (priceLabel != null) ...[
                   const SizedBox(width: 10),
-                  Text(priceLabel!,
-                      style: interNum(15, 760, color: scheme.onSurface)),
+                  Text(
+                    priceLabel!,
+                    style: interNum(15, 760, color: scheme.onSurface),
+                  ),
                 ],
               ],
             ),

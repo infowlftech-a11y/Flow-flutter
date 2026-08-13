@@ -40,9 +40,10 @@ class ProfileScreen extends ConsumerWidget {
                 child: Stack(
                   children: [
                     FlowAvatar(
-                        url: user?.photoUrl,
-                        name: session.displayName,
-                        size: 76),
+                      url: user?.photoUrl,
+                      name: session.displayName,
+                      size: 76,
+                    ),
                     Positioned(
                       right: 0,
                       bottom: 0,
@@ -52,12 +53,15 @@ class ProfileScreen extends ConsumerWidget {
                           color: tones.azureBrand,
                           shape: BoxShape.circle,
                           border: Border.all(
-                              color: Theme.of(context)
-                                  .scaffoldBackgroundColor,
-                              width: 2),
+                            color: Theme.of(context).scaffoldBackgroundColor,
+                            width: 2,
+                          ),
                         ),
-                        child: const Icon(Symbols.edit_rounded,
-                            size: 12, color: Colors.white),
+                        child: const Icon(
+                          Symbols.edit_rounded,
+                          size: 12,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ],
@@ -68,28 +72,35 @@ class ProfileScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(session.displayName,
-                        style: Theme.of(context).textTheme.headlineMedium),
+                    Text(
+                      session.displayName,
+                      style: Theme.of(context).textTheme.headlineMedium,
+                    ),
                     const SizedBox(height: 2),
-                    Text(user?.email ?? '',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall),
+                    Text(
+                      user?.email ?? '',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 6,
                       runSpacing: 6,
                       children: [
-                        TagPill(session.isTrainer
-                            ? 'TRAINER'
-                            : (user?.level ?? 'RIDER').toUpperCase()),
+                        TagPill(
+                          session.isTrainer
+                              ? 'TRAINER'
+                              : (user?.level ?? 'RIDER').toUpperCase(),
+                        ),
                         if (user?.nationality != null)
-                          TagPill(user!.nationality!,
-                              color: tones.textFaint),
+                          TagPill(user!.nationality!, color: tones.textFaint),
                         if ((user?.location ?? user?.homeSpot) != null)
-                          TagPill(user!.location ?? user.homeSpot!,
-                              icon: Symbols.place_rounded,
-                              color: tones.textFaint),
+                          TagPill(
+                            user!.location ?? user.homeSpot!,
+                            icon: Symbols.place_rounded,
+                            color: tones.textFaint,
+                          ),
                       ],
                     ),
                   ],
@@ -103,93 +114,165 @@ class ProfileScreen extends ConsumerWidget {
           // pretending to be a feature.
           const SizedBox(height: 28),
           const SectionHeader('Account'),
-          _SettingsCard(children: [
-            _row(context, Symbols.badge_rounded, 'Personal details',
+          _SettingsCard(
+            children: [
+              _row(
+                context,
+                Symbols.badge_rounded,
+                'Personal details',
                 subtitle: 'Name, photo, languages and level',
-                onTap: () => context.push('/profile/edit')),
-            if (session.isTrainer)
-              _row(context, Symbols.visibility_rounded,
+                onTap: () => context.push('/profile/edit'),
+              ),
+              if (session.isTrainer)
+                _row(
+                  context,
+                  Symbols.visibility_rounded,
                   'View my public profile',
                   subtitle: 'Exactly what riders see before they book',
-                  onTap: () => context.push('/trainer/${session.uid}')),
-            _row(context, Symbols.mail_rounded, 'Email address',
+                  onTap: () => context.push('/trainer/${session.uid}'),
+                ),
+              _row(
+                context,
+                Symbols.mail_rounded,
+                'Email address',
                 subtitle: user?.email ?? '—',
-                onTap: () => _openEmailSheet(context, user?.email ?? '')),
-          ]),
+                onTap: () => _openEmailSheet(context, user?.email ?? ''),
+              ),
+            ],
+          ),
           const SizedBox(height: 20),
           const SectionHeader('Notifications'),
-          _SettingsCard(children: [
-            _row(context, Symbols.inbox_rounded, 'Notification inbox',
+          _SettingsCard(
+            children: [
+              _row(
+                context,
+                Symbols.inbox_rounded,
+                'Notification inbox',
                 subtitle: 'Everything the app has told you',
-                onTap: () => context.push('/notifications')),
-            _row(context, Symbols.tune_rounded, 'Push notifications',
+                onTap: () => context.push('/notifications'),
+              ),
+              _row(
+                context,
+                Symbols.tune_rounded,
+                'Push notifications',
                 subtitle: 'Managed in your phone settings',
-                onTap: () => _openPushSheet(context)),
-          ]),
+                onTap: () => _openPushSheet(context),
+              ),
+            ],
+          ),
           const SizedBox(height: 20),
           const SectionHeader('Support'),
-          _SettingsCard(children: [
-            _row(context, Symbols.support_agent_rounded, 'Help & support',
+          _SettingsCard(
+            children: [
+              _row(
+                context,
+                Symbols.support_agent_rounded,
+                'Help & support',
                 subtitle: 'Open a ticket — we answer in the app',
-                onTap: () => context.push('/support')),
-            _row(context, Symbols.menu_book_rounded, 'How FLOW works',
+                onTap: () => context.push('/support'),
+              ),
+              _row(
+                context,
+                Symbols.menu_book_rounded,
+                'How FLOW works',
                 subtitle: 'Booking, check-in and payment, explained',
-                onTap: () => _openHowItWorksSheet(context, session.isTrainer)),
-          ]),
+                onTap: () => _openHowItWorksSheet(context, session.isTrainer),
+              ),
+            ],
+          ),
           const SizedBox(height: 20),
           const SectionHeader('Privacy & data'),
-          _SettingsCard(children: [
-            _row(context, Symbols.shield_rounded, 'Security & data',
+          _SettingsCard(
+            children: [
+              _row(
+                context,
+                Symbols.shield_rounded,
+                'Security & data',
                 subtitle: 'What we store, and who can see it',
-                onTap: () => _openPrivacySheet(context)),
-            _row(context, Symbols.gavel_rounded, 'Terms & conditions',
-                onTap: () => _openTermsSheet(context)),
-            _row(context, Symbols.manage_accounts_rounded, 'Manage my account',
+                onTap: () => _openPrivacySheet(context),
+              ),
+              _row(
+                context,
+                Symbols.gavel_rounded,
+                'Terms & conditions',
+                onTap: () => _openTermsSheet(context),
+              ),
+              _row(
+                context,
+                Symbols.manage_accounts_rounded,
+                'Manage my account',
                 subtitle: 'Export or delete everything',
-                onTap: () => _openAccountSheet(context, ref)),
-          ]),
+                onTap: () => _openAccountSheet(context, ref),
+              ),
+            ],
+          ),
           const SizedBox(height: 20),
           // Sign out sits alone, and Delete lives one level down inside
           // "Manage my account". They used to be adjacent rows in adjacent
           // cards, ~60dp apart, with the destructive one *below* the one
           // people tap daily — and the tap that costs you your account was
           // the easier one to hit by accident.
-          _SettingsCard(children: [
-            _row(context, Symbols.logout_rounded, 'Sign out', onTap: () async {
-              final ok = await confirmAction(
+          _SettingsCard(
+            children: [
+              _row(
                 context,
-                title: 'Sign out?',
-                body: "You'll need your email and password to get back in.",
-                confirmLabel: 'Sign out',
-              );
-              if (ok) await ref.read(signOutProvider)();
-            }),
-          ]),
+                Symbols.logout_rounded,
+                'Sign out',
+                onTap: () async {
+                  final ok = await confirmAction(
+                    context,
+                    title: 'Sign out?',
+                    body: "You'll need your email and password to get back in.",
+                    confirmLabel: 'Sign out',
+                  );
+                  if (ok) await ref.read(signOutProvider)();
+                },
+              ),
+            ],
+          ),
           const SizedBox(height: 24),
           Center(
-            child: Text(FlowConst.appVersionLabel,
-                style: inter(11.5, 560,
-                    color: tones.textFaint, spacing: 1.2)),
+            child: Text(
+              FlowConst.appVersionLabel,
+              style: inter(11.5, 560, color: tones.textFaint, spacing: 1.2),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _row(BuildContext context, IconData icon, String label,
-      {required VoidCallback onTap, Color? color, String? subtitle}) {
+  Widget _row(
+    BuildContext context,
+    IconData icon,
+    String label, {
+    required VoidCallback onTap,
+    Color? color,
+    String? subtitle,
+  }) {
     return ListTile(
       leading: Icon(icon, size: 22, color: color),
-      title: Text(label,
-          style: inter(15, 560, color: color ?? context.scheme.onSurface)),
+      title: Text(
+        label,
+        style: inter(15, 560, color: color ?? context.scheme.onSurface),
+      ),
       subtitle: subtitle == null
           ? null
-          : Text(subtitle,
-              maxLines: 1,
+          : Text(
+              subtitle,
+              // Two lines: these subtitles carry real information ("we answer
+              // in two days", what a page covers) and at 1.3x a single line
+              // kept about three words of it — every row on the screen ended
+              // in an ellipsis.
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: inter(12.5, 460, color: context.tones.textFaint)),
-      trailing: Icon(Symbols.chevron_right_rounded,
-          size: 20, color: context.tones.textFaint),
+              style: inter(12.5, 460, color: context.tones.textFaint),
+            ),
+      trailing: Icon(
+        Symbols.chevron_right_rounded,
+        size: 20,
+        color: context.tones.textFaint,
+      ),
       onTap: onTap,
     );
   }
@@ -211,10 +294,9 @@ class ProfileScreen extends ConsumerWidget {
             Text(
               'This is the address you sign in with, and where we send '
               'anything that has to reach you outside the app.',
-              style: Theme.of(sheetContext)
-                  .textTheme
-                  .bodyMedium!
-                  .copyWith(height: 1.55),
+              style: Theme.of(
+                sheetContext,
+              ).textTheme.bodyMedium!.copyWith(height: 1.55),
             ),
             const SizedBox(height: 20),
             PrimaryButton(
@@ -252,10 +334,9 @@ class ProfileScreen extends ConsumerWidget {
               'your phone settings — Settings → Apps → FLOW → Notifications. '
               'Turning them off there does not affect the notification inbox '
               'in the app; nothing is lost, it just waits for you.',
-              style: Theme.of(sheetContext)
-                  .textTheme
-                  .bodyMedium!
-                  .copyWith(height: 1.55),
+              style: Theme.of(
+                sheetContext,
+              ).textTheme.bodyMedium!.copyWith(height: 1.55),
             ),
           ],
         ),
@@ -399,17 +480,18 @@ class ProfileScreen extends ConsumerWidget {
               label: const Text('Request my data'),
             ),
             const SizedBox(height: 28),
-            Text('Delete my account',
-                style: inter(15, 700, color: context.tones.danger)),
+            Text(
+              'Delete my account',
+              style: inter(15, 700, color: context.tones.danger),
+            ),
             const SizedBox(height: 6),
             Text(
               'Permanently removes your profile, favourites and history. '
               'Your past sessions stay on your trainers’ records, because '
               'they are their books too. This cannot be undone.',
-              style: Theme.of(sheetContext)
-                  .textTheme
-                  .bodyMedium!
-                  .copyWith(height: 1.55),
+              style: Theme.of(
+                sheetContext,
+              ).textTheme.bodyMedium!.copyWith(height: 1.55),
             ),
             const SizedBox(height: 14),
             SizedBox(
@@ -418,7 +500,8 @@ class ProfileScreen extends ConsumerWidget {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: context.tones.danger,
                   side: BorderSide(
-                      color: context.tones.danger.withValues(alpha: .5)),
+                    color: context.tones.danger.withValues(alpha: .5),
+                  ),
                 ),
                 onPressed: () {
                   Navigator.pop(sheetContext);
@@ -499,7 +582,8 @@ class ProfileScreen extends ConsumerWidget {
               controller: reason,
               maxLines: 3,
               decoration: const InputDecoration(
-                  hintText: 'Too few trainers? Moving on? Something broke?'),
+                hintText: 'Too few trainers? Moving on? Something broke?',
+              ),
             ),
             const SizedBox(height: 16),
             PrimaryButton(
@@ -527,8 +611,10 @@ class ProfileScreen extends ConsumerWidget {
     // intact; letting it through would strand a signed-in user with no
     // profile and no way back.
     if (ref.read(authRepositoryProvider).needsReauthForDeletion) {
-      showFlowToast(context,
-          'For your security, sign out and sign back in before deleting your account.');
+      showFlowToast(
+        context,
+        'For your security, sign out and sign back in before deleting your account.',
+      );
       reason.dispose();
       return;
     }
@@ -555,7 +641,9 @@ class ProfileScreen extends ConsumerWidget {
     } catch (_) {
       if (context.mounted) {
         showFlowToast(
-            context, "Couldn't delete your account. Try again later.");
+          context,
+          "Couldn't delete your account. Try again later.",
+        );
       }
     } finally {
       reason.dispose();
@@ -623,11 +711,12 @@ class _PrivacyItem extends StatelessWidget {
               children: [
                 Text(title, style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 4),
-                Text(body,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodyMedium!
-                        .copyWith(height: 1.5)),
+                Text(
+                  body,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium!.copyWith(height: 1.5),
+                ),
               ],
             ),
           ),
