@@ -52,7 +52,11 @@ enum UserFilter {
   };
 }
 
-/// Case-insensitive name/email search over a role/status filter.
+/// Case-insensitive name/email/member-ID search over a role/status filter.
+///
+/// The ID match is containment, so "FLW-R-7X8K", "7X8K" and a half-typed
+/// "7x8" all land on the same row — support reads these off tickets and
+/// phone calls, rarely in full.
 List<AppUser> filterUsers(
   List<AppUser> users,
   UserFilter filter,
@@ -64,7 +68,11 @@ List<AppUser> filterUsers(
       if (filter.matches(u) &&
           (q.isEmpty ||
               u.name.toLowerCase().contains(q) ||
-              u.email.toLowerCase().contains(q)))
+              u.email.toLowerCase().contains(q) ||
+              memberRef(
+                u.uid,
+                coach: u.role == UserRole.business,
+              ).toLowerCase().contains(q)))
         u,
   ];
 }
@@ -130,7 +138,7 @@ class _UsersTabState extends ConsumerState<UsersTab> {
                 controller: _search,
                 onChanged: (_) => setState(() {}),
                 decoration: InputDecoration(
-                  hintText: 'Search name or email…',
+                  hintText: 'Search name, email or ID…',
                   prefixIcon: const Icon(Symbols.search_rounded),
                   suffixIcon: _search.text.isEmpty
                       ? null
@@ -214,6 +222,21 @@ class _UserCard extends ConsumerWidget {
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 3),
+                // The member ID rides directly under the name — it is the
+                // handle bans and suspensions are discussed by, so the row
+                // shows the same string the search matches. Staff accounts
+                // have no member ID; they are not members.
+                if (!user.isStaff)
+                  Text(
+                    memberRef(user.uid, coach: user.role == UserRole.business),
+                    style: interNum(
+                      11.5,
+                      640,
+                      color: tones.azureBrand,
+                      spacing: .4,
+                    ),
+                  ),
+                const SizedBox(height: 3),
                 // Two lines — same reason as the approval card: the domain
                 // half of an email is what staff search by, and one line
                 // dropped it at 1.3x.
@@ -262,7 +285,12 @@ void _openUserSheet(BuildContext context, WidgetRef ref, AppUser user) {
   showFlowSheet<void>(
     context,
     title: user.name.isEmpty ? user.email : user.name,
-    subtitle: '${_roleLabel(user)} · ${user.status.name}',
+    subtitle: [
+      _roleLabel(user),
+      if (!user.isStaff)
+        memberRef(user.uid, coach: user.role == UserRole.business),
+      user.status.name,
+    ].join(' · '),
     builder: (sheetContext) => _UserSheetBody(user: user),
   );
 }
@@ -276,9 +304,30 @@ class _UserSheetBody extends ConsumerWidget {
     final tones = context.tones;
 
     // The user's footprint, from streams the console already holds open.
+    // Derived on read, not stored on the profile — the console sees every
+    // booking, so the numbers cannot go stale and no counter needs a write.
     final bookings = ref.watch(allBookingsProvider).value ?? const <Booking>[];
-    final asRider = bookings.where((b) => b.kiterId == user.uid).length;
-    final asTrainer = bookings.where((b) => b.instructorId == user.uid).length;
+    final asRider = [
+      for (final b in bookings)
+        if (b.kiterId == user.uid) b,
+    ];
+    final asTrainer = [
+      for (final b in bookings)
+        if (b.instructorId == user.uid) b,
+    ];
+    int done(List<Booking> list) =>
+        list.where((b) => b.status == BookingStatus.completed).length;
+    // Cancels *they* chose, not cancellations that happened to them — the
+    // number that matters when weighing a suspension.
+    int walkedAwayFrom(List<Booking> list, String by) => list
+        .where(
+          (b) => b.status == BookingStatus.cancelled && b.cancelledBy == by,
+        )
+        .length;
+    double volume(List<Booking> list) => list
+        .where((b) => b.status == BookingStatus.completed)
+        .fold(0, (sum, b) => sum + b.amountDue);
+    final isCoach = user.role == UserRole.business;
     final openTickets =
         ref
             .watch(allTicketsProvider)
@@ -295,15 +344,33 @@ class _UserSheetBody extends ConsumerWidget {
         0;
 
     final facts = <(String, String)>[
+      if (!user.isStaff)
+        (
+          isCoach ? 'Coach ID' : 'Rider ID',
+          memberRef(user.uid, coach: isCoach),
+        ),
       ('Email', user.email),
       if (user.location != null) ('Location', user.location!),
       if (user.nationality != null) ('Nationality', user.nationality!),
       if (user.level != null) ('Level', user.level!),
-      if (user.role == UserRole.business)
-        ('Rate', '${money(user.displayRate)}/h'),
+      if (isCoach) ('Rate', '${money(user.displayRate)}/h'),
       if (user.ikoId != null) ('Credential', user.ikoId!),
-      ('Sessions as rider', '$asRider'),
-      if (user.role == UserRole.business) ('Sessions as trainer', '$asTrainer'),
+      ('Sessions as rider', '${asRider.length} · ${done(asRider)} completed'),
+      if (isCoach)
+        (
+          'Sessions as coach',
+          '${asTrainer.length} · ${done(asTrainer)} completed',
+        ),
+      (
+        'Cancelled by them',
+        isCoach
+            ? '${walkedAwayFrom(asRider, 'user')} as rider · '
+                  '${walkedAwayFrom(asTrainer, 'provider')} as coach'
+            : '${walkedAwayFrom(asRider, 'user')}',
+      ),
+      if (done(asRider) > 0) ('Spent on sessions', money(volume(asRider))),
+      if (isCoach && done(asTrainer) > 0)
+        ('Earned as coach', money(volume(asTrainer))),
       ('Open tickets', '$openTickets'),
       ('Open reports against them', '$reportsAgainst'),
       if (user.status == AccountStatus.blocked)

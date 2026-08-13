@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +9,7 @@ import '../../core/theme/radii.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/typography.dart';
 import '../../core/utils/haptics.dart';
+import '../../core/utils/refs.dart';
 import '../../core/widgets/buttons.dart';
 import '../../core/widgets/feedback.dart';
 import '../../core/widgets/flow_image.dart';
@@ -122,6 +124,26 @@ class ProfileScreen extends ConsumerWidget {
                 'Personal details',
                 subtitle: 'Name, photo, languages and level',
                 onTap: () => context.push('/profile/edit'),
+              ),
+              // The ID support and the console know this account by (P3) —
+              // derived from the uid, same scheme as the FLW- session refs.
+              // Tap copies: it exists to be pasted into a ticket or read
+              // aloud, never memorised.
+              _row(
+                context,
+                Symbols.fingerprint_rounded,
+                session.isTrainer ? 'Coach ID' : 'Rider ID',
+                subtitle:
+                    '${memberRef(session.uid, coach: session.isTrainer)} — '
+                    'tap to copy for support',
+                onTap: () {
+                  Clipboard.setData(
+                    ClipboardData(
+                      text: memberRef(session.uid, coach: session.isTrainer),
+                    ),
+                  );
+                  showFlowToast(context, 'ID copied');
+                },
               ),
               if (session.isTrainer)
                 _row(

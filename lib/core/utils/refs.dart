@@ -26,3 +26,22 @@ String sessionRef(String id, String date) {
   final day = digits.length == 8 ? digits.substring(4) : digits;
   return day.isEmpty ? 'FLW-$tail' : 'FLW-$day-$tail';
 }
+
+/// The public name of a person: `FLW-R-7X8K` for a rider, `FLW-C-7X8K` for a
+/// coach (trainers, stations, safari operators — everyone who sells hours).
+///
+/// Exists for the console: "suspend FLW-R-7X8K" survives being said aloud,
+/// typed into the directory search, and pasted into a ticket, where a name
+/// does not — the cast has two Ahmeds and support cannot suspend "Ahmed".
+///
+/// Derived from the uid the same way [sessionRef] derives from the booking
+/// id, never stored: every account that has ever existed already has one,
+/// and nothing needs a migration. The uid stays the canonical key; the tail
+/// is for telling people apart in conversation, and the directory search
+/// matches it by containment so a collision costs one extra row on screen,
+/// not a wrong ban.
+String memberRef(String uid, {required bool coach}) {
+  final clean = uid.replaceAll(RegExp('[^A-Za-z0-9]'), '').toUpperCase();
+  final tail = clean.length <= 4 ? clean : clean.substring(clean.length - 4);
+  return 'FLW-${coach ? 'C' : 'R'}-$tail';
+}

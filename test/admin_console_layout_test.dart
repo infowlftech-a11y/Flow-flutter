@@ -41,8 +41,10 @@ Future<FakeFirebaseFirestore> staffDb() async {
   final db = await seededDb();
 
   await db.collection(Col.users).doc(staff.uid).set({
-    'name': staff.name, 'email': staff.email,
-    'role': 'admin', 'status': 'active',
+    'name': staff.name,
+    'email': staff.email,
+    'role': 'admin',
+    'status': 'active',
   });
 
   // An applicant with everything filled in — the long name, the long bio and
@@ -69,28 +71,33 @@ Future<FakeFirebaseFirestore> staffDb() async {
   });
 
   await db.collection(Col.reports).doc('rp1').set({
-    'reporterId': rider.uid, 'reporterName': rider.name,
-    'reportedUserId': 'u_suspended', 'reportedUserName': 'Karim Adel',
+    'reporterId': rider.uid,
+    'reporterName': rider.name,
+    'reportedUserId': 'u_suspended',
+    'reportedUserName': 'Karim Adel',
     'reason': 'Unsafe behaviour on the water',
     'details': 'Rode straight through the beginner zone twice in one session.',
     'status': 'pending',
   });
 
   await db.collection(Col.appeals).doc('ap1').set({
-    'userId': 'u_suspended', 'userName': 'Karim Adel',
+    'userId': 'u_suspended',
+    'userName': 'Karim Adel',
     'reason': 'I was outside the marked zone and happy to explain.',
     'status': 'pending',
     'messages': <Map<String, dynamic>>[],
   });
 
   await db.collection(Col.tickets).doc('t1').set({
-    'userId': rider.uid, 'userName': rider.name,
+    'userId': rider.uid,
+    'userName': rider.name,
     'subject': 'Refund for a cancelled session',
     'status': 'open',
   });
 
   await db.collection(Col.leaveReasons).doc('l1').set({
-    'userId': 'u_gone', 'userName': 'Former Rider',
+    'userId': 'u_gone',
+    'userName': 'Former Rider',
     'userEmail': 'gone@example.com',
     'reason': 'Moving away from the coast — thanks for everything.',
   });
@@ -113,27 +120,41 @@ const _tabs = <String, String>{
   'Feedback': 'Moving away from the coast — thanks for everything.',
   // The directory and sessions views are proved open by their search hints —
   // the only strings on those tabs that no seeded data could also produce.
-  'Users': 'Search name or email…',
+  // P3 (ordered) taught the directory search the member IDs, and the hint
+  // says so — this string tracks it.
+  'Users': 'Search name, email or ID…',
   'Sessions': 'Search rider or trainer…',
 };
 
 void main() {
   group('the console renders for staff at all', () {
-    testWidgets('a staff account gets the console, not the gate',
-        (tester) async {
-      await pumpScreen(tester, const AdminScreen(),
-          db: await staffDb(), as: staff);
+    testWidgets('a staff account gets the console, not the gate', (
+      tester,
+    ) async {
+      await pumpScreen(
+        tester,
+        const AdminScreen(),
+        db: await staffDb(),
+        as: staff,
+      );
 
       expect(find.text('Admin console'), findsOneWidget);
-      expect(find.text('Staff only'), findsNothing,
-          reason: 'if this fails the rest of the file proves nothing');
+      expect(
+        find.text('Staff only'),
+        findsNothing,
+        reason: 'if this fails the rest of the file proves nothing',
+      );
     });
 
     testWidgets('a trainer gets the gate', (tester) async {
       // Pinned because it is the state screen_overlap_test.dart has been
       // testing by accident, and it should stay a deliberate choice.
-      await pumpScreen(tester, const AdminScreen(),
-          db: await staffDb(), as: trainer);
+      await pumpScreen(
+        tester,
+        const AdminScreen(),
+        db: await staffDb(),
+        as: trainer,
+      );
 
       expect(find.text('Staff only'), findsOneWidget);
     });
@@ -143,8 +164,13 @@ void main() {
     for (final scale in [1.0, 1.3]) {
       for (final entry in _tabs.entries) {
         testWidgets('${entry.key} — @${scale}x', (tester) async {
-          await pumpScreen(tester, const AdminScreen(),
-              db: await staffDb(), as: staff, textScale: scale);
+          await pumpScreen(
+            tester,
+            const AdminScreen(),
+            db: await staffDb(),
+            as: staff,
+            textScale: scale,
+          );
 
           await _openTab(tester, entry.key, marker: entry.value);
           expectNoTextOverlaps(tester, where: '${entry.key} @${scale}x');
@@ -157,15 +183,24 @@ void main() {
     // The console is the staff root: there is nothing under it to pop to, so
     // the system back gesture used to fall through and close the app cold.
     // The PopScope catches it and offers the same sign-out the app bar does.
-    testWidgets('back at the console opens the sign-out confirm',
-        (tester) async {
-      await pumpScreen(tester, const AdminScreen(),
-          db: await staffDb(), as: staff);
+    testWidgets('back at the console opens the sign-out confirm', (
+      tester,
+    ) async {
+      await pumpScreen(
+        tester,
+        const AdminScreen(),
+        db: await staffDb(),
+        as: staff,
+      );
 
       final handled = await tester.binding.handlePopRoute();
-      expect(handled, isTrue,
-          reason: 'the pop fell through to the system — that is the app '
-              'closing on the back gesture');
+      expect(
+        handled,
+        isTrue,
+        reason:
+            'the pop fell through to the system — that is the app '
+            'closing on the back gesture',
+      );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200));
 
@@ -183,23 +218,36 @@ void main() {
     // padding — the thread, the reply field and the buttons were squeezed
     // out of the sheet entirely, and the reporter's description was
     // "everything turns white and disappears".
-    testWidgets('the reply field stays visible above the keyboard',
-        (tester) async {
-      await pumpScreen(tester, const AdminScreen(),
-          db: await staffDb(), as: staff);
+    testWidgets('the reply field stays visible above the keyboard', (
+      tester,
+    ) async {
+      await pumpScreen(
+        tester,
+        const AdminScreen(),
+        db: await staffDb(),
+        as: staff,
+      );
       await _openTab(tester, 'Tickets', marker: _tabs['Tickets']!);
 
       await tester.tap(
-          find.textContaining('Refund for a cancelled session').first);
+        find.textContaining('Refund for a cancelled session').first,
+      );
       for (var i = 0; i < 6; i++) {
         await tester.pump(const Duration(milliseconds: 120));
       }
-      expect(find.byType(TextField), findsOneWidget,
-          reason: 'the thread sheet did not open');
+      expect(
+        find.byType(TextField),
+        findsOneWidget,
+        reason: 'the thread sheet did not open',
+      );
 
       // Keyboard up: 300 logical px of viewInsets at DPR 1.0.
       tester.view.viewInsets = const FakeViewPadding(
-          left: 0, top: 0, right: 0, bottom: 300);
+        left: 0,
+        top: 0,
+        right: 0,
+        bottom: 300,
+      );
       for (var i = 0; i < 6; i++) {
         await tester.pump(const Duration(milliseconds: 120));
       }
@@ -209,11 +257,17 @@ void main() {
       // the RenderFlex overflow the squeeze causes would fail the test on
       // its own as well.
       final field = tester.getRect(find.byType(TextField));
-      expect(field.bottom, lessThanOrEqualTo(780 - 300 + 0.1),
-          reason: 'the reply field is under the keyboard');
+      expect(
+        field.bottom,
+        lessThanOrEqualTo(780 - 300 + 0.1),
+        reason: 'the reply field is under the keyboard',
+      );
       expect(find.text('Send reply'), findsOneWidget);
-      expect(find.text('Close ticket'), findsOneWidget,
-          reason: 'the close action names what it closes');
+      expect(
+        find.text('Close ticket'),
+        findsOneWidget,
+        reason: 'the close action names what it closes',
+      );
     });
   });
 
@@ -224,11 +278,14 @@ void main() {
     // name+email column, which is the same shape that broke elsewhere.
     for (final tab in ['Approvals', 'Reports', 'Suspended', 'Users']) {
       testWidgets('$tab — 320px @1.3x', (tester) async {
-        await pumpScreen(tester, const AdminScreen(),
-            db: await staffDb(),
-            as: staff,
-            size: const Size(320, 640),
-            textScale: 1.3);
+        await pumpScreen(
+          tester,
+          const AdminScreen(),
+          db: await staffDb(),
+          as: staff,
+          size: const Size(320, 640),
+          textScale: 1.3,
+        );
 
         await _openTab(tester, tab, marker: _tabs[tab]!);
         expectNoTextOverlaps(tester, where: '$tab @320px');
@@ -261,7 +318,11 @@ Future<void> _openTab(
     await tester.pump(const Duration(milliseconds: 120));
   }
 
-  expect(find.textContaining(marker, findRichText: true), findsWidgets,
-      reason: '$prefix did not open — every assertion after this would have '
-          'run against whichever tab was already showing');
+  expect(
+    find.textContaining(marker, findRichText: true),
+    findsWidgets,
+    reason:
+        '$prefix did not open — every assertion after this would have '
+        'run against whichever tab was already showing',
+  );
 }

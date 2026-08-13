@@ -39,4 +39,16 @@ void main() {
     final legacy = 'FLW-${date.replaceAll('-', '').substring(4)}-$legacyTail';
     expect(sessionRef(id, date), legacy);
   });
+
+  group('memberRef — the person the console is talking about (P3)', () {
+    test('rider and coach differ by the middle letter only', () {
+      expect(memberRef('xK9fQ2abcd7x8k', coach: false), 'FLW-R-7X8K');
+      expect(memberRef('xK9fQ2abcd7x8k', coach: true), 'FLW-C-7X8K');
+    });
+
+    test('same cleaning rules as sessionRef — the schemes must not drift', () {
+      expect(memberRef('ab_c-d!e1234', coach: false), 'FLW-R-1234');
+      expect(memberRef('u1', coach: true), 'FLW-C-U1');
+    });
+  });
 }

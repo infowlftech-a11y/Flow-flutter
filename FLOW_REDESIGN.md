@@ -728,3 +728,45 @@ double-submit guard (flow_review_test), report/appeal outcomes
 Three test files updated at construction sites only (new repository
 dependency / new required params) — no assertion weakened; each carries a P2
 comment.
+
+---
+
+## P3 — Every person has a name the console can act on, and a history behind it
+
+**Ordered 2026-08-13:** "There should be a rider ID and a Coach ID, to be
+easier for the admin to deal with the banning system and the suspensions and
+searching" + "accumulation information about riders and coaches, like the
+number of sessions made." Implemented the same day.
+
+### Member IDs
+
+`FLW-R-<tail>` for riders, `FLW-C-<tail>` for coaches (trainers, stations,
+safari operators), where the tail is the last four alphanumerics of the uid —
+the exact scheme the session refs already use (`memberRef` beside
+`sessionRef` in core/utils/refs.dart). **Derived, never stored**: every
+account that has ever existed already has one, no migration, no rules
+change. The uid stays the canonical key; collisions in a four-character tail
+cost one extra search row, never a wrong ban.
+
+Surfaces: the directory search matches it (whole, tail, or half-typed), each
+directory row prints it under the name, the user sheet leads with it, and
+the profile screen gives every user their own ID with tap-to-copy — it
+exists to be pasted into support tickets and read out loud.
+
+### Accumulated history (the dossier)
+
+The console's user sheet now derives, from the booking stream it already
+holds open: sessions as rider/coach split total · completed, **cancellations
+they chose** (rider-stamped vs provider-stamped — the number that matters
+when weighing a suspension, straight from the P1 `cancelledBy` stamps),
+lifetime € spent on completed sessions, and € earned as a coach. Derived on
+read like everything else in the console — no counters, nothing to go stale.
+
+Public profiles deliberately show none of this: the rules only let the two
+parties of a booking read it, so a public "142 sessions taught" needs a
+stored counter, and an honest counter needs the server-side writer (same
+Functions dependency as P1/P2; one `onWrite` trigger when that lands).
+
+One pinned test string updated with a comment: the console layout test
+proves the directory open by its search hint, and the hint now says
+"…or ID…" because the search now does.
