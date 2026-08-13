@@ -23,6 +23,7 @@ import '../../data/models/catalogue.dart';
 import '../../data/models/schedule.dart';
 import '../../data/models/wind.dart';
 import '../../data/repositories/booking_repository.dart';
+import '../auth/verify_email_gate.dart';
 import '../../providers/providers.dart';
 
 /// The booking flow — who / pick a day / available hours / summary on one
@@ -413,6 +414,11 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     bool instant,
   ) async {
     if (_submitting) return;
+    // P6: the pay step is the verification gate — money never moves for an
+    // inbox nobody has proven. Before the busy state, so a dismissed sheet
+    // leaves the pay button live.
+    if (!await ensureEmailVerified(sheetContext, ref)) return;
+    if (!sheetContext.mounted) return;
     setSheet(() => _submitting = true);
     setState(() {});
     try {

@@ -16,6 +16,7 @@ import '../../core/widgets/surfaces.dart';
 import '../../data/models/app_user.dart';
 import '../../data/models/catalogue.dart';
 import '../../data/repositories/booking_repository.dart';
+import '../auth/verify_email_gate.dart';
 import '../../providers/providers.dart';
 
 /// Station / safari-operator profile with type-dependent tabs (§3.5).
@@ -431,6 +432,11 @@ class _TripCardState extends ConsumerState<_TripCard> {
 
   Future<void> _reserve() async {
     final trip = widget.trip;
+    // P6: the pay step is the verification gate — same rule as the booking
+    // screen. Checked before the confirm dialog so nobody agrees to pay and
+    // then hits a wall.
+    if (!await ensureEmailVerified(context, ref)) return;
+    if (!mounted) return;
     final ok = await confirmAction(
       context,
       title: 'Reserve your seat?',

@@ -33,7 +33,9 @@ class AuthRepository {
   Future<void> signIn(String email, String password) async {
     try {
       await _auth.signInWithEmailAndPassword(
-          email: email.trim(), password: password);
+        email: email.trim(),
+        password: password,
+      );
     } catch (error) {
       throw translate(error);
     }
@@ -61,7 +63,9 @@ class AuthRepository {
   Future<void> signUp(String email, String password) async {
     try {
       await _auth.createUserWithEmailAndPassword(
-          email: email.trim(), password: password);
+        email: email.trim(),
+        password: password,
+      );
     } catch (error) {
       final failure = translate(error);
       if (failure.code == 'email-already-in-use') {
@@ -83,6 +87,36 @@ class AuthRepository {
   }
 
   Future<void> signOut() => _auth.signOut();
+
+  // ── Email verification (P6) ──────────────────────────────────────────────
+  // Booking moves real money, so the pay step asks every account to prove
+  // its inbox once. Client-side gate only, deliberately: the rules cannot
+  // require `email_verified` on the token without breaking every pinned
+  // emulator test (their auth contexts carry no such claim), so server-side
+  // enforcement joins the App Check / Functions layer.
+
+  /// Fails closed — a missing user reads as unverified.
+  bool get emailVerified => _auth.currentUser?.emailVerified ?? false;
+
+  Future<void> sendEmailVerification() async {
+    try {
+      await _auth.currentUser?.sendEmailVerification();
+    } catch (error) {
+      throw translate(error);
+    }
+  }
+
+  /// Re-fetches the account and reports the fresh flag — the verification
+  /// tap happens in a mail app, outside this process, so the cached user
+  /// object cannot know about it.
+  Future<bool> reloadEmailVerified() async {
+    try {
+      await _auth.currentUser?.reload();
+    } catch (error) {
+      throw translate(error);
+    }
+    return _auth.currentUser?.emailVerified ?? false;
+  }
 
   /// Whether Firebase will refuse a destructive operation because the
   /// session is stale.
@@ -139,11 +173,16 @@ class AuthRepository {
 
     final normalized = _normalize(code, detail);
     if (_configCodes.contains(normalized)) {
-      return AuthFailure(message(normalized),
-          code: normalized, isConfigError: true);
+      return AuthFailure(
+        message(normalized),
+        code: normalized,
+        isConfigError: true,
+      );
     }
-    return AuthFailure(message(normalized, rawDetail: detail),
-        code: normalized);
+    return AuthFailure(
+      message(normalized, rawDetail: detail),
+      code: normalized,
+    );
   }
 
   /// Firebase reports the same underlying problem under several spellings
@@ -187,8 +226,7 @@ class AuthRepository {
     final known = switch (code) {
       'user-not-found' ||
       'wrong-password' ||
-      'invalid-credential' =>
-        'Incorrect email or password.',
+      'invalid-credential' => 'Incorrect email or password.',
       'invalid-email' => "That email address doesn't look right.",
       'email-already-in-use' => 'An account with this email already exists.',
       'weak-password' => 'Password should be at least 6 characters.',
@@ -203,8 +241,8 @@ class AuthRepository {
       'invalid-login-credentials' => 'Incorrect email or password.',
       'account-exists-with-different-credential' =>
         'This email is already registered with a different sign-in method.',
-      'expired-action-code' || 'invalid-action-code' =>
-        'That link has expired. Request a new one.',
+      'expired-action-code' ||
+      'invalid-action-code' => 'That link has expired. Request a new one.',
       'internal-error' =>
         "Our sign-in service hiccuped. Please try again in a moment.",
       // ── Configuration, not user error. Say so plainly. ─────────────────
