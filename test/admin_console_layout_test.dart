@@ -102,6 +102,16 @@ Future<FakeFirebaseFirestore> staffDb() async {
     'reason': 'Moving away from the coast — thanks for everything.',
   });
 
+  // P6: one audit entry, so the Log tab renders a row rather than the
+  // empty state.
+  await db.collection(Col.auditLog).doc('audit1').set({
+    'action': 'suspend',
+    'staffId': staff.uid,
+    'targetUserId': 'u_suspended',
+    'targetName': 'Karim Adel',
+    'detail': 'until 2099-09-01',
+  });
+
   return db;
 }
 
@@ -124,6 +134,8 @@ const _tabs = <String, String>{
   // says so — this string tracks it.
   'Users': 'Search name, email or ID…',
   'Sessions': 'Search rider or trainer…',
+  // P6: the audit row's byline — no seeded data produces this string.
+  'Log': 'until 2099-09-01',
 };
 
 void main() {

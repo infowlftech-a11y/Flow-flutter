@@ -582,6 +582,49 @@ void main() {
       );
     });
 
+    test('a suspension signed with byStaff lands on the audit log', () async {
+      await admin.blockUser(
+        'rider1',
+        until: '2099-09-01',
+        byStaff: 'admin1',
+        targetName: 'rider1',
+      );
+
+      final entries = (await db.collection(Col.auditLog).get()).docs;
+      final e = entries.single.data();
+      expect(e['action'], 'suspend');
+      expect(e['staffId'], 'admin1');
+      expect(e['targetUserId'], 'rider1');
+      expect(e['detail'], contains('2099-09-01'));
+    });
+
+    test('an unattributed action writes no audit line at all', () async {
+      await admin.blockUser('rider1', until: '2099-09-01');
+
+      expect(
+        (await db.collection(Col.auditLog).get()).docs,
+        isEmpty,
+        reason:
+            'an audit line without an author is noise in a uniform — '
+            'the log records who, or it records nothing',
+      );
+    });
+
+    test('a report decision carries its note onto the log', () async {
+      await fileReport();
+      final r = (await admin.watchReports().first).single;
+      await admin.closeReport(
+        r.id,
+        upheld: false,
+        note: 'No evidence',
+        byStaff: 'admin1',
+      );
+
+      final e = (await db.collection(Col.auditLog).get()).docs.single.data();
+      expect(e['action'], 'report_dismissed');
+      expect(e['detail'], 'No evidence');
+    });
+
     test('a staff appeal reply reaches the suspended account', () async {
       await support.submitAppeal(
         userId: 'rider1',

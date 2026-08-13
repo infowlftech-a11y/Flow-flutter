@@ -464,6 +464,18 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ── audit log (P6) ───────────────────────────────────────────────────
+    // The staff accountability trail: every suspend, lift, approval and
+    // report decision, attributed. Append-only for *everyone including
+    // staff* — an editable audit log is a diary, not a record — and each
+    // entry must name its own author, so nobody signs a colleague's name.
+    match /audit_log/{entryId} {
+      allow read: if isStaff();
+      allow create: if isStaff()
+        && request.resource.data.staffId == uid();
+      allow update, delete: if false;
+    }
+
     // ── safari trips ─────────────────────────────────────────────────────
     // Public to read; the host manages them. The seat count lives on this
     // document and is moved by the *reserving rider's* transaction, so a

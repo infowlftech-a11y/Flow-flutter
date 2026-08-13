@@ -75,7 +75,7 @@ class AdminScreen extends ConsumerWidget {
     String label(String name, int count) =>
         count == 0 ? name : '$name ($count)';
 
-    // Eight tabs: six queues, then the directory and the sessions view.
+    // Nine tabs: six queues, the directory, the sessions view, and the log.
     //
     // The queues came first — support tickets and suspensions had
     // repositories, rules and providers and no screen at all: a ticket a
@@ -90,7 +90,7 @@ class AdminScreen extends ConsumerWidget {
     // Support conversations start with a name; the person answering has to
     // be able to find that name and see what it has been doing.
     return DefaultTabController(
-      length: 8,
+      length: 9,
       // Back used to fall through to the system and close the app cold —
       // the console is the staff root, so there was nothing to pop. Catch it
       // and offer the same sign-out the app bar offers; declining stays put.
@@ -141,6 +141,9 @@ class AdminScreen extends ConsumerWidget {
                 const Tab(text: 'Feedback'),
                 const Tab(text: 'Users'),
                 const Tab(text: 'Sessions'),
+                // P6: the accountability trail — who suspended, lifted,
+                // approved, decided; append-only by rules.
+                const Tab(text: 'Log'),
               ],
             ),
           ),
@@ -154,6 +157,7 @@ class AdminScreen extends ConsumerWidget {
               LeaveReasonsTab(),
               UsersTab(),
               AllSessionsTab(),
+              AuditLogTab(),
             ],
           ),
         ),
@@ -230,7 +234,10 @@ class _ApplicantCardState extends ConsumerState<_ApplicantCard> {
     final repo = ref.read(adminRepositoryProvider);
     try {
       Haptics.medium();
-      await repo.approveTrainer(widget.trainer);
+      await repo.approveTrainer(
+        widget.trainer,
+        byStaff: ref.read(sessionProvider).uid,
+      );
       if (mounted) {
         showFlowToast(
           context,
@@ -289,7 +296,11 @@ class _ApplicantCardState extends ConsumerState<_ApplicantCard> {
     try {
       await ref
           .read(adminRepositoryProvider)
-          .rejectTrainer(widget.trainer, reason: reason.text);
+          .rejectTrainer(
+            widget.trainer,
+            reason: reason.text,
+            byStaff: ref.read(sessionProvider).uid,
+          );
       if (mounted) showFlowToast(context, 'Application declined');
     } catch (_) {
       if (mounted) showFlowToast(context, "Couldn't decline. Try again.");
@@ -598,13 +609,19 @@ class _ReportCard extends ConsumerWidget {
                 final until = DateTime.now()
                     .add(const Duration(days: 7))
                     .toIso8601String();
-                await admin.blockUser(report.reportedUserId, until: until);
+                await admin.blockUser(
+                  report.reportedUserId,
+                  until: until,
+                  byStaff: ref.read(sessionProvider).uid,
+                  targetName: report.reportedUserName,
+                );
                 await admin.closeReport(
                   report.id,
                   upheld: true,
                   note: note.text,
                   reporterId: report.reporterId,
                   reportedUserName: report.reportedUserName,
+                  byStaff: ref.read(sessionProvider).uid,
                 );
                 if (sheetContext.mounted) Navigator.pop(sheetContext);
                 if (context.mounted) {
@@ -641,6 +658,7 @@ class _ReportCard extends ConsumerWidget {
                       note: note.text,
                       reporterId: report.reporterId,
                       reportedUserName: report.reportedUserName,
+                      byStaff: ref.read(sessionProvider).uid,
                     );
                 if (sheetContext.mounted) Navigator.pop(sheetContext);
                 if (context.mounted) {
@@ -777,8 +795,18 @@ class _AppealCardState extends ConsumerState<_AppealCard> {
     setState(() => _busy = true);
     try {
       final admin = ref.read(adminRepositoryProvider);
-      await admin.unblockUser(widget.appeal.userId);
-      await admin.setAppealStatus(widget.appeal.id, 'resolved');
+      final me = ref.read(sessionProvider).uid;
+      await admin.unblockUser(
+        widget.appeal.userId,
+        byStaff: me,
+        targetName: widget.appeal.userName,
+      );
+      await admin.setAppealStatus(
+        widget.appeal.id,
+        'resolved',
+        byStaff: me,
+        targetName: widget.appeal.userName,
+      );
       if (mounted) showFlowToast(context, 'Suspension lifted');
     } catch (_) {
       if (mounted) showFlowToast(context, "Couldn't lift it. Try again.");

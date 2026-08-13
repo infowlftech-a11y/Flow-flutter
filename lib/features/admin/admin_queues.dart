@@ -14,6 +14,7 @@ import '../../core/widgets/misc.dart';
 import '../../core/widgets/sheets.dart';
 import '../../core/widgets/surfaces.dart';
 import '../../data/models/app_user.dart';
+import '../../data/models/audit.dart';
 import '../../data/models/support.dart';
 import '../../providers/providers.dart';
 
@@ -408,7 +409,13 @@ class _SuspendedCard extends ConsumerWidget {
     );
     if (!ok) return;
     try {
-      await ref.read(adminRepositoryProvider).unblockUser(user.uid);
+      await ref
+          .read(adminRepositoryProvider)
+          .unblockUser(
+            user.uid,
+            byStaff: ref.read(sessionProvider).uid,
+            targetName: user.name,
+          );
       if (context.mounted) showFlowToast(context, '${user.name} is back');
     } catch (_) {
       if (context.mounted) {
@@ -508,6 +515,90 @@ class _LeaveReasonCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ── Audit log (P6) ───────────────────────────────────────────────────────
+
+/// The accountability trail: one row per staff action, newest first,
+/// append-only by rules. Exists so "who suspended this account and why"
+/// has an answer that is not a shrug.
+class AuditLogTab extends ConsumerWidget {
+  const AuditLogTab({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final log = ref.watch(auditLogProvider);
+    // Staff ids resolve to names through the directory stream the console
+    // already holds open; an id with no profile (deleted staff) stays raw.
+    final users = ref.watch(allUsersProvider).value ?? const <AppUser>[];
+    final names = {for (final u in users) u.uid: u.name};
+
+    return AsyncView<List<AuditEntry>>(
+      value: log,
+      onRetry: () => ref.invalidate(auditLogProvider),
+      onRefresh: () async {
+        ref.invalidate(auditLogProvider);
+        await ref.read(auditLogProvider.future);
+      },
+      // 76, not 64: the skeleton row's own paddings need ~66px, and a
+      // 64px box overflowed by 2px — the same reason the notification
+      // list's skeleton settled on 76.
+      skeleton: const SkeletonList(count: 6, itemHeight: 76),
+      data: (entries) {
+        if (entries.isEmpty) {
+          return const EmptyView.scrollable(
+            icon: Symbols.history_rounded,
+            title: 'Nothing on the record yet',
+            subtitle:
+                'Every suspension, lift, approval and report decision lands '
+                'here with the staff member who made it.',
+          );
+        }
+        return ListView.separated(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(20),
+          itemCount: entries.length,
+          separatorBuilder: (_, _) => const SizedBox(height: 8),
+          itemBuilder: (context, i) {
+            final e = entries[i];
+            final tones = context.tones;
+            final by = names[e.staffId] ?? e.staffId;
+            return FlowCard(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          [e.label, ?e.targetName].join(' '),
+                          style: inter(
+                            14,
+                            620,
+                            color: context.scheme.onSurface,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        timeAgo(e.createdAt),
+                        style: inter(11.5, 520, color: tones.textFaint),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    ['by $by', ?e.detail].join(' · '),
+                    style: inter(12.5, 480, color: tones.textFaint),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

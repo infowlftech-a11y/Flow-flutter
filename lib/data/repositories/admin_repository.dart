@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../firestore_paths.dart';
 import '../models/app_user.dart';
+import '../models/audit.dart';
 import '../models/report.dart';
 import '../models/support.dart';
 import 'notification_repository.dart';
@@ -25,6 +26,47 @@ class AdminRepository {
       _db.collection(Col.reports);
   CollectionReference<Map<String, dynamic>> get _appeals =>
       _db.collection(Col.appeals);
+  CollectionReference<Map<String, dynamic>> get _audit =>
+      _db.collection(Col.auditLog);
+
+  // ── Audit trail (P6) ───────────────────────────────────────────────────
+
+  /// Newest first, client-side (§6.2). Staff-only by rules.
+  Stream<List<AuditEntry>> watchAuditLog() => _audit.snapshots().map((qs) {
+    final list = [
+      for (final doc in qs.docs) AuditEntry.fromDoc(doc.id, doc.data()),
+    ];
+    list.sort(
+      (a, b) =>
+          (b.createdAt ?? DateTime(0)).compareTo(a.createdAt ?? DateTime(0)),
+    );
+    return list;
+  });
+
+  /// One appended line per staff action, written after the action lands so
+  /// the log never claims something that failed. [byStaff] is optional on
+  /// every method for source compatibility, but a missing actor writes
+  /// nothing — an unattributed audit line is noise wearing a uniform.
+  Future<void> _auditWrite({
+    required String action,
+    required String? byStaff,
+    String? targetUserId,
+    String? targetName,
+    String? detail,
+  }) {
+    if (byStaff == null || byStaff.isEmpty) return Future.value();
+    final note = (detail ?? '').trim();
+    return _audit
+        .add({
+          'action': action,
+          'staffId': byStaff,
+          'targetUserId': ?targetUserId,
+          if ((targetName ?? '').isNotEmpty) 'targetName': targetName,
+          if (note.isNotEmpty) 'detail': note,
+          'createdAt': FieldValue.serverTimestamp(),
+        })
+        .then((_) {});
+  }
 
   // ── Trainer approvals ──────────────────────────────────────────────────
 
@@ -65,12 +107,18 @@ class AdminRepository {
 
   /// Approve a trainer — this is what makes them visible in Explore, which
   /// queries `role == 'business' && status == 'active'`.
-  Future<void> approveTrainer(AppUser trainer) async {
+  Future<void> approveTrainer(AppUser trainer, {String? byStaff}) async {
     await _users.doc(trainer.uid).update({
       'status': 'active',
       'reviewedAt': FieldValue.serverTimestamp(),
       ..._clearBlockMarkers,
     });
+    await _auditWrite(
+      action: 'trainer_approved',
+      byStaff: byStaff,
+      targetUserId: trainer.uid,
+      targetName: trainer.name,
+    );
     await _notifications.notify(
       targetUserId: trainer.uid,
       title: "You're live on Flow 🤙",
@@ -83,13 +131,24 @@ class AdminRepository {
 
   /// Decline an application. The rider-facing app holds rejected accounts at
   /// a gate rather than handing them a dashboard nobody can book.
-  Future<void> rejectTrainer(AppUser trainer, {String? reason}) async {
+  Future<void> rejectTrainer(
+    AppUser trainer, {
+    String? reason,
+    String? byStaff,
+  }) async {
     await _users.doc(trainer.uid).update({
       'status': 'rejected',
       'reviewedAt': FieldValue.serverTimestamp(),
       if ((reason ?? '').trim().isNotEmpty) 'reviewNote': reason!.trim(),
       ..._clearBlockMarkers,
     });
+    await _auditWrite(
+      action: 'trainer_rejected',
+      byStaff: byStaff,
+      targetUserId: trainer.uid,
+      targetName: trainer.name,
+      detail: reason,
+    );
     final note = (reason ?? '').trim();
     await _notifications.notify(
       targetUserId: trainer.uid,
@@ -112,7 +171,12 @@ class AdminRepository {
   ///
   /// The prior status has to be recorded here or [unblockUser] has nothing to
   /// restore and can only guess.
-  Future<void> blockUser(String uid, {required String until}) async {
+  Future<void> blockUser(
+    String uid, {
+    required String until,
+    String? byStaff,
+    String? targetName,
+  }) async {
     final ref = _users.doc(uid);
     await _db.runTransaction((tx) async {
       final snap = await tx.get(ref);
@@ -127,6 +191,13 @@ class AdminRepository {
           'statusBeforeBlock': previous,
       });
     });
+    await _auditWrite(
+      action: 'suspend',
+      byStaff: byStaff,
+      targetUserId: uid,
+      targetName: targetName,
+      detail: until == 'forever' ? 'permanent' : 'until $until',
+    );
   }
 
   /// Lifts a block, restoring the status the account actually had.
@@ -141,7 +212,11 @@ class AdminRepository {
   /// With no recorded prior status (a block written before this field
   /// existed) it fails **safe**: a business account returns to `pending` and
   /// goes back through approvals rather than going live unreviewed.
-  Future<void> unblockUser(String uid) async {
+  Future<void> unblockUser(
+    String uid, {
+    String? byStaff,
+    String? targetName,
+  }) async {
     final ref = _users.doc(uid);
     final lifted = await _db.runTransaction((tx) async {
       final snap = await tx.get(ref);
@@ -172,6 +247,12 @@ class AdminRepository {
       title: 'Your account is active again',
       message: 'Welcome back. Your suspension has been lifted.',
       type: 'account_restored',
+    );
+    await _auditWrite(
+      action: 'lift',
+      byStaff: byStaff,
+      targetUserId: uid,
+      targetName: targetName,
     );
   }
 
@@ -219,12 +300,19 @@ class AdminRepository {
     String? note,
     String? reporterId,
     String? reportedUserName,
+    String? byStaff,
   }) async {
     await _reports.doc(reportId).update({
       'status': upheld ? 'resolved' : 'dismissed',
       'resolvedAt': FieldValue.serverTimestamp(),
       if ((note ?? '').trim().isNotEmpty) 'resolutionNote': note!.trim(),
     });
+    await _auditWrite(
+      action: upheld ? 'report_upheld' : 'report_dismissed',
+      byStaff: byStaff,
+      targetName: reportedUserName,
+      detail: note,
+    );
     if (reporterId == null || reporterId.isEmpty) return;
     final who = (reportedUserName ?? '').isEmpty
         ? 'the person'
@@ -281,7 +369,20 @@ class AdminRepository {
     );
   }
 
-  Future<void> setAppealStatus(String appealId, String status) => _appeals
-      .doc(appealId)
-      .update({'status': status, 'reviewedAt': FieldValue.serverTimestamp()});
+  Future<void> setAppealStatus(
+    String appealId,
+    String status, {
+    String? byStaff,
+    String? targetName,
+  }) async {
+    await _appeals.doc(appealId).update({
+      'status': status,
+      'reviewedAt': FieldValue.serverTimestamp(),
+    });
+    await _auditWrite(
+      action: 'appeal_$status',
+      byStaff: byStaff,
+      targetName: targetName,
+    );
+  }
 }

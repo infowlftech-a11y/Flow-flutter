@@ -467,7 +467,14 @@ class _UserSheetBody extends ConsumerWidget {
     if (!sure || !context.mounted) return;
     final until = DateTime.now().add(const Duration(days: 7)).toIso8601String();
     try {
-      await ref.read(adminRepositoryProvider).blockUser(user.uid, until: until);
+      await ref
+          .read(adminRepositoryProvider)
+          .blockUser(
+            user.uid,
+            until: until,
+            byStaff: ref.read(sessionProvider).uid,
+            targetName: user.name,
+          );
       if (context.mounted) {
         Navigator.pop(context);
         showFlowToast(
@@ -493,7 +500,13 @@ class _UserSheetBody extends ConsumerWidget {
     );
     if (!sure || !context.mounted) return;
     try {
-      await ref.read(adminRepositoryProvider).unblockUser(user.uid);
+      await ref
+          .read(adminRepositoryProvider)
+          .unblockUser(
+            user.uid,
+            byStaff: ref.read(sessionProvider).uid,
+            targetName: user.name,
+          );
       if (context.mounted) {
         Navigator.pop(context);
         showFlowToast(context, 'Suspension lifted');

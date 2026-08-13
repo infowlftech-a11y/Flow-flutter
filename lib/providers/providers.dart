@@ -12,6 +12,7 @@ import '../data/models/catalogue.dart';
 import '../data/models/schedule.dart';
 import '../data/models/social.dart';
 import '../data/models/support.dart';
+import '../data/models/audit.dart';
 import '../data/models/report.dart';
 import '../data/models/wind.dart';
 import '../data/repositories/admin_repository.dart';
@@ -805,6 +806,12 @@ final reportsProvider = StreamProvider.autoDispose<List<Report>>((ref) {
 final appealsProvider = StreamProvider.autoDispose<List<Appeal>>((ref) {
   if (!ref.watch(sessionProvider).isStaff) return Stream.value(const []);
   return ref.watch(adminRepositoryProvider).watchAppeals();
+});
+
+/// The accountability trail (P6) — staff-only, like every console stream.
+final auditLogProvider = StreamProvider.autoDispose<List<AuditEntry>>((ref) {
+  if (!ref.watch(sessionProvider).isStaff) return Stream.value(const []);
+  return ref.watch(adminRepositoryProvider).watchAuditLog();
 });
 
 final allTicketsProvider = StreamProvider.autoDispose<List<SupportTicket>>((

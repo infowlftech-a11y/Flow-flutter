@@ -20,6 +20,9 @@ abstract final class Col {
   static const reports = 'reports';
   static const leaveReasons = 'leave_reasons';
   static const safariTrips = 'safari_trips';
+  // P6: append-only staff accountability trail. Written by the console in
+  // the same call as the action it records; immutable by rules.
+  static const auditLog = 'audit_log';
   static const stationInstructors = 'station_instructors'; // users/{id}/…
   static const stationServices = 'station_services'; // users/{id}/…
 }
