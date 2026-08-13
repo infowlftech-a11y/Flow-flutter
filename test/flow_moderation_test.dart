@@ -36,14 +36,21 @@ void main() {
     db = FakeFirebaseFirestore();
     notifications = NotificationRepository(db);
     admin = AdminRepository(db, notifications);
-    support = SupportRepository(db);
+    // P2 (ordered): support gained the notification writer — construction
+    // only, no assertion in this file changed.
+    support = SupportRepository(db, notifications);
     users = UserRepository(db);
 
     for (final (uid, role) in [
-      ('rider1', 'kiter'), ('rider2', 'kiter'), ('trainer1', 'business'),
+      ('rider1', 'kiter'),
+      ('rider2', 'kiter'),
+      ('trainer1', 'business'),
     ]) {
       await db.collection(Col.users).doc(uid).set({
-        'name': uid, 'email': '$uid@test.dev', 'role': role, 'status': 'active',
+        'name': uid,
+        'email': '$uid@test.dev',
+        'role': role,
+        'status': 'active',
       });
     }
   });
@@ -53,12 +60,14 @@ void main() {
     String reported = 'trainer1',
     String reason = 'Safety concerns',
     String? details,
-  }) =>
-      support.reportUser(
-        reporterId: reporter, reporterName: reporter,
-        reportedUserId: reported, reportedUserName: reported,
-        reason: reason, details: details,
-      );
+  }) => support.reportUser(
+    reporterId: reporter,
+    reporterName: reporter,
+    reportedUserId: reported,
+    reportedUserName: reported,
+    reason: reason,
+    details: details,
+  );
 
   /// Reads the profile with a direct `get`, not `watchUser(...).first`.
   ///
@@ -95,14 +104,19 @@ void main() {
       expect(all.map((d) => d.data()['details']), contains(''));
     });
 
-    test('the reported user is not notified — they must not learn of it',
-        () async {
-      await fileReport();
+    test(
+      'the reported user is not notified — they must not learn of it',
+      () async {
+        await fileReport();
 
-      expect(await notifications.watchFor('trainer1').first, isEmpty,
-          reason: '§3.12: you cannot discover that you have been reported');
-      expect(await notifications.watchFor('rider1').first, isEmpty);
-    });
+        expect(
+          await notifications.watchFor('trainer1').first,
+          isEmpty,
+          reason: '§3.12: you cannot discover that you have been reported',
+        );
+        expect(await notifications.watchFor('rider1').first, isEmpty);
+      },
+    );
 
     test('two riders can report the same person independently', () async {
       await fileReport(reporter: 'rider1');
@@ -116,8 +130,10 @@ void main() {
     test('the queue is newest first', () async {
       for (var i = 0; i < 3; i++) {
         await db.collection(Col.reports).add({
-          'reporterId': 'rider1', 'reportedUserId': 'trainer1',
-          'reason': 'Other', 'status': 'pending',
+          'reporterId': 'rider1',
+          'reportedUserId': 'trainer1',
+          'reason': 'Other',
+          'status': 'pending',
           'createdAt': Timestamp.fromDate(DateTime(2026, 1, i + 1)),
         });
       }
@@ -147,8 +163,7 @@ void main() {
       final r = (await admin.watchReports().first).single;
       await admin.closeReport(r.id, upheld: false);
 
-      expect((await admin.watchReports().first).single.status,
-          'dismissed');
+      expect((await admin.watchReports().first).single.status, 'dismissed');
     });
 
     test('a blank note leaves no empty resolutionNote behind', () async {
@@ -165,8 +180,11 @@ void main() {
       final r = (await admin.watchReports().first).single;
       await admin.closeReport(r.id, upheld: true);
 
-      expect((await profile('trainer1')).status, AccountStatus.active,
-          reason: 'upholding a report and blocking are separate acts');
+      expect(
+        (await profile('trainer1')).status,
+        AccountStatus.active,
+        reason: 'upholding a report and blocking are separate acts',
+      );
     });
   });
 
@@ -190,10 +208,16 @@ void main() {
       await admin.blockUser('rider1', until: '2020-01-01');
 
       final u = await profile('rider1');
-      expect(u.status, AccountStatus.blocked,
-          reason: 'the stored status does not change by itself');
-      expect(u.isBlockInForce, isFalse,
-          reason: 'but the gate stops holding them, with no admin action');
+      expect(
+        u.status,
+        AccountStatus.blocked,
+        reason: 'the stored status does not change by itself',
+      );
+      expect(
+        u.isBlockInForce,
+        isFalse,
+        reason: 'but the gate stops holding them, with no admin action',
+      );
     });
 
     test('forever never lapses', () async {
@@ -204,14 +228,16 @@ void main() {
     test('an unparseable date fails closed — a malformed value is not a way '
         'out', () async {
       await db.collection(Col.users).doc('rider1').update({
-        'status': 'blocked', 'blockedUntil': 'next tuesday',
+        'status': 'blocked',
+        'blockedUntil': 'next tuesday',
       });
       expect((await profile('rider1')).isBlockInForce, isTrue);
     });
 
     test('a blocked status with no date at all fails closed', () async {
-      await db.collection(Col.users).doc('rider1')
-          .update({'status': 'blocked'});
+      await db.collection(Col.users).doc('rider1').update({
+        'status': 'blocked',
+      });
       expect((await profile('rider1')).isBlockInForce, isTrue);
     });
 
@@ -244,20 +270,25 @@ void main() {
   group('the appeal round trip', () {
     Future<String> appealFrom(String uid) async {
       await support.submitAppeal(
-          userId: uid, userName: uid, reason: 'It was not me');
+        userId: uid,
+        userName: uid,
+        reason: 'It was not me',
+      );
       return (await admin.watchAppeals().first).single.id;
     }
 
-    test('a suspended user can file one — the account is suspended, not gone',
-        () async {
-      await admin.blockUser('rider1', until: 'forever');
-      await appealFrom('rider1');
+    test(
+      'a suspended user can file one — the account is suspended, not gone',
+      () async {
+        await admin.blockUser('rider1', until: 'forever');
+        await appealFrom('rider1');
 
-      final mine = await support.watchMyAppeal('rider1').first;
-      expect(mine, isNotNull);
-      expect(mine!.status, 'pending');
-      expect(mine.messages, isEmpty);
-    });
+        final mine = await support.watchMyAppeal('rider1').first;
+        expect(mine, isNotNull);
+        expect(mine!.status, 'pending');
+        expect(mine.messages, isEmpty);
+      },
+    );
 
     test('it reaches the admin queue', () async {
       await appealFrom('rider1');
@@ -272,17 +303,44 @@ void main() {
     test('both sides append without overwriting each other (§6.3)', () async {
       final id = await appealFrom('rider1');
 
-      await support.replyToAppeal(id,
-          const AppealMessage(id: 'm', senderId: 'rider1', senderName: 'rider1', text: 'Any news?'));
-      await admin.replyToAppeal(id,
-          const AppealMessage(id: 'm', senderId: 'admin', senderName: 'Admin', text: 'Reviewing it now.'));
-      await support.replyToAppeal(id,
-          const AppealMessage(id: 'm', senderId: 'rider1', senderName: 'rider1', text: 'Thank you.'));
+      await support.replyToAppeal(
+        id,
+        const AppealMessage(
+          id: 'm',
+          senderId: 'rider1',
+          senderName: 'rider1',
+          text: 'Any news?',
+        ),
+      );
+      await admin.replyToAppeal(
+        id,
+        const AppealMessage(
+          id: 'm',
+          senderId: 'admin',
+          senderName: 'Admin',
+          text: 'Reviewing it now.',
+        ),
+      );
+      await support.replyToAppeal(
+        id,
+        const AppealMessage(
+          id: 'm',
+          senderId: 'rider1',
+          senderName: 'rider1',
+          text: 'Thank you.',
+        ),
+      );
 
       final thread = (await support.watchMyAppeal('rider1').first)!.messages;
-      expect(thread, hasLength(3),
-          reason: 'arrayUnion, so a concurrent reply is not dropped');
-      expect([for (final m in thread) m.senderId], ['rider1', 'admin', 'rider1']);
+      expect(
+        thread,
+        hasLength(3),
+        reason: 'arrayUnion, so a concurrent reply is not dropped',
+      );
+      expect(
+        [for (final m in thread) m.senderId],
+        ['rider1', 'admin', 'rider1'],
+      );
     });
 
     // arrayUnion de-duplicates by value on real Firestore, so a user sending
@@ -290,114 +348,163 @@ void main() {
     // lost message. fake_cloud_firestore appends both, so the claim cannot be
     // settled here; it is verified in test_rules/arrays.test.mjs instead.
 
-    test('the admin decides, and the decision is visible to the user',
-        () async {
-      final id = await appealFrom('rider1');
-      await admin.setAppealStatus(id, 'rejected');
+    test(
+      'the admin decides, and the decision is visible to the user',
+      () async {
+        final id = await appealFrom('rider1');
+        await admin.setAppealStatus(id, 'rejected');
 
-      expect((await support.watchMyAppeal('rider1').first)!.status, 'rejected');
-      final raw = (await db.collection(Col.appeals).doc(id).get()).data()!;
-      expect(raw['reviewedAt'], isNotNull);
-    });
+        expect(
+          (await support.watchMyAppeal('rider1').first)!.status,
+          'rejected',
+        );
+        final raw = (await db.collection(Col.appeals).doc(id).get()).data()!;
+        expect(raw['reviewedAt'], isNotNull);
+      },
+    );
 
     test('accepting an appeal does not lift the block by itself', () async {
       await admin.blockUser('rider1', until: 'forever');
       final id = await appealFrom('rider1');
       await admin.setAppealStatus(id, 'accepted');
 
-      expect((await profile('rider1')).status, AccountStatus.blocked,
-          reason: 'the appeal records the decision; unblockUser enacts it');
-      expect((await profile('rider1')).isBlockInForce, isTrue);
-    });
-
-    test('the full round trip: report -> block -> appeal -> accept -> unblock',
-        () async {
-      await fileReport(reporter: 'rider2', reported: 'rider1');
-      final report = (await admin.watchReports().first).single;
-
-      await admin.blockUser('rider1', until: 'forever');
-      await admin.closeReport(report.id, upheld: true, note: 'Blocked');
-      expect((await profile('rider1')).isBlockInForce, isTrue);
-
-      final appeal = await appealFrom('rider1');
-      await admin.replyToAppeal(appeal,
-          const AppealMessage(id: 'm', senderId: 'admin', senderName: 'Admin', text: 'Understood.'));
-      await admin.setAppealStatus(appeal, 'accepted');
-      await admin.unblockUser('rider1');
-
-      final restored = await profile('rider1');
-      expect(restored.status, AccountStatus.active);
-      // The gate is the *conjunction* (providers.dart:177), and only the
-      // conjunction is meaningful: with blockedUntil cleared, isBlockInForce
-      // on its own reads true, because it fails closed on a missing date.
       expect(
-          restored.status == AccountStatus.blocked && restored.isBlockInForce,
-          isFalse);
-      expect((await admin.watchReports().first).single.status,
-          'resolved');
-      expect((await support.watchMyAppeal('rider1').first)!.status, 'accepted');
+        (await profile('rider1')).status,
+        AccountStatus.blocked,
+        reason: 'the appeal records the decision; unblockUser enacts it',
+      );
+      expect((await profile('rider1')).isBlockInForce, isTrue);
     });
+
+    test(
+      'the full round trip: report -> block -> appeal -> accept -> unblock',
+      () async {
+        await fileReport(reporter: 'rider2', reported: 'rider1');
+        final report = (await admin.watchReports().first).single;
+
+        await admin.blockUser('rider1', until: 'forever');
+        await admin.closeReport(report.id, upheld: true, note: 'Blocked');
+        expect((await profile('rider1')).isBlockInForce, isTrue);
+
+        final appeal = await appealFrom('rider1');
+        await admin.replyToAppeal(
+          appeal,
+          const AppealMessage(
+            id: 'm',
+            senderId: 'admin',
+            senderName: 'Admin',
+            text: 'Understood.',
+          ),
+        );
+        await admin.setAppealStatus(appeal, 'accepted');
+        await admin.unblockUser('rider1');
+
+        final restored = await profile('rider1');
+        expect(restored.status, AccountStatus.active);
+        // The gate is the *conjunction* (providers.dart:177), and only the
+        // conjunction is meaningful: with blockedUntil cleared, isBlockInForce
+        // on its own reads true, because it fails closed on a missing date.
+        expect(
+          restored.status == AccountStatus.blocked && restored.isBlockInForce,
+          isFalse,
+        );
+        expect((await admin.watchReports().first).single.status, 'resolved');
+        expect(
+          (await support.watchMyAppeal('rider1').first)!.status,
+          'accepted',
+        );
+      },
+    );
   });
 
   group('adversarial — moderation state under pressure', () {
-    test('a report about an account that has since been deleted still reads',
-        () async {
-      await fileReport(reported: 'trainer1');
-      await users.deleteProfile('trainer1');
+    test(
+      'a report about an account that has since been deleted still reads',
+      () async {
+        await fileReport(reported: 'trainer1');
+        await users.deleteProfile('trainer1');
 
-      final r = (await admin.watchReports().first).single;
-      expect(r.reportedUserName, 'trainer1',
-          reason: 'the name is denormalised so the queue survives deletion');
-    });
+        final r = (await admin.watchReports().first).single;
+        expect(
+          r.reportedUserName,
+          'trainer1',
+          reason: 'the name is denormalised so the queue survives deletion',
+        );
+      },
+    );
 
     // "blocking an account that no longer exists throws" cannot be settled
     // here either: real Firestore rejects a transactional update of a missing
     // document with NOT_FOUND, fake_cloud_firestore accepts it and creates
     // one. Verified in test_rules/arrays.test.mjs.
 
-    test('a second appeal while one is pending is refused (BUG-016)',
-        () async {
+    test('a second appeal while one is pending is refused (BUG-016)', () async {
       // Two open appeals meant the user's screen (limit 1) and the admin
       // queue could be looking at different documents: staff answer the one
       // the user cannot see, and the thread appears dead from both ends.
       await support.submitAppeal(
-          userId: 'rider1', userName: 'rider1', reason: 'First');
+        userId: 'rider1',
+        userName: 'rider1',
+        reason: 'First',
+      );
       await expectLater(
         () => support.submitAppeal(
-            userId: 'rider1', userName: 'rider1', reason: 'Second'),
+          userId: 'rider1',
+          userName: 'rider1',
+          reason: 'Second',
+        ),
         throwsA(isA<DuplicateAppealFailure>()),
       );
 
-      expect(await admin.watchAppeals().first, hasLength(1),
-          reason: 'the refusal must happen before the write');
+      expect(
+        await admin.watchAppeals().first,
+        hasLength(1),
+        reason: 'the refusal must happen before the write',
+      );
     });
 
     test('a fresh appeal is allowed once the last one was decided', () async {
       // A user suspended a second time must be able to appeal a second time
       // — the guard is per open case, not per lifetime.
       await support.submitAppeal(
-          userId: 'rider1', userName: 'rider1', reason: 'First');
+        userId: 'rider1',
+        userName: 'rider1',
+        reason: 'First',
+      );
       final first = (await admin.watchAppeals().first).single.id;
       await admin.setAppealStatus(first, 'rejected');
 
       await support.submitAppeal(
-          userId: 'rider1', userName: 'rider1', reason: 'Second suspension');
+        userId: 'rider1',
+        userName: 'rider1',
+        reason: 'Second suspension',
+      );
 
       expect(await admin.watchAppeals().first, hasLength(2));
-      expect((await support.watchMyAppeal('rider1').first)!.reason,
-          'Second suspension',
-          reason: 'watchMyAppeal surfaces the most recent — the open one');
+      expect(
+        (await support.watchMyAppeal('rider1').first)!.reason,
+        'Second suspension',
+        reason: 'watchMyAppeal surfaces the most recent — the open one',
+      );
     });
 
-    test("one user's pending appeal does not lock out another user's",
-        () async {
-      await support.submitAppeal(
-          userId: 'rider1', userName: 'rider1', reason: 'Mine');
-      await support.submitAppeal(
-          userId: 'rider2', userName: 'rider2', reason: 'Also mine');
+    test(
+      "one user's pending appeal does not lock out another user's",
+      () async {
+        await support.submitAppeal(
+          userId: 'rider1',
+          userName: 'rider1',
+          reason: 'Mine',
+        );
+        await support.submitAppeal(
+          userId: 'rider2',
+          userName: 'rider2',
+          reason: 'Also mine',
+        );
 
-      expect(await admin.watchAppeals().first, hasLength(2));
-    });
+        expect(await admin.watchAppeals().first, hasLength(2));
+      },
+    );
 
     test('closing the same report twice is not an error', () async {
       await fileReport();
@@ -405,9 +512,98 @@ void main() {
       await admin.closeReport(r.id, upheld: true);
       await admin.closeReport(r.id, upheld: false);
 
-      expect((await admin.watchReports().first).single.status,
-          'dismissed',
-          reason: 'last write wins; there is no guard on re-deciding');
+      expect(
+        (await admin.watchReports().first).single.status,
+        'dismissed',
+        reason: 'last write wins; there is no guard on re-deciding',
+      );
+    });
+  });
+
+  // ── P2: the reporter hears the outcome; the appellant hears the reply ──
+  //
+  // A report used to resolve into a collection its author cannot read, so
+  // from the reporter's side every complaint simply vanished. The reporter
+  // still cannot read the report — the notification is the one and only
+  // thing that comes back, and it carries no more than the decision.
+  group('P2 — moderation outcomes notify the people waiting on them', () {
+    Future<List<Map<String, dynamic>>> notificationsOf(String type) async => [
+      for (final d in (await db.collection(Col.notifications).get()).docs)
+        if (d.data()['type'] == type) d.data(),
+    ];
+
+    test('an upheld report tells the reporter action was taken', () async {
+      await fileReport();
+      final r = (await admin.watchReports().first).single;
+      await admin.closeReport(
+        r.id,
+        upheld: true,
+        note: 'Suspended 7 days',
+        reporterId: r.reporterId,
+        reportedUserName: r.reportedUserName,
+      );
+
+      final n = (await notificationsOf('report_update')).single;
+      expect(n['targetUserId'], 'rider1');
+      expect(n['message'], contains('acted on it'));
+      expect(
+        n['message'],
+        contains('Suspended 7 days'),
+        reason: 'the closing note is the human half of the outcome',
+      );
+    });
+
+    test('a dismissal says reviewed, not ignored', () async {
+      await fileReport();
+      final r = (await admin.watchReports().first).single;
+      await admin.closeReport(
+        r.id,
+        upheld: false,
+        reporterId: r.reporterId,
+        reportedUserName: r.reportedUserName,
+      );
+
+      final n = (await notificationsOf('report_update')).single;
+      expect(n['targetUserId'], 'rider1');
+      expect(n['message'], contains('did not find grounds'));
+    });
+
+    test('closing without a reporter id notifies nobody', () async {
+      await fileReport();
+      final r = (await admin.watchReports().first).single;
+      await admin.closeReport(r.id, upheld: true);
+
+      expect(
+        await notificationsOf('report_update'),
+        isEmpty,
+        reason:
+            'the old signature must stay a pure close — callers that '
+            'cannot name the reporter must not write a broken notification',
+      );
+    });
+
+    test('a staff appeal reply reaches the suspended account', () async {
+      await support.submitAppeal(
+        userId: 'rider1',
+        userName: 'rider1',
+        reason: 'Please',
+      );
+      final appeal = (await admin.watchAppeals().first).single;
+      await admin.replyToAppeal(
+        appeal.id,
+        notifyUserId: 'rider1',
+        AppealMessage(
+          id: '1',
+          senderId: 'admin1',
+          senderName: 'Flow Support',
+          text: 'We are looking into it today.',
+          timestamp: DateTime(2026, 8, 13),
+        ),
+      );
+
+      final n = (await notificationsOf('appeal_update')).single;
+      expect(n['targetUserId'], 'rider1');
+      expect(n['message'], 'We are looking into it today.');
     });
   });
 }

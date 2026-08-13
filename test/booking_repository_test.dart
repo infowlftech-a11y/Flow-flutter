@@ -15,6 +15,7 @@ import 'package:flow/core/utils/date_x.dart';
 import 'package:flow/data/firestore_paths.dart';
 import 'package:flow/data/models/booking.dart';
 import 'package:flow/data/models/catalogue.dart';
+import 'package:flow/data/models/payment.dart';
 import 'package:flow/data/models/social.dart';
 import 'package:flow/data/repositories/booking_repository.dart';
 import 'package:flow/data/repositories/notification_repository.dart';
@@ -33,8 +34,8 @@ void main() {
   // A date far enough out that no lead-time rule can touch it.
   const day = '2099-06-15';
 
-  BookingTarget target({double rate = 50}) => BookingTarget(
-      providerId: 'trainer1', title: 'Anna', rate: rate);
+  BookingTarget target({double rate = 50}) =>
+      BookingTarget(providerId: 'trainer1', title: 'Anna', rate: rate);
 
   Future<String> create({List<String> hours = const ['10:00', '11:00']}) =>
       repo.createBooking(
@@ -48,25 +49,37 @@ void main() {
       );
 
   group('createBooking', () {
-    test('writes the canonical shape, pending, with the payment held', () async {
-      final id = await create();
-      final doc = (await db.collection(Col.bookings).doc(id).get()).data()!;
-      expect(doc['status'], 'pending',
-          reason: 'every rider booking starts pending — no instant booking');
-      expect(doc['selectedTimes'], ['10:00', '11:00']);
-      expect(doc['durationHours'], 2);
-      expect(doc['totalPrice'], 100);
-      // P1 (FLOW_REDESIGN.md): the rider pays FLOW at booking. This asserted
-      // 'unpaid' through the cash era; the escrow order flipped it.
-      expect(doc['paymentStatus'], 'held');
-      expect(doc['paymentMethod'], 'app');
-      expect(doc['paidAt'], isNotNull,
-          reason: 'the hold instant is the receipt');
-      expect(doc['amountDue'], 100,
-          reason: 'the amount is captured at booking time, not derived later');
-      final b = Booking.fromDoc(id, doc);
-      expect(b.timeRange, '10:00–12:00');
-    });
+    test(
+      'writes the canonical shape, pending, with the payment held',
+      () async {
+        final id = await create();
+        final doc = (await db.collection(Col.bookings).doc(id).get()).data()!;
+        expect(
+          doc['status'],
+          'pending',
+          reason: 'every rider booking starts pending — no instant booking',
+        );
+        expect(doc['selectedTimes'], ['10:00', '11:00']);
+        expect(doc['durationHours'], 2);
+        expect(doc['totalPrice'], 100);
+        // P1 (FLOW_REDESIGN.md): the rider pays FLOW at booking. This asserted
+        // 'unpaid' through the cash era; the escrow order flipped it.
+        expect(doc['paymentStatus'], 'held');
+        expect(doc['paymentMethod'], 'app');
+        expect(
+          doc['paidAt'],
+          isNotNull,
+          reason: 'the hold instant is the receipt',
+        );
+        expect(
+          doc['amountDue'],
+          100,
+          reason: 'the amount is captured at booking time, not derived later',
+        );
+        final b = Booking.fromDoc(id, doc);
+        expect(b.timeRange, '10:00–12:00');
+      },
+    );
 
     test('notifies the trainer', () async {
       final id = await create();
@@ -85,17 +98,15 @@ void main() {
       await create(hours: const ['10:00', '11:00']);
       expect(
         () => create(hours: const ['11:00', '12:00']),
-        throwsA(isA<SlotTakenFailure>()
-            .having((f) => f.slots, 'slots', ['11:00'])),
+        throwsA(
+          isA<SlotTakenFailure>().having((f) => f.slots, 'slots', ['11:00']),
+        ),
       );
     });
 
     test('a cancelled booking releases its hours', () async {
       final id = await create(hours: const ['10:00']);
-      await db
-          .collection(Col.bookings)
-          .doc(id)
-          .update({'status': 'cancelled'});
+      await db.collection(Col.bookings).doc(id).update({'status': 'cancelled'});
       await expectLater(create(hours: const ['10:00']), completes);
     });
 
@@ -125,56 +136,83 @@ void main() {
 
   group('safari seats', () {
     SafariTrip trip({int capacity = 2, int booked = 0}) => SafariTrip(
-        id: 'trip1',
-        hostId: 'host1',
-        title: 'Sunset downwinder',
-        startDate: day,
-        price: 95,
-        capacity: capacity,
-        bookedSeats: booked);
+      id: 'trip1',
+      hostId: 'host1',
+      title: 'Sunset downwinder',
+      startDate: day,
+      price: 95,
+      capacity: capacity,
+      bookedSeats: booked,
+    );
 
-    Future<void> seedTrip({int capacity = 2, int booked = 0}) =>
-        db.collection(Col.safariTrips).doc('trip1').set({
-          'capacity': capacity,
-          'bookedSeats': booked,
-          'status': 'open',
-        });
+    Future<void> seedTrip({int capacity = 2, int booked = 0}) => db
+        .collection(Col.safariTrips)
+        .doc('trip1')
+        .set({'capacity': capacity, 'bookedSeats': booked, 'status': 'open'});
 
     test('reserving counts the seat and holds the payment', () async {
       await seedTrip();
       await repo.reserveSafariSeat(
-          trip: trip(), hostName: 'Red Sea Co.', riderUid: 'r1', riderName: 'S');
-      final t = (await db.collection(Col.safariTrips).doc('trip1').get()).data()!;
+        trip: trip(),
+        hostName: 'Red Sea Co.',
+        riderUid: 'r1',
+        riderName: 'S',
+      );
+      final t = (await db.collection(Col.safariTrips).doc('trip1').get())
+          .data()!;
       expect(t['bookedSeats'], 1);
       expect(t['status'], 'open');
       final b = (await db.collection(Col.bookings).get()).docs.single.data();
       expect(b['type'], 'safari');
-      expect(b['paymentStatus'], 'held',
-          reason: 'a seat is escrow like a lesson (P1) — paid to FLOW at '
-              'reservation, never marked settled to the host at creation');
-    });
-
-    test('the last seat flips the trip to full; the next rider bounces',
-        () async {
-      await seedTrip(capacity: 2, booked: 1);
-      await repo.reserveSafariSeat(
-          trip: trip(), hostName: 'H', riderUid: 'r1', riderName: 'S');
-      final t = (await db.collection(Col.safariTrips).doc('trip1').get()).data()!;
-      expect(t['status'], 'full');
       expect(
-        () => repo.reserveSafariSeat(
-            trip: trip(), hostName: 'H', riderUid: 'r2', riderName: 'T'),
-        throwsA(isA<SlotTakenFailure>()),
+        b['paymentStatus'],
+        'held',
+        reason:
+            'a seat is escrow like a lesson (P1) — paid to FLOW at '
+            'reservation, never marked settled to the host at creation',
       );
     });
+
+    test(
+      'the last seat flips the trip to full; the next rider bounces',
+      () async {
+        await seedTrip(capacity: 2, booked: 1);
+        await repo.reserveSafariSeat(
+          trip: trip(),
+          hostName: 'H',
+          riderUid: 'r1',
+          riderName: 'S',
+        );
+        final t = (await db.collection(Col.safariTrips).doc('trip1').get())
+            .data()!;
+        expect(t['status'], 'full');
+        expect(
+          () => repo.reserveSafariSeat(
+            trip: trip(),
+            hostName: 'H',
+            riderUid: 'r2',
+            riderName: 'T',
+          ),
+          throwsA(isA<SlotTakenFailure>()),
+        );
+      },
+    );
 
     test('an uncapped trip never reports full', () async {
       await seedTrip(capacity: 0);
       await repo.reserveSafariSeat(
-          trip: trip(capacity: 0), hostName: 'H', riderUid: 'r1', riderName: 'S');
-      final t = (await db.collection(Col.safariTrips).doc('trip1').get()).data()!;
-      expect(t['status'], 'open',
-          reason: 'capacity 0 means uncapped — 1 >= 0 must not read as full');
+        trip: trip(capacity: 0),
+        hostName: 'H',
+        riderUid: 'r1',
+        riderName: 'S',
+      );
+      final t = (await db.collection(Col.safariTrips).doc('trip1').get())
+          .data()!;
+      expect(
+        t['status'],
+        'open',
+        reason: 'capacity 0 means uncapped — 1 >= 0 must not read as full',
+      );
     });
 
     test('capacity stored as a string still guards the seat', () async {
@@ -184,7 +222,11 @@ void main() {
       });
       expect(
         () => repo.reserveSafariSeat(
-            trip: trip(capacity: 1), hostName: 'H', riderUid: 'r', riderName: 'S'),
+          trip: trip(capacity: 1),
+          hostName: 'H',
+          riderUid: 'r',
+          riderName: 'S',
+        ),
         throwsA(isA<SlotTakenFailure>()),
         reason: 'tolerant readers inside the transaction, not raw casts',
       );
@@ -193,128 +235,231 @@ void main() {
 
   group('cancelByRider on a safari', () {
     Booking safariBooking(String id) => Booking(
-        id: id,
-        date: day,
-        status: BookingStatus.confirmed,
-        instructorId: 'host1',
-        instructorName: 'H',
-        kiterId: 'r1',
-        studentName: 'S',
-        type: 'safari',
-        tripId: 'trip1');
+      id: id,
+      date: day,
+      status: BookingStatus.confirmed,
+      instructorId: 'host1',
+      instructorName: 'H',
+      kiterId: 'r1',
+      studentName: 'S',
+      type: 'safari',
+      tripId: 'trip1',
+    );
 
     test('releases the seat and reopens the trip', () async {
-      await db
-          .collection(Col.safariTrips)
-          .doc('trip1')
-          .set({'capacity': 2, 'bookedSeats': 2, 'status': 'full'});
+      await db.collection(Col.safariTrips).doc('trip1').set({
+        'capacity': 2,
+        'bookedSeats': 2,
+        'status': 'full',
+      });
       await db.collection(Col.bookings).doc('b1').set({'status': 'confirmed'});
       await repo.cancelByRider(safariBooking('b1'));
-      final t = (await db.collection(Col.safariTrips).doc('trip1').get()).data()!;
+      final t = (await db.collection(Col.safariTrips).doc('trip1').get())
+          .data()!;
       expect(t['bookedSeats'], 1);
       expect(t['status'], 'open');
     });
 
     test('a double cancel floors the count at zero', () async {
-      await db
-          .collection(Col.safariTrips)
-          .doc('trip1')
-          .set({'capacity': 2, 'bookedSeats': 1, 'status': 'open'});
+      await db.collection(Col.safariTrips).doc('trip1').set({
+        'capacity': 2,
+        'bookedSeats': 1,
+        'status': 'open',
+      });
       await db.collection(Col.bookings).doc('b1').set({'status': 'confirmed'});
       await repo.cancelByRider(safariBooking('b1'));
-      await repo.cancelByRider(safariBooking('b1')); // retry that already landed
-      final t = (await db.collection(Col.safariTrips).doc('trip1').get()).data()!;
-      expect(t['bookedSeats'], 0,
-          reason: 'a negative count over-reports free seats forever');
+      await repo.cancelByRider(
+        safariBooking('b1'),
+      ); // retry that already landed
+      final t = (await db.collection(Col.safariTrips).doc('trip1').get())
+          .data()!;
+      expect(
+        t['bookedSeats'],
+        0,
+        reason: 'a negative count over-reports free seats forever',
+      );
     });
   });
 
   group('settlement', () {
-    Future<void> seedBooking(String id,
-            {String trainer = 'trainer1', String payment = 'unpaid'}) =>
-        db.collection(Col.bookings).doc(id).set({
-          'instructorId': trainer,
-          'status': 'completed',
-          'paymentStatus': payment,
-        });
+    Future<void> seedBooking(
+      String id, {
+      String trainer = 'trainer1',
+      String payment = 'unpaid',
+    }) => db.collection(Col.bookings).doc(id).set({
+      'instructorId': trainer,
+      'status': 'completed',
+      'paymentStatus': payment,
+    });
 
     test('markPaid settles, and settling twice is not an error', () async {
       await seedBooking('b1');
       await repo.markPaid('b1', trainerId: 'trainer1');
-      final first =
-          (await db.collection(Col.bookings).doc('b1').get()).data()!;
+      final first = (await db.collection(Col.bookings).doc('b1').get()).data()!;
       expect(first['paymentStatus'], 'paid');
       final firstPaidAt = first['paidAt'];
       await repo.markPaid('b1', trainerId: 'trainer1');
-      final second =
-          (await db.collection(Col.bookings).doc('b1').get()).data()!;
-      expect(second['paidAt'], firstPaidAt,
-          reason: 'a double tap must not overwrite when the money arrived');
+      final second = (await db.collection(Col.bookings).doc('b1').get())
+          .data()!;
+      expect(
+        second['paidAt'],
+        firstPaidAt,
+        reason: 'a double tap must not overwrite when the money arrived',
+      );
     });
 
     test('only the owning trainer can settle or refund', () async {
       await seedBooking('b1');
-      expect(() => repo.markPaid('b1', trainerId: 'intruder'),
-          throwsA(isA<PaymentFailure>()));
-      expect(() => repo.markRefunded('b1', trainerId: 'intruder'),
-          throwsA(isA<PaymentFailure>()));
+      expect(
+        () => repo.markPaid('b1', trainerId: 'intruder'),
+        throwsA(isA<PaymentFailure>()),
+      );
+      expect(
+        () => repo.markRefunded('b1', trainerId: 'intruder'),
+        throwsA(isA<PaymentFailure>()),
+      );
     });
 
     test('a refunded session refuses payment until reopened', () async {
       await seedBooking('b1', payment: 'refunded');
-      expect(() => repo.markPaid('b1', trainerId: 'trainer1'),
-          throwsA(isA<PaymentFailure>()));
+      expect(
+        () => repo.markPaid('b1', trainerId: 'trainer1'),
+        throwsA(isA<PaymentFailure>()),
+      );
     });
 
-    test('a refund keeps the paid timestamp — two events, one ledger',
-        () async {
-      await seedBooking('b1', payment: 'paid');
-      await db
-          .collection(Col.bookings)
-          .doc('b1')
-          .update({'paidAt': DateTime(2026, 1, 1)});
-      await repo.markRefunded('b1', trainerId: 'trainer1');
-      final doc = (await db.collection(Col.bookings).doc('b1').get()).data()!;
-      expect(doc['paymentStatus'], 'refunded');
-      expect(doc['paidAt'], isNotNull);
-    });
+    test(
+      'a refund keeps the paid timestamp — two events, one ledger',
+      () async {
+        await seedBooking('b1', payment: 'paid');
+        await db.collection(Col.bookings).doc('b1').update({
+          'paidAt': DateTime(2026, 1, 1),
+        });
+        await repo.markRefunded('b1', trainerId: 'trainer1');
+        final doc = (await db.collection(Col.bookings).doc('b1').get()).data()!;
+        expect(doc['paymentStatus'], 'refunded');
+        expect(doc['paidAt'], isNotNull);
+      },
+    );
 
     test('a vanished booking is a named failure, not a crash', () async {
-      expect(() => repo.markPaid('ghost', trainerId: 't'),
-          throwsA(isA<PaymentFailure>()));
+      expect(
+        () => repo.markPaid('ghost', trainerId: 't'),
+        throwsA(isA<PaymentFailure>()),
+      );
     });
 
     // ── P1: escrow bookings are settled by FLOW, not on the beach ─────────
 
-    test('markPaid refuses a held booking — nothing to collect in person',
-        () async {
-      await seedBooking('b1', payment: 'held');
-      expect(() => repo.markPaid('b1', trainerId: 'trainer1'),
-          throwsA(isA<PaymentFailure>()));
-      final doc = (await db.collection(Col.bookings).doc('b1').get()).data()!;
-      expect(doc['paymentStatus'], 'held',
-          reason: 'a refused settlement must not half-write');
-    });
+    test(
+      'markPaid refuses a held booking — nothing to collect in person',
+      () async {
+        await seedBooking('b1', payment: 'held');
+        expect(
+          () => repo.markPaid('b1', trainerId: 'trainer1'),
+          throwsA(isA<PaymentFailure>()),
+        );
+        final doc = (await db.collection(Col.bookings).doc('b1').get()).data()!;
+        expect(
+          doc['paymentStatus'],
+          'held',
+          reason: 'a refused settlement must not half-write',
+        );
+      },
+    );
 
     test('a rider cancel stamps who and when — the policy inputs', () async {
       final id = await create();
-      final before =
-          (await db.collection(Col.bookings).doc(id).get()).data()!;
+      final before = (await db.collection(Col.bookings).doc(id).get()).data()!;
       await repo.cancelByRider(Booking.fromDoc(id, before));
       final doc = (await db.collection(Col.bookings).doc(id).get()).data()!;
       expect(doc['cancelledBy'], 'user');
-      expect(doc['cancelledAt'], isNotNull,
-          reason: 'the free-cancel window is judged against this stamp');
+      expect(
+        doc['cancelledAt'],
+        isNotNull,
+        reason: 'the free-cancel window is judged against this stamp',
+      );
     });
 
     test('a provider cancel stamps itself too — it always refunds', () async {
       final id = await create();
       final doc0 = (await db.collection(Col.bookings).doc(id).get()).data()!;
-      await repo.setStatus(
-          Booking.fromDoc(id, doc0), BookingStatus.cancelled);
+      await repo.setStatus(Booking.fromDoc(id, doc0), BookingStatus.cancelled);
       final doc = (await db.collection(Col.bookings).doc(id).get()).data()!;
       expect(doc['cancelledBy'], 'provider');
       expect(doc['cancelledAt'], isNotNull);
+    });
+  });
+
+  // ── P2: the cancel warning quotes the money outcome ──────────────────────
+  //
+  // The trainer's first question on "Rider cancelled ⚠️" is what it does to
+  // their hours and their money. The notification derives the answer exactly
+  // the way the ledger does (P1): CancellationPolicy.preview at the instant
+  // of the cancel.
+  group('P2 — the rider-cancel notification tells the trainer the outcome', () {
+    Booking held({required String date, required String startTime}) => Booking(
+      id: 'bx',
+      date: date,
+      status: BookingStatus.confirmed,
+      instructorId: 'trainer1',
+      instructorName: 'Anna',
+      kiterId: 'rider1',
+      studentName: 'Seif',
+      startTime: startTime,
+      payment: const PaymentInfo(
+        status: PaymentStatus.held,
+        method: PaymentMethod.app,
+        amount: 100,
+      ),
+    );
+
+    Future<String> trainerMessage() async {
+      final docs = (await db.collection(Col.notifications).get()).docs;
+      return [
+            for (final d in docs)
+              if (d.data()['targetUserId'] == 'trainer1') d.data()['message'],
+          ].single
+          as String;
+    }
+
+    test('inside 24 h: still paid out', () async {
+      final start = DateTime.now().add(const Duration(hours: 2));
+      await db.collection(Col.bookings).doc('bx').set({'status': 'confirmed'});
+      await repo.cancelByRider(
+        held(
+          date: ymd(start),
+          startTime: '${start.hour.toString().padLeft(2, '0')}:00',
+        ),
+      );
+      expect(await trainerMessage(), contains('still paid out to you'));
+    });
+
+    test('outside the window: rider refunded, hours open', () async {
+      await db.collection(Col.bookings).doc('bx').set({'status': 'confirmed'});
+      await repo.cancelByRider(held(date: day, startTime: '10:00'));
+      final message = await trainerMessage();
+      expect(message, contains('refunded'));
+      expect(message, contains('open again'));
+    });
+
+    test('a cash-era booking says nothing about money', () async {
+      await db.collection(Col.bookings).doc('bx').set({'status': 'confirmed'});
+      await repo.cancelByRider(
+        Booking(
+          id: 'bx',
+          date: day,
+          status: BookingStatus.confirmed,
+          instructorId: 'trainer1',
+          instructorName: 'Anna',
+          kiterId: 'rider1',
+          studentName: 'Seif',
+          startTime: '10:00',
+        ),
+      );
+      final message = await trainerMessage();
+      expect(message, isNot(contains('paid')));
+      expect(message, isNot(contains('refunded')));
     });
   });
 
@@ -337,8 +482,10 @@ void main() {
 
     test('someone else’s ticket bounces before any state is read', () async {
       await seed('confirmed', date: todayYmd());
-      expect(() => repo.checkIn('b1', trainerId: 'other'),
-          throwsA(isA<CheckInFailure>()));
+      expect(
+        () => repo.checkIn('b1', trainerId: 'other'),
+        throwsA(isA<CheckInFailure>()),
+      );
     });
 
     test('every non-confirmed status bounces with its own reason', () async {
@@ -352,8 +499,10 @@ void main() {
       }
       // And already running is its own message, not a silent success.
       await seed('in_progress', date: todayYmd());
-      await expectLater(repo.checkIn('b1', trainerId: 'trainer1'),
-          throwsA(isA<CheckInFailure>()));
+      await expectLater(
+        repo.checkIn('b1', trainerId: 'trainer1'),
+        throwsA(isA<CheckInFailure>()),
+      );
     });
 
     test('a ticket for another day bounces even when confirmed', () async {
@@ -368,17 +517,19 @@ void main() {
 
   group('setStatus notifications', () {
     Booking booking({String kiterId = 'r1', String? type}) => Booking(
-        id: 'b1',
-        date: day,
-        status: BookingStatus.pending,
-        instructorId: 'trainer1',
-        instructorName: 'T',
-        kiterId: kiterId,
-        studentName: 'S',
-        type: type);
+      id: 'b1',
+      date: day,
+      status: BookingStatus.pending,
+      instructorId: 'trainer1',
+      instructorName: 'T',
+      kiterId: kiterId,
+      studentName: 'S',
+      type: type,
+    );
 
-    setUp(() =>
-        db.collection(Col.bookings).doc('b1').set({'status': 'pending'}));
+    setUp(
+      () => db.collection(Col.bookings).doc('b1').set({'status': 'pending'}),
+    );
 
     test('approval notifies the rider with the right kind', () async {
       await repo.setStatus(booking(), BookingStatus.confirmed);
@@ -387,15 +538,20 @@ void main() {
     });
 
     test('a decline reason is carried into the message', () async {
-      await repo.setStatus(booking(), BookingStatus.rejected,
-          declineReason: 'Wind too strong');
+      await repo.setStatus(
+        booking(),
+        BookingStatus.rejected,
+        declineReason: 'Wind too strong',
+      );
       final inbox = await notifications.watchFor('r1').first;
       expect(inbox.single.message, contains('Wind too strong'));
     });
 
     test('walk-ins never notify — there is no account behind them', () async {
       await repo.setStatus(
-          booking(kiterId: 'manual_entry'), BookingStatus.completed);
+        booking(kiterId: 'manual_entry'),
+        BookingStatus.completed,
+      );
       expect(await notifications.watchFor('manual_entry').first, isEmpty);
     });
   });

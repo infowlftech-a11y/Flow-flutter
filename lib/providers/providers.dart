@@ -28,40 +28,71 @@ import '../services/wind_service.dart';
 
 // ── Infrastructure & repositories (§7.1) ─────────────────────────────────
 
-final firebaseAuthProvider = Provider<FirebaseAuth>((ref) => FirebaseAuth.instance);
-final firestoreProvider =
-    Provider<FirebaseFirestore>((ref) => FirebaseFirestore.instance);
-final firebaseStorageProvider =
-    Provider<FirebaseStorage>((ref) => FirebaseStorage.instance);
+final firebaseAuthProvider = Provider<FirebaseAuth>(
+  (ref) => FirebaseAuth.instance,
+);
+final firestoreProvider = Provider<FirebaseFirestore>(
+  (ref) => FirebaseFirestore.instance,
+);
+final firebaseStorageProvider = Provider<FirebaseStorage>(
+  (ref) => FirebaseStorage.instance,
+);
 
-final authRepositoryProvider =
-    Provider((ref) => AuthRepository(ref.watch(firebaseAuthProvider)));
-final userRepositoryProvider =
-    Provider((ref) => UserRepository(ref.watch(firestoreProvider)));
-final notificationRepositoryProvider =
-    Provider((ref) => NotificationRepository(ref.watch(firestoreProvider)));
-final bookingRepositoryProvider = Provider((ref) => BookingRepository(
-    ref.watch(firestoreProvider), ref.watch(notificationRepositoryProvider)));
-final scheduleRepositoryProvider =
-    Provider((ref) => ScheduleRepository(ref.watch(firestoreProvider)));
-final reviewRepositoryProvider =
-    Provider((ref) => ReviewRepository(ref.watch(firestoreProvider)));
-final chatRepositoryProvider = Provider((ref) => ChatRepository(
-    ref.watch(firestoreProvider), ref.watch(notificationRepositoryProvider)));
-final supportRepositoryProvider =
-    Provider((ref) => SupportRepository(ref.watch(firestoreProvider)));
-final storageRepositoryProvider =
-    Provider((ref) => StorageRepository(ref.watch(firebaseStorageProvider)));
-final adminRepositoryProvider = Provider((ref) => AdminRepository(
-    ref.watch(firestoreProvider), ref.watch(notificationRepositoryProvider)));
+final authRepositoryProvider = Provider(
+  (ref) => AuthRepository(ref.watch(firebaseAuthProvider)),
+);
+final userRepositoryProvider = Provider(
+  (ref) => UserRepository(ref.watch(firestoreProvider)),
+);
+final notificationRepositoryProvider = Provider(
+  (ref) => NotificationRepository(ref.watch(firestoreProvider)),
+);
+final bookingRepositoryProvider = Provider(
+  (ref) => BookingRepository(
+    ref.watch(firestoreProvider),
+    ref.watch(notificationRepositoryProvider),
+  ),
+);
+final scheduleRepositoryProvider = Provider(
+  (ref) => ScheduleRepository(ref.watch(firestoreProvider)),
+);
+final reviewRepositoryProvider = Provider(
+  (ref) => ReviewRepository(
+    ref.watch(firestoreProvider),
+    ref.watch(notificationRepositoryProvider),
+  ),
+);
+final chatRepositoryProvider = Provider(
+  (ref) => ChatRepository(
+    ref.watch(firestoreProvider),
+    ref.watch(notificationRepositoryProvider),
+  ),
+);
+final supportRepositoryProvider = Provider(
+  (ref) => SupportRepository(
+    ref.watch(firestoreProvider),
+    ref.watch(notificationRepositoryProvider),
+  ),
+);
+final storageRepositoryProvider = Provider(
+  (ref) => StorageRepository(ref.watch(firebaseStorageProvider)),
+);
+final adminRepositoryProvider = Provider(
+  (ref) => AdminRepository(
+    ref.watch(firestoreProvider),
+    ref.watch(notificationRepositoryProvider),
+  ),
+);
 
 // ── Session — the gate state machine (§2.3, §7.2) ────────────────────────
 
 final authStateProvider = StreamProvider<User?>(
-    (ref) => ref.watch(authRepositoryProvider).authState());
+  (ref) => ref.watch(authRepositoryProvider).authState(),
+);
 
-final currentUidProvider =
-    Provider<String?>((ref) => ref.watch(authStateProvider).value?.uid);
+final currentUidProvider = Provider<String?>(
+  (ref) => ref.watch(authStateProvider).value?.uid,
+);
 
 /// Sign-out, with this device's push token released first (§11.3).
 ///
@@ -72,17 +103,19 @@ final currentUidProvider =
 /// while the session is still alive — afterwards the rules reject the write —
 /// and it is best-effort: a failed clear must never strand someone in an
 /// account they are trying to leave.
-final signOutProvider = Provider<Future<void> Function()>((ref) => () async {
-      final uid = ref.read(currentUidProvider);
-      if (uid != null) {
-        try {
-          await ref.read(userRepositoryProvider).clearFcmToken(uid);
-        } catch (_) {
-          // Offline, or the profile is already gone. Sign out regardless.
-        }
+final signOutProvider = Provider<Future<void> Function()>(
+  (ref) => () async {
+    final uid = ref.read(currentUidProvider);
+    if (uid != null) {
+      try {
+        await ref.read(userRepositoryProvider).clearFcmToken(uid);
+      } catch (_) {
+        // Offline, or the profile is already gone. Sign out regardless.
       }
-      await ref.read(authRepositoryProvider).signOut();
-    });
+    }
+    await ref.read(authRepositoryProvider).signOut();
+  },
+);
 
 /// The profile document is **streamed, not fetched once** — approval or a
 /// block moves the app immediately, with no restart.
@@ -115,11 +148,7 @@ enum AppStage {
 }
 
 class Session {
-  const Session({
-    required this.stage,
-    this.user,
-    this.firebaseUser,
-  });
+  const Session({required this.stage, this.user, this.firebaseUser});
 
   final AppStage stage;
   final AppUser? user;
@@ -177,7 +206,10 @@ final sessionProvider = Provider<Session>((ref) {
   // 4. profile missing OR role unknown → onboarding
   if (user == null || user.role == UserRole.unknown) {
     return Session(
-        stage: AppStage.chooseRole, user: user, firebaseUser: firebaseUser);
+      stage: AppStage.chooseRole,
+      user: user,
+      firebaseUser: firebaseUser,
+    );
   }
 
   // 5. blocked — only while the ban is actually in force. §2.4 requires a
@@ -188,7 +220,10 @@ final sessionProvider = Provider<Session>((ref) {
   // admin unblock ever rewrites it.
   if (user.status == AccountStatus.blocked && user.isBlockInForce) {
     return Session(
-        stage: AppStage.blocked, user: user, firebaseUser: firebaseUser);
+      stage: AppStage.blocked,
+      user: user,
+      firebaseUser: firebaseUser,
+    );
   }
 
   // 6. staff — the console is their entire app.
@@ -198,15 +233,19 @@ final sessionProvider = Provider<Session>((ref) {
   // in a queue they are the one who empties.
   if (user.isStaff) {
     return Session(
-        stage: AppStage.staff, user: user, firebaseUser: firebaseUser);
+      stage: AppStage.staff,
+      user: user,
+      firebaseUser: firebaseUser,
+    );
   }
 
   // 7. trainer pending approval
   if (user.isTrainer && user.status == AccountStatus.pending) {
     return Session(
-        stage: AppStage.awaitingApproval,
-        user: user,
-        firebaseUser: firebaseUser);
+      stage: AppStage.awaitingApproval,
+      user: user,
+      firebaseUser: firebaseUser,
+    );
   }
 
   // 8. trainer whose application was declined.
@@ -218,7 +257,10 @@ final sessionProvider = Provider<Session>((ref) {
   // real state and gets a real gate.
   if (user.isTrainer && user.status == AccountStatus.rejected) {
     return Session(
-        stage: AppStage.rejected, user: user, firebaseUser: firebaseUser);
+      stage: AppStage.rejected,
+      user: user,
+      firebaseUser: firebaseUser,
+    );
   }
 
   // 9. ready
@@ -228,29 +270,37 @@ final sessionProvider = Provider<Session>((ref) {
 // ── Explore (§7.3, §8.8) ─────────────────────────────────────────────────
 
 final activeTrainersProvider = StreamProvider<List<AppUser>>(
-    (ref) => ref.watch(userRepositoryProvider).watchActiveTrainers());
+  (ref) => ref.watch(userRepositoryProvider).watchActiveTrainers(),
+);
 
 final ratingsProvider = StreamProvider<Map<String, RatingSummary>>(
-    (ref) => ref.watch(reviewRepositoryProvider).watchAllRatings());
+  (ref) => ref.watch(reviewRepositoryProvider).watchAllRatings(),
+);
 
 final trainerReviewsProvider = StreamProvider.family<List<Review>, String>(
-    (ref, trainerId) =>
-        ref.watch(reviewRepositoryProvider).watchForTrainer(trainerId));
+  (ref, trainerId) =>
+      ref.watch(reviewRepositoryProvider).watchForTrainer(trainerId),
+);
 
 /// Also used for stations.
 final trainerProfileProvider = StreamProvider.family<AppUser?, String>(
-    (ref, uid) => ref.watch(userRepositoryProvider).watchUser(uid));
+  (ref, uid) => ref.watch(userRepositoryProvider).watchUser(uid),
+);
 
 final stationInstructorsProvider =
-    StreamProvider.family<List<StationInstructor>, String>((ref, id) =>
-        ref.watch(userRepositoryProvider).watchStationInstructors(id));
+    StreamProvider.family<List<StationInstructor>, String>(
+      (ref, id) =>
+          ref.watch(userRepositoryProvider).watchStationInstructors(id),
+    );
 
 final stationServicesProvider =
-    StreamProvider.family<List<StationService>, String>((ref, id) =>
-        ref.watch(userRepositoryProvider).watchStationServices(id));
+    StreamProvider.family<List<StationService>, String>(
+      (ref, id) => ref.watch(userRepositoryProvider).watchStationServices(id),
+    );
 
 final safariTripsProvider = StreamProvider.family<List<SafariTrip>, String>(
-    (ref, hostId) => ref.watch(userRepositoryProvider).watchSafariTrips(hostId));
+  (ref, hostId) => ref.watch(userRepositoryProvider).watchSafariTrips(hostId),
+);
 
 class ExploreFilter {
   const ExploreFilter({
@@ -275,18 +325,18 @@ class ExploreFilter {
     String? Function()? spot,
     Set<String>? languages,
     bool? favouritesOnly,
-  }) =>
-      ExploreFilter(
-        query: query ?? this.query,
-        spot: spot != null ? spot() : this.spot,
-        languages: languages ?? this.languages,
-        favouritesOnly: favouritesOnly ?? this.favouritesOnly,
-      );
+  }) => ExploreFilter(
+    query: query ?? this.query,
+    spot: spot != null ? spot() : this.spot,
+    languages: languages ?? this.languages,
+    favouritesOnly: favouritesOnly ?? this.favouritesOnly,
+  );
 }
 
 final exploreFilterProvider =
     NotifierProvider<ExploreFilterNotifier, ExploreFilter>(
-        ExploreFilterNotifier.new);
+      ExploreFilterNotifier.new,
+    );
 
 class ExploreFilterNotifier extends Notifier<ExploreFilter> {
   @override
@@ -300,8 +350,7 @@ class ExploreFilterNotifier extends Notifier<ExploreFilter> {
     state = state.copyWith(languages: langs);
   }
 
-  void setFavouritesOnly(bool v) =>
-      state = state.copyWith(favouritesOnly: v);
+  void setFavouritesOnly(bool v) => state = state.copyWith(favouritesOnly: v);
 
   void reset() => state = const ExploreFilter();
 }
@@ -322,9 +371,9 @@ final filteredTrainersProvider = Provider<AsyncValue<List<AppUser>>>((ref) {
                     .toLowerCase()
                     .contains(q)) &&
             (filter.spot == null ||
-                (t.location ?? '')
-                    .toLowerCase()
-                    .contains(filter.spot!.toLowerCase())) &&
+                (t.location ?? '').toLowerCase().contains(
+                  filter.spot!.toLowerCase(),
+                )) &&
             (filter.languages.isEmpty ||
                 t.languages.any(filter.languages.contains)))
           t,
@@ -347,7 +396,8 @@ final trainerBookingsProvider = StreamProvider<List<Booking>>((ref) {
 });
 
 final bookingByIdProvider = StreamProvider.family<Booking?, String>(
-    (ref, id) => ref.watch(bookingRepositoryProvider).watchBooking(id));
+  (ref, id) => ref.watch(bookingRepositoryProvider).watchBooking(id),
+);
 
 typedef BookingBuckets = Map<BookingBucket, List<Booking>>;
 
@@ -370,14 +420,17 @@ BookingBuckets _bucketize(List<Booking> source, {required bool forInstructor}) {
   return buckets;
 }
 
-final riderBucketsProvider = Provider<AsyncValue<BookingBuckets>>((ref) => ref
-    .watch(riderBookingsProvider)
-    .whenData((list) => _bucketize(list, forInstructor: false)));
+final riderBucketsProvider = Provider<AsyncValue<BookingBuckets>>(
+  (ref) => ref
+      .watch(riderBookingsProvider)
+      .whenData((list) => _bucketize(list, forInstructor: false)),
+);
 
-final trainerBucketsProvider = Provider<AsyncValue<BookingBuckets>>((ref) =>
-    ref
-        .watch(trainerBookingsProvider)
-        .whenData((list) => _bucketize(list, forInstructor: true)));
+final trainerBucketsProvider = Provider<AsyncValue<BookingBuckets>>(
+  (ref) => ref
+      .watch(trainerBookingsProvider)
+      .whenData((list) => _bucketize(list, forInstructor: true)),
+);
 
 final pendingRequestsProvider = Provider<AsyncValue<List<Booking>>>((ref) {
   final today = todayYmd();
@@ -404,21 +457,34 @@ final todayManifestProvider = Provider<AsyncValue<List<Booking>>>((ref) {
   });
 });
 
-final trainerCompletedProvider = Provider<AsyncValue<List<Booking>>>((ref) =>
-    ref.watch(trainerBookingsProvider).whenData((list) => [
+final trainerCompletedProvider = Provider<AsyncValue<List<Booking>>>(
+  (ref) => ref
+      .watch(trainerBookingsProvider)
+      .whenData(
+        (list) => [
           for (final b in list)
             if (b.status == BookingStatus.completed) b,
-        ]));
+        ],
+      ),
+);
 
-final trainerRevenueProvider = Provider<AsyncValue<double>>((ref) =>
-    ref.watch(trainerCompletedProvider).whenData((list) =>
-        list.fold<double>(0, (acc, b) => acc + (b.totalPrice ?? 0))));
+final trainerRevenueProvider = Provider<AsyncValue<double>>(
+  (ref) => ref
+      .watch(trainerCompletedProvider)
+      .whenData(
+        (list) => list.fold<double>(0, (acc, b) => acc + (b.totalPrice ?? 0)),
+      ),
+);
 
 final trainerMonthRevenueProvider = Provider<AsyncValue<double>>((ref) {
   final ym = thisMonthYm();
-  return ref.watch(trainerCompletedProvider).whenData((list) =>
-      list.where((b) => b.date.startsWith(ym)).fold<double>(
-          0, (acc, b) => acc + (b.totalPrice ?? 0)));
+  return ref
+      .watch(trainerCompletedProvider)
+      .whenData(
+        (list) => list
+            .where((b) => b.date.startsWith(ym))
+            .fold<double>(0, (acc, b) => acc + (b.totalPrice ?? 0)),
+      );
 });
 
 /// Completed sessions the trainer has not been paid for.
@@ -428,24 +494,36 @@ final trainerMonthRevenueProvider = Provider<AsyncValue<double>>((ref) {
 /// would drop every historical session — none of which carry payment data —
 /// out of a number trainers already know. This is an additional figure, and
 /// it only ever counts bookings that explicitly say they are owing.
-final trainerUnpaidProvider = Provider<AsyncValue<List<Booking>>>((ref) =>
-    ref.watch(trainerCompletedProvider).whenData((list) => [
+final trainerUnpaidProvider = Provider<AsyncValue<List<Booking>>>(
+  (ref) => ref
+      .watch(trainerCompletedProvider)
+      .whenData(
+        (list) => [
           for (final b in list)
             if (b.payment.isOutstanding) b,
-        ]));
+        ],
+      ),
+);
 
-final trainerOutstandingProvider = Provider<AsyncValue<double>>((ref) => ref
-    .watch(trainerUnpaidProvider)
-    .whenData((list) => list.fold<double>(0, (acc, b) => acc + b.amountDue)));
+final trainerOutstandingProvider = Provider<AsyncValue<double>>(
+  (ref) => ref
+      .watch(trainerUnpaidProvider)
+      .whenData((list) => list.fold<double>(0, (acc, b) => acc + b.amountDue)),
+);
 
 /// What FLOW owes the trainer for delivered escrow sessions (P1) — the
 /// riders already paid; the payout waits on the processor. Kept apart from
 /// [trainerOutstandingProvider], which is cash a *rider* still owes: one is
 /// something the trainer can act on (collect), the other is FLOW's debt.
-final trainerPayoutDueProvider = Provider<AsyncValue<double>>((ref) =>
-    ref.watch(trainerCompletedProvider).whenData((list) => list
-        .where((b) => b.awaitsPayout)
-        .fold<double>(0, (acc, b) => acc + b.amountDue)));
+final trainerPayoutDueProvider = Provider<AsyncValue<double>>(
+  (ref) => ref
+      .watch(trainerCompletedProvider)
+      .whenData(
+        (list) => list
+            .where((b) => b.awaitsPayout)
+            .fold<double>(0, (acc, b) => acc + b.amountDue),
+      ),
+);
 
 /// A week of earnings, Monday-first, plus how it compares with the week before.
 ///
@@ -504,9 +582,11 @@ final trainerEarningsWeekProvider = Provider<AsyncValue<EarningsWeek>>((ref) {
     }
 
     final total = week.fold<double>(0, (a, b) => a + b);
-    final todayOffset = DateTime(now.year, now.month, now.day)
-        .difference(start)
-        .inDays;
+    final todayOffset = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).difference(start).inDays;
 
     return (
       byWeekday: week,
@@ -525,8 +605,10 @@ typedef DayKey = ({String instructorId, String date});
 /// only once **all three** have produced a value, then on every change.
 /// autoDispose cancels subscriptions and resets the has-value flags, so a
 /// re-listen never accumulates dead subscriptions.
-final dayAvailabilityProvider =
-    StreamProvider.autoDispose.family<DayAvailability, DayKey>((ref, key) {
+final dayAvailabilityProvider = StreamProvider.autoDispose.family<DayAvailability, DayKey>((
+  ref,
+  key,
+) {
   final schedule = ref.watch(scheduleRepositoryProvider);
   final bookings = ref.watch(bookingRepositoryProvider);
 
@@ -537,12 +619,14 @@ final dayAvailabilityProvider =
 
   void emit() {
     if (blocks == null || dayBookings == null || vacations == null) return;
-    controller.add(DayAvailability.compose(
-      date: key.date,
-      blocks: blocks!,
-      bookings: dayBookings!,
-      vacations: vacations!,
-    ));
+    controller.add(
+      DayAvailability.compose(
+        date: key.date,
+        blocks: blocks!,
+        bookings: dayBookings!,
+        vacations: vacations!,
+      ),
+    );
   }
 
   final subs = [
@@ -550,24 +634,29 @@ final dayAvailabilityProvider =
       blocks = v;
       emit();
     }, onError: controller.addError),
-    bookings.watchDayBookings(key.instructorId, key.date).listen((v) {
-      dayBookings = v;
-      emit();
-    }, onError: (Object e, StackTrace st) {
-      // Bookings are readable only by their own two parties (BUG-017), so
-      // for anyone who is not this trainer (or staff) this stream is refused
-      // wholesale. That is not an error for the grid: the same hours arrive
-      // as `occupied` availability docs in the blocks stream, which is what
-      // they exist for. A denial therefore reports "no bookings visible"
-      // rather than killing the composed stream — but only a denial;
-      // anything else is still a failure the grid must show.
-      if (e is FirebaseException && e.code == 'permission-denied') {
-        dayBookings = const [];
-        emit();
-      } else {
-        controller.addError(e, st);
-      }
-    }),
+    bookings
+        .watchDayBookings(key.instructorId, key.date)
+        .listen(
+          (v) {
+            dayBookings = v;
+            emit();
+          },
+          onError: (Object e, StackTrace st) {
+            // Bookings are readable only by their own two parties (BUG-017), so
+            // for anyone who is not this trainer (or staff) this stream is refused
+            // wholesale. That is not an error for the grid: the same hours arrive
+            // as `occupied` availability docs in the blocks stream, which is what
+            // they exist for. A denial therefore reports "no bookings visible"
+            // rather than killing the composed stream — but only a denial;
+            // anything else is still a failure the grid must show.
+            if (e is FirebaseException && e.code == 'permission-denied') {
+              dayBookings = const [];
+              emit();
+            } else {
+              controller.addError(e, st);
+            }
+          },
+        ),
     schedule.watchVacations(key.instructorId).listen((v) {
       vacations = v;
       emit();
@@ -585,11 +674,12 @@ final dayAvailabilityProvider =
 });
 
 /// Raw day blocks — the schedule tab needs doc ids to release blocks.
-final dayBlocksProvider =
-    StreamProvider.autoDispose.family<List<Availability>, DayKey>((ref, key) =>
-        ref
-            .watch(scheduleRepositoryProvider)
-            .watchDayBlocks(key.instructorId, key.date));
+final dayBlocksProvider = StreamProvider.autoDispose
+    .family<List<Availability>, DayKey>(
+      (ref, key) => ref
+          .watch(scheduleRepositoryProvider)
+          .watchDayBlocks(key.instructorId, key.date),
+    );
 
 final myVacationsProvider = StreamProvider<List<Vacation>>((ref) {
   final uid = ref.watch(currentUidProvider);
@@ -601,9 +691,10 @@ final myVacationsProvider = StreamProvider<List<Vacation>>((ref) {
 /// has no date filter, so this is the *same* query `dayAvailabilityProvider`
 /// already runs — Firestore serves both listeners from one subscription, so
 /// flagging away days across the strip costs no extra reads.
-final instructorVacationsProvider =
-    StreamProvider.autoDispose.family<List<Vacation>, String>((ref, id) =>
-        ref.watch(scheduleRepositoryProvider).watchVacations(id));
+final instructorVacationsProvider = StreamProvider.autoDispose
+    .family<List<Vacation>, String>(
+      (ref, id) => ref.watch(scheduleRepositoryProvider).watchVacations(id),
+    );
 
 // ── Wind (§3.6) ──────────────────────────────────────────────────────────
 
@@ -615,9 +706,9 @@ final windServiceProvider = Provider<WindService>((ref) => WindService());
 /// provider alive means moving between a trainer's profile and their booking
 /// screen reuses the same numbers instead of showing a second spinner over
 /// data that is already in memory.
-final windForecastProvider =
-    FutureProvider.family<WindForecast, String>((ref, spot) =>
-        ref.watch(windServiceProvider).forSpot(spot));
+final windForecastProvider = FutureProvider.family<WindForecast, String>(
+  (ref, spot) => ref.watch(windServiceProvider).forSpot(spot),
+);
 
 /// The forecast at whichever spot a provider teaches from.
 ///
@@ -625,8 +716,10 @@ final windForecastProvider =
 /// for it, so the booking screen does not have to thread a location through
 /// [BookingTarget] — which is transient and deliberately knows nothing about
 /// the profile behind it (§5.5).
-final providerWindProvider =
-    FutureProvider.family<WindForecast, String>((ref, providerId) async {
+final providerWindProvider = FutureProvider.family<WindForecast, String>((
+  ref,
+  providerId,
+) async {
   final profile = await ref.watch(trainerProfileProvider(providerId).future);
   final spot = profile?.location ?? profile?.homeSpot;
   if (spot == null || spot.isEmpty) return WindForecast.empty;
@@ -641,13 +734,10 @@ final notificationsProvider = StreamProvider<List<AppNotification>>((ref) {
   return ref.watch(notificationRepositoryProvider).watchFor(uid);
 });
 
-final unreadNotificationCountProvider = Provider<int>((ref) =>
-    ref
-        .watch(notificationsProvider)
-        .value
-        ?.where((n) => !n.read)
-        .length ??
-    0);
+final unreadNotificationCountProvider = Provider<int>(
+  (ref) =>
+      ref.watch(notificationsProvider).value?.where((n) => !n.read).length ?? 0,
+);
 
 final inboxProvider = StreamProvider<List<ChatThread>>((ref) {
   final uid = ref.watch(currentUidProvider);
@@ -664,7 +754,8 @@ final unreadChatCountProvider = Provider<int>((ref) {
 });
 
 final chatMessagesProvider = StreamProvider.family<List<ChatMessage>, String>(
-    (ref, chatId) => ref.watch(chatRepositoryProvider).watchMessages(chatId));
+  (ref, chatId) => ref.watch(chatRepositoryProvider).watchMessages(chatId),
+);
 
 // ── Support (§7.3) ───────────────────────────────────────────────────────
 
@@ -675,10 +766,13 @@ final myTicketsProvider = StreamProvider<List<SupportTicket>>((ref) {
 });
 
 final ticketProvider = StreamProvider.family<SupportTicket?, String>(
-    (ref, id) => ref.watch(supportRepositoryProvider).watchTicket(id));
+  (ref, id) => ref.watch(supportRepositoryProvider).watchTicket(id),
+);
 
-final ticketMessagesProvider = StreamProvider.family<List<TicketMessage>, String>(
-    (ref, id) => ref.watch(supportRepositoryProvider).watchTicketMessages(id));
+final ticketMessagesProvider =
+    StreamProvider.family<List<TicketMessage>, String>(
+      (ref, id) => ref.watch(supportRepositoryProvider).watchTicketMessages(id),
+    );
 
 final myAppealProvider = StreamProvider<Appeal?>((ref) {
   final uid = ref.watch(currentUidProvider);
@@ -691,8 +785,9 @@ final myAppealProvider = StreamProvider<Appeal?>((ref) {
 // autoDispose so these collection listeners are torn down when staff leave
 // the console — a rider or trainer should never be holding them open.
 
-final pendingTrainersProvider =
-    StreamProvider.autoDispose<List<AppUser>>((ref) {
+final pendingTrainersProvider = StreamProvider.autoDispose<List<AppUser>>((
+  ref,
+) {
   if (!ref.watch(sessionProvider).isStaff) return Stream.value(const []);
   return ref.watch(adminRepositoryProvider).watchPendingTrainers();
 });
@@ -712,14 +807,16 @@ final appealsProvider = StreamProvider.autoDispose<List<Appeal>>((ref) {
   return ref.watch(adminRepositoryProvider).watchAppeals();
 });
 
-final allTicketsProvider =
-    StreamProvider.autoDispose<List<SupportTicket>>((ref) {
+final allTicketsProvider = StreamProvider.autoDispose<List<SupportTicket>>((
+  ref,
+) {
   if (!ref.watch(sessionProvider).isStaff) return Stream.value(const []);
   return ref.watch(supportRepositoryProvider).watchAllTickets();
 });
 
-final leaveReasonsProvider =
-    StreamProvider.autoDispose<List<LeaveReason>>((ref) {
+final leaveReasonsProvider = StreamProvider.autoDispose<List<LeaveReason>>((
+  ref,
+) {
   if (!ref.watch(sessionProvider).isStaff) return Stream.value(const []);
   return ref.watch(adminRepositoryProvider).watchLeaveReasons();
 });
@@ -743,8 +840,10 @@ final allBookingsProvider = StreamProvider.autoDispose<List<Booking>>((ref) {
 /// Work waiting on staff, across every queue the console owns.
 final adminQueueCountProvider = Provider.autoDispose<int>((ref) {
   final trainers = ref.watch(pendingTrainersProvider).value?.length ?? 0;
-  final reports = ref.watch(reportsProvider).value?.where((r) => r.isOpen).length ?? 0;
-  final appeals = ref
+  final reports =
+      ref.watch(reportsProvider).value?.where((r) => r.isOpen).length ?? 0;
+  final appeals =
+      ref
           .watch(appealsProvider)
           .value
           ?.where((a) => a.status == 'pending')

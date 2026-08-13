@@ -14,15 +14,16 @@ class ChatRepository {
       _db.collection(Col.chats);
 
   /// Inbox — client-side sort by lastMessageAt desc (§6.2).
-  Stream<List<ChatThread>> watchInbox(String uid) => _chats
-      .where('participants', arrayContains: uid)
-      .snapshots()
-      .map((qs) {
+  Stream<List<ChatThread>> watchInbox(String uid) =>
+      _chats.where('participants', arrayContains: uid).snapshots().map((qs) {
         final list = [
           for (final d in qs.docs) ChatThread.fromDoc(d.id, d.data()),
         ];
-        list.sort((a, b) => (b.lastMessageAt ?? DateTime(0))
-            .compareTo(a.lastMessageAt ?? DateTime(0)));
+        list.sort(
+          (a, b) => (b.lastMessageAt ?? DateTime(0)).compareTo(
+            a.lastMessageAt ?? DateTime(0),
+          ),
+        );
         return list;
       });
 
@@ -43,11 +44,8 @@ class ChatRepository {
   /// the sort moves here, where a pending timestamp can be treated as what it
   /// actually is: the newest message in the thread. Sorting client-side is
   /// also what the rest of the app already does (§6.2).
-  Stream<List<ChatMessage>> watchMessages(String chatId) => _chats
-      .doc(chatId)
-      .collection(Col.messages)
-      .snapshots()
-      .map((qs) {
+  Stream<List<ChatMessage>> watchMessages(String chatId) =>
+      _chats.doc(chatId).collection(Col.messages).snapshots().map((qs) {
         final list = [
           for (final d in qs.docs) ChatMessage.fromDoc(d.id, d.data()),
         ];
@@ -82,9 +80,9 @@ class ChatRepository {
   }
 
   void markThreadRead(String chatId, String me) {
-    _chats
-        .doc(chatId)
-        .set({'unreadCount': {me: 0}}, SetOptions(merge: true)).ignore();
+    _chats.doc(chatId).set({
+      'unreadCount': {me: 0},
+    }, SetOptions(merge: true)).ignore();
   }
 
   /// Fire-and-forget by design: Firestore's latency compensation paints the
@@ -108,16 +106,13 @@ class ChatRepository {
       'createdAt': FieldValue.serverTimestamp(),
       'read': false,
     });
-    batch.set(
-        threadRef,
-        {
-          'lastMessage': text,
-          // v2.6 wrote lastMessageTimestamp + updatedAt for the web client.
-          'lastMessageAt': FieldValue.serverTimestamp(),
-          // FieldValue.increment, not a hardcoded 1 (§14.1).
-          'unreadCount': {partnerId: FieldValue.increment(1)},
-        },
-        SetOptions(merge: true));
+    batch.set(threadRef, {
+      'lastMessage': text,
+      // v2.6 wrote lastMessageTimestamp + updatedAt for the web client.
+      'lastMessageAt': FieldValue.serverTimestamp(),
+      // FieldValue.increment, not a hardcoded 1 (§14.1).
+      'unreadCount': {partnerId: FieldValue.increment(1)},
+    }, SetOptions(merge: true));
     final future = batch.commit();
 
     // The in-app + push notification for the recipient (§11.1).
@@ -131,6 +126,11 @@ class ChatRepository {
           title: 'Message from $myName',
           message: preview,
           type: 'message',
+          // From the recipient's side the sender is the chat partner — this
+          // is what lets the notification tap land in the conversation
+          // itself instead of the inbox (P2).
+          chatPartnerId: me,
+          chatPartnerName: myName,
         )
         .ignore();
 

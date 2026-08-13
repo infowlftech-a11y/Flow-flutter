@@ -11,17 +11,18 @@ class NotificationRepository {
       _db.collection(Col.notifications);
 
   /// Newest first, sorted client-side (§6.2).
-  Stream<List<AppNotification>> watchFor(String uid) => _col
-      .where('targetUserId', isEqualTo: uid)
-      .snapshots()
-      .map((qs) {
-        final list = [
-          for (final doc in qs.docs) AppNotification.fromDoc(doc.id, doc.data()),
-        ];
-        list.sort((a, b) => (b.createdAt ?? DateTime(0))
-            .compareTo(a.createdAt ?? DateTime(0)));
-        return list;
-      });
+  Stream<List<AppNotification>> watchFor(
+    String uid,
+  ) => _col.where('targetUserId', isEqualTo: uid).snapshots().map((qs) {
+    final list = [
+      for (final doc in qs.docs) AppNotification.fromDoc(doc.id, doc.data()),
+    ];
+    list.sort(
+      (a, b) =>
+          (b.createdAt ?? DateTime(0)).compareTo(a.createdAt ?? DateTime(0)),
+    );
+    return list;
+  });
 
   /// Writes `targetUserId` only.
   ///
@@ -36,6 +37,9 @@ class NotificationRepository {
     required String message,
     required String type,
     String? bookingId,
+    String? ticketId,
+    String? chatPartnerId,
+    String? chatPartnerName,
   }) {
     if (targetUserId.isEmpty) return Future.value();
     final data = <String, dynamic>{
@@ -47,6 +51,11 @@ class NotificationRepository {
       'createdAt': FieldValue.serverTimestamp(),
     };
     if (bookingId != null) data['bookingId'] = bookingId;
+    // P2 deep-link payloads: which thread a support reply belongs to, and
+    // who sent a message (the sender's uid *is* the recipient's chat route).
+    if (ticketId != null) data['ticketId'] = ticketId;
+    if (chatPartnerId != null) data['chatPartnerId'] = chatPartnerId;
+    if (chatPartnerName != null) data['chatPartnerName'] = chatPartnerName;
     return _col.add(data);
   }
 

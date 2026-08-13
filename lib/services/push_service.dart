@@ -39,12 +39,14 @@ class PushController {
     // Tap from background.
     _subs.add(FirebaseMessaging.onMessageOpenedApp.listen(handleTap));
     // Token refresh.
-    _subs.add(_messaging.onTokenRefresh.listen((token) {
-      final uid = _ref.read(currentUidProvider);
-      if (uid != null) {
-        _ref.read(userRepositoryProvider).saveFcmToken(uid, token).ignore();
-      }
-    }));
+    _subs.add(
+      _messaging.onTokenRefresh.listen((token) {
+        final uid = _ref.read(currentUidProvider);
+        if (uid != null) {
+          _ref.read(userRepositoryProvider).saveFcmToken(uid, token).ignore();
+        }
+      }),
+    );
     // Cold start via a notification tap.
     _messaging.getInitialMessage().then((m) {
       if (m != null) handleTap(m);
@@ -73,44 +75,71 @@ class PushController {
     if (context == null || !context.mounted) return;
     final title = message.notification?.title ?? 'FLOW';
     final body = message.notification?.body ?? '';
-    ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
-      duration: const Duration(seconds: 5),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-          if (body.isNotEmpty) Text(body, maxLines: 2, overflow: TextOverflow.ellipsis),
-        ],
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(
+        duration: const Duration(seconds: 5),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+            if (body.isNotEmpty)
+              Text(body, maxLines: 2, overflow: TextOverflow.ellipsis),
+          ],
+        ),
+        action: SnackBarAction(
+          label: 'VIEW',
+          onPressed: () => handleTap(message),
+        ),
       ),
-      action: SnackBarAction(
-        label: 'VIEW',
-        onPressed: () => handleTap(message),
-      ),
-    ));
+    );
   }
 
   /// Tap routing (§11.3). v2.6 routed riders to a bare `/sessions`; the push
   /// carries `bookingId` in its data payload, so we close that gap and land
-  /// on the specific booking — same deep link as the in-app list.
+  /// on the specific booking — same deep link as the in-app list. P2 extends
+  /// the payload the same way the in-app tiles were: a support push lands in
+  /// its ticket thread, a message push in its conversation, a review push on
+  /// the trainer's own profile. Every branch mirrors _NotificationTile._open
+  /// — the two views of one notification must not land in two places.
   void handleTap(RemoteMessage message) {
     final context = contextSupplier?.call();
     if (context == null || !context.mounted) return;
     final type = (message.data['type'] ?? '').toString();
     final bookingId = (message.data['bookingId'] ?? '').toString();
+    final ticketId = (message.data['ticketId'] ?? '').toString();
+    final chatPartnerId = (message.data['chatPartnerId'] ?? '').toString();
+    final chatPartnerName = (message.data['chatPartnerName'] ?? '').toString();
     final isTrainer = _ref.read(sessionProvider).isTrainer;
 
-    if (type.startsWith('booking') || bookingId.isNotEmpty) {
+    if (type == 'support_reply' || type == 'support_closed') {
+      context.push(ticketId.isEmpty ? '/support' : '/support/ticket/$ticketId');
+    } else if (type == 'message') {
+      if (chatPartnerId.isEmpty) {
+        context.push('/inbox');
+      } else {
+        context.push(
+          Uri(
+            path: '/chat/$chatPartnerId',
+            queryParameters: {
+              if (chatPartnerName.isNotEmpty) 'name': chatPartnerName,
+            },
+          ).toString(),
+        );
+      }
+    } else if (type == 'review_received') {
+      context.push('/trainer/${_ref.read(sessionProvider).uid}');
+    } else if (type.startsWith('booking') || bookingId.isNotEmpty) {
       if (isTrainer) {
         context.go('/home');
       } else {
-        context.go(bookingId.isNotEmpty
-            ? '/sessions?highlight=$bookingId'
-            : '/sessions');
+        context.go(
+          bookingId.isNotEmpty ? '/sessions?highlight=$bookingId' : '/sessions',
+        );
       }
-    } else if (type == 'message') {
-      context.go('/inbox');
     } else {
+      // report_update, appeal_update, account_* and broadcasts carry their
+      // whole payload as text — the list's sheet renders it in full.
       context.push('/notifications');
     }
   }

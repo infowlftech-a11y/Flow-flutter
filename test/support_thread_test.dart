@@ -23,6 +23,7 @@ import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:flow/data/firestore_paths.dart';
+import 'package:flow/data/repositories/notification_repository.dart';
 import 'package:flow/data/repositories/support_repository.dart';
 
 void main() {
@@ -31,11 +32,15 @@ void main() {
 
   setUp(() {
     db = FakeFirebaseFirestore();
-    support = SupportRepository(db);
+    // P2 (ordered): support replies notify the ticket owner, so the
+    // repository carries the notification writer. Construction only — every
+    // assertion in this file is unchanged.
+    support = SupportRepository(db, NotificationRepository(db));
   });
 
-  Future<List<String>> thread(String ticketId) async =>
-      [for (final m in await support.watchTicketMessages(ticketId).first) m.text];
+  Future<List<String>> thread(String ticketId) async => [
+    for (final m in await support.watchTicketMessages(ticketId).first) m.text,
+  ];
 
   group('a ticket thread reads in the order it was written', () {
     test('opening a ticket puts the body in as the first message', () async {
@@ -46,8 +51,9 @@ void main() {
         body: 'My trainer cancelled and I have not been refunded.',
       );
 
-      expect(await thread(id),
-          ['My trainer cancelled and I have not been refunded.']);
+      expect(await thread(id), [
+        'My trainer cancelled and I have not been refunded.',
+      ]);
 
       final ticket = await support.watchTicket(id).first;
       expect(ticket!.isOpen, isTrue);
@@ -56,28 +62,49 @@ void main() {
 
     test('user and staff replies append, oldest first', () async {
       final id = await support.openTicket(
-        userId: 'rider1', userName: 'Rider One',
-        subject: 'Refund', body: 'First',
+        userId: 'rider1',
+        userName: 'Rider One',
+        subject: 'Refund',
+        body: 'First',
       );
+      // userId/subject: P2 needs the owner to notify — new required params.
       await support.replyAsStaff(
-          ticketId: id, staffId: 'support1', text: 'Second');
+        ticketId: id,
+        staffId: 'support1',
+        text: 'Second',
+        userId: 'rider1',
+        subject: 'Refund',
+      );
       await support.replyToTicket(
-          ticketId: id, userId: 'rider1', text: 'Third');
+        ticketId: id,
+        userId: 'rider1',
+        text: 'Third',
+      );
 
       expect(await thread(id), ['First', 'Second', 'Third']);
     });
 
     test('a staff reply is marked as coming from support', () async {
       final id = await support.openTicket(
-        userId: 'rider1', userName: 'Rider One',
-        subject: 'Refund', body: 'Mine',
+        userId: 'rider1',
+        userName: 'Rider One',
+        subject: 'Refund',
+        body: 'Mine',
       );
       await support.replyAsStaff(
-          ticketId: id, staffId: 'support1', text: 'Ours');
+        ticketId: id,
+        staffId: 'support1',
+        text: 'Ours',
+        userId: 'rider1',
+        subject: 'Refund',
+      );
 
       final messages = await support.watchTicketMessages(id).first;
-      expect(messages.map((m) => m.fromStaff), [false, true],
-          reason: 'isAdmin is what renders the bubble on the support side');
+      expect(
+        messages.map((m) => m.fromStaff),
+        [false, true],
+        reason: 'isAdmin is what renders the bubble on the support side',
+      );
     });
   });
 
@@ -95,22 +122,35 @@ void main() {
 
     test('sorts last, not first', () async {
       final id = await support.openTicket(
-        userId: 'rider1', userName: 'Rider One',
-        subject: 'Refund', body: 'The complaint',
+        userId: 'rider1',
+        userName: 'Rider One',
+        subject: 'Refund',
+        body: 'The complaint',
       );
       await support.replyAsStaff(
-          ticketId: id, staffId: 'support1', text: 'The answer');
+        ticketId: id,
+        staffId: 'support1',
+        text: 'The answer',
+        userId: 'rider1',
+        subject: 'Refund',
+      );
       await pendingMessage(id, 'Just typed');
 
-      expect(await thread(id), ['The complaint', 'The answer', 'Just typed'],
-          reason: 'an unacknowledged write is the newest message in the '
-              'thread — ordering on the server put it above everything');
+      expect(
+        await thread(id),
+        ['The complaint', 'The answer', 'Just typed'],
+        reason:
+            'an unacknowledged write is the newest message in the '
+            'thread — ordering on the server put it above everything',
+      );
     });
 
     test('two of them stay adjacent rather than reordering', () async {
       final id = await support.openTicket(
-        userId: 'rider1', userName: 'Rider One',
-        subject: 'Refund', body: 'Settled',
+        userId: 'rider1',
+        userName: 'Rider One',
+        subject: 'Refund',
+        body: 'Settled',
       );
       await pendingMessage(id, 'Pending A');
       await pendingMessage(id, 'Pending B');
@@ -124,7 +164,8 @@ void main() {
   group('a ticket about one session carries its reference', () {
     test('the attached session is stored and read back', () async {
       final id = await support.openTicket(
-        userId: 'rider1', userName: 'Rider One',
+        userId: 'rider1',
+        userName: 'Rider One',
         subject: 'Trainer never showed up',
         body: 'Waited forty minutes on the beach.',
         sessionId: 'xK9fQ2abcd7x8k',
@@ -132,28 +173,41 @@ void main() {
       );
 
       final ticket = await support.watchTicket(id).first;
-      expect(ticket!.sessionId, 'xK9fQ2abcd7x8k',
-          reason: 'the raw id is the canonical key for looking the booking up');
-      expect(ticket.sessionRef, 'FLW-0513-7X8K',
-          reason: 'the rendered ref is what screens print without a read');
-    });
-
-    test('a ticket about nothing in particular stores no session fields',
-        () async {
-      final id = await support.openTicket(
-        userId: 'rider1', userName: 'Rider One',
-        subject: 'How do refunds work?', body: 'Just asking.',
+      expect(
+        ticket!.sessionId,
+        'xK9fQ2abcd7x8k',
+        reason: 'the raw id is the canonical key for looking the booking up',
       );
-
-      final raw = await db.collection(Col.tickets).doc(id).get();
-      expect(raw.data()!.containsKey('sessionId'), isFalse,
-          reason: 'absent means absent — not null, not an empty string');
-      expect(raw.data()!.containsKey('sessionRef'), isFalse);
-
-      final ticket = await support.watchTicket(id).first;
-      expect(ticket!.sessionId, isNull);
-      expect(ticket.sessionRef, isNull);
+      expect(
+        ticket.sessionRef,
+        'FLW-0513-7X8K',
+        reason: 'the rendered ref is what screens print without a read',
+      );
     });
+
+    test(
+      'a ticket about nothing in particular stores no session fields',
+      () async {
+        final id = await support.openTicket(
+          userId: 'rider1',
+          userName: 'Rider One',
+          subject: 'How do refunds work?',
+          body: 'Just asking.',
+        );
+
+        final raw = await db.collection(Col.tickets).doc(id).get();
+        expect(
+          raw.data()!.containsKey('sessionId'),
+          isFalse,
+          reason: 'absent means absent — not null, not an empty string',
+        );
+        expect(raw.data()!.containsKey('sessionRef'), isFalse);
+
+        final ticket = await support.watchTicket(id).first;
+        expect(ticket!.sessionId, isNull);
+        expect(ticket.sessionRef, isNull);
+      },
+    );
 
     test('a report carries the same pair when one was attached', () async {
       await support.reportUser(
@@ -175,38 +229,108 @@ void main() {
   group('the queues the console reads', () {
     test('a ticket appears in its owner list and the staff list', () async {
       await support.openTicket(
-        userId: 'rider1', userName: 'Rider One',
-        subject: 'Mine', body: 'x',
+        userId: 'rider1',
+        userName: 'Rider One',
+        subject: 'Mine',
+        body: 'x',
       );
       await support.openTicket(
-        userId: 'rider2', userName: 'Rider Two',
-        subject: 'Theirs', body: 'y',
+        userId: 'rider2',
+        userName: 'Rider Two',
+        subject: 'Theirs',
+        body: 'y',
       );
 
-      expect((await support.watchMyTickets('rider1').first).map((t) => t.subject),
-          ['Mine']);
       expect(
-          (await support.watchAllTickets().first).map((t) => t.subject).toSet(),
-          {'Mine', 'Theirs'},
-          reason: 'the console reads every ticket, not just its own');
+        (await support.watchMyTickets('rider1').first).map((t) => t.subject),
+        ['Mine'],
+      );
+      expect(
+        (await support.watchAllTickets().first).map((t) => t.subject).toSet(),
+        {'Mine', 'Theirs'},
+        reason: 'the console reads every ticket, not just its own',
+      );
     });
 
-    test('closing takes it out of the open count, reopening puts it back',
-        () async {
+    test(
+      'closing takes it out of the open count, reopening puts it back',
+      () async {
+        final id = await support.openTicket(
+          userId: 'rider1',
+          userName: 'Rider One',
+          subject: 'Refund',
+          body: 'x',
+        );
+
+        Future<bool> isOpen() async =>
+            (await support.watchTicket(id).first)!.isOpen;
+
+        expect(await isOpen(), isTrue);
+        await support.closeTicket(id, userId: 'rider1', subject: 'Refund');
+        expect(await isOpen(), isFalse);
+        await support.reopenTicket(id);
+        expect(
+          await isOpen(),
+          isTrue,
+          reason: 'a closed ticket is not a dead end — §3.13',
+        );
+      },
+    );
+  });
+
+  // ── P2: support movement reaches the owner's notifications ─────────────
+  group('P2 — a support reply is news, not something to discover', () {
+    Future<List<Map<String, dynamic>>> notifications() async => [
+      for (final d in (await db.collection(Col.notifications).get()).docs)
+        d.data(),
+    ];
+
+    test('a staff reply writes support_reply carrying its thread', () async {
       final id = await support.openTicket(
-        userId: 'rider1', userName: 'Rider One',
-        subject: 'Refund', body: 'x',
+        userId: 'rider1',
+        userName: 'Rider One',
+        subject: 'Refund',
+        body: 'Where is my money?',
+      );
+      await support.replyAsStaff(
+        ticketId: id,
+        staffId: 'support1',
+        text: 'On its way today.',
+        userId: 'rider1',
+        subject: 'Refund',
       );
 
-      Future<bool> isOpen() async =>
-          (await support.watchTicket(id).first)!.isOpen;
+      final n = (await notifications()).single;
+      expect(n['targetUserId'], 'rider1');
+      expect(n['type'], 'support_reply');
+      expect(
+        n['ticketId'],
+        id,
+        reason: 'the tap must land in this thread, not on the list',
+      );
+      expect(n['message'], 'On its way today.');
+      expect(n['title'], contains('Refund'));
+    });
 
-      expect(await isOpen(), isTrue);
-      await support.closeTicket(id);
-      expect(await isOpen(), isFalse);
-      await support.reopenTicket(id);
-      expect(await isOpen(), isTrue,
-          reason: 'a closed ticket is not a dead end — §3.13');
+    test('resolving writes support_closed that names the way back', () async {
+      final id = await support.openTicket(
+        userId: 'rider1',
+        userName: 'Rider One',
+        subject: 'Refund',
+        body: 'x',
+      );
+      await support.closeTicket(id, userId: 'rider1', subject: 'Refund');
+
+      final n = (await notifications()).single;
+      expect(n['type'], 'support_closed');
+      expect(n['ticketId'], id);
+      expect(
+        n['message'],
+        contains('reopen'),
+        reason:
+            'a silent resolution reads as being ignored — the copy '
+            'must offer the disagree path',
+      );
     });
   });
 }

@@ -27,15 +27,15 @@ class Review {
   final DateTime? createdAt;
 
   factory Review.fromDoc(String id, Map<String, dynamic> d) => Review(
-        id: id,
-        trainerId: d.str('trainerId') ?? '',
-        userId: d.str('userId') ?? '',
-        userName: d.str('userName') ?? 'Rider',
-        rating: (d.integer('rating') ?? 5).clamp(1, 5),
-        comment: d.str('comment'),
-        bookingId: d.str('bookingId'),
-        createdAt: d.date('createdAt'),
-      );
+    id: id,
+    trainerId: d.str('trainerId') ?? '',
+    userId: d.str('userId') ?? '',
+    userName: d.str('userName') ?? 'Rider',
+    rating: (d.integer('rating') ?? 5).clamp(1, 5),
+    comment: d.str('comment'),
+    bookingId: d.str('bookingId'),
+    createdAt: d.date('createdAt'),
+  );
 }
 
 /// Computed rating. With no reviews the summary is **5.0 / 0** so unrated
@@ -83,7 +83,8 @@ class ChatThread {
   }
 
   factory ChatThread.fromDoc(String id, Map<String, dynamic> d) {
-    final names = d.nested('participantNames')
+    final names = d
+        .nested('participantNames')
         .map((k, v) => MapEntry(k, v?.toString() ?? ''));
     return ChatThread(
       id: id,
@@ -135,12 +136,12 @@ class ChatMessage {
   final bool read;
 
   factory ChatMessage.fromDoc(String id, Map<String, dynamic> d) => ChatMessage(
-        id: id,
-        senderId: d.str('senderId') ?? '',
-        text: d.str('text') ?? '',
-        createdAt: d.date('createdAt'),
-        read: d.boolean('read'),
-      );
+    id: id,
+    senderId: d.str('senderId') ?? '',
+    text: d.str('text') ?? '',
+    createdAt: d.date('createdAt'),
+    read: d.boolean('read'),
+  );
 }
 
 enum NotificationKind {
@@ -158,22 +159,44 @@ enum NotificationKind {
   /// [system] because no case matched — the right destination by accident
   /// rather than by choice (BUG-011). Modelled so the tile can carry its own
   /// icon and the routing switch names the case it is handling.
+  /// `appeal_update` joins it: a staff reply on a suspension appeal is a
+  /// decision about the account, and the message is the payload.
   account,
+
+  /// Support moved on a ticket the user opened: a staff reply, or the
+  /// ticket being resolved. Carries [AppNotification.ticketId] so the tap
+  /// lands in that thread, not on the list (P2).
+  support,
+
+  /// A staff outcome on a complaint the user filed. No destination screen
+  /// exists for a filed report by design (reports are write-only for the
+  /// reporter), so this renders as a sheet and the message carries the
+  /// whole outcome.
+  reportUpdate,
+
+  /// A rider left a review — told to the trainer. Routes to the trainer's
+  /// own public profile, where the review is visible.
+  reviewReceived,
   system;
 
   static NotificationKind parse(String? raw) => switch (raw) {
-        'booking_request' || 'booking_new' => bookingRequest,
-        'booking_confirmed' => bookingConfirmed,
-        'booking_rejected' => bookingRejected,
-        'booking_cancelled' => bookingCancelled,
-        'reminder' => reminder,
-        'review' => review,
-        'message' => message,
-        'global_broadcast' => broadcast,
-        'account_approved' || 'account_rejected' || 'account_restored' =>
-          account,
-        _ => system,
-      };
+    'booking_request' || 'booking_new' => bookingRequest,
+    'booking_confirmed' => bookingConfirmed,
+    'booking_rejected' => bookingRejected,
+    'booking_cancelled' => bookingCancelled,
+    'reminder' => reminder,
+    'review' => review,
+    'message' => message,
+    'global_broadcast' => broadcast,
+    'account_approved' ||
+    'account_rejected' ||
+    'account_restored' ||
+    'appeal_update' => account,
+    'support_reply' || 'support_closed' => support,
+    'report_update' => reportUpdate,
+    'review_received' => reviewReceived,
+    _ => system,
+  };
 }
 
 class AppNotification {
@@ -185,6 +208,9 @@ class AppNotification {
     required this.read,
     this.createdAt,
     this.bookingId,
+    this.ticketId,
+    this.chatPartnerId,
+    this.chatPartnerName,
   });
 
   final String id;
@@ -195,6 +221,19 @@ class AppNotification {
   final DateTime? createdAt;
   final String? bookingId;
 
+  /// The support ticket a [NotificationKind.support] notification is about,
+  /// so its tap opens that thread rather than the ticket list (P2).
+  final String? ticketId;
+
+  /// For [NotificationKind.message]: the *sender's* uid — which is the
+  /// partner id the recipient's chat route needs. Older message
+  /// notifications lack it and fall back to the inbox.
+  final String? chatPartnerId;
+
+  /// The sender's display name, so the chat screen deep-linked from a tap
+  /// can title itself before the thread stream arrives.
+  final String? chatPartnerName;
+
   factory AppNotification.fromDoc(String id, Map<String, dynamic> d) =>
       AppNotification(
         id: id,
@@ -204,5 +243,8 @@ class AppNotification {
         read: d.boolean('read'),
         createdAt: d.date('createdAt'),
         bookingId: d.str('bookingId'),
+        ticketId: d.str('ticketId'),
+        chatPartnerId: d.str('chatPartnerId'),
+        chatPartnerName: d.str('chatPartnerName'),
       );
 }

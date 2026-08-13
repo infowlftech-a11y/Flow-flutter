@@ -46,8 +46,11 @@ class AdminRepository {
   Stream<List<AppUser>> watchBlockedUsers() => _users
       .where('status', isEqualTo: 'blocked')
       .snapshots()
-      .map((qs) =>
-          [for (final doc in qs.docs) AppUser.fromDoc(doc.id, doc.data())]);
+      .map(
+        (qs) => [
+          for (final doc in qs.docs) AppUser.fromDoc(doc.id, doc.data()),
+        ],
+      );
 
   /// A review decision is an explicit statement of what the account now IS,
   /// so it supersedes any suspension in force: the block markers are cleared
@@ -56,9 +59,9 @@ class AdminRepository {
   /// later [unblockUser] restored `statusBeforeBlock`, pulling an approved,
   /// bookable trainer back to `pending` and out of Explore.
   static Map<String, dynamic> get _clearBlockMarkers => {
-        'blockedUntil': FieldValue.delete(),
-        'statusBeforeBlock': FieldValue.delete(),
-      };
+    'blockedUntil': FieldValue.delete(),
+    'statusBeforeBlock': FieldValue.delete(),
+  };
 
   /// Approve a trainer — this is what makes them visible in Explore, which
   /// queries `role == 'business' && status == 'active'`.
@@ -71,7 +74,8 @@ class AdminRepository {
     await _notifications.notify(
       targetUserId: trainer.uid,
       title: "You're live on Flow 🤙",
-      message: 'Your trainer profile is approved. Riders can find and book '
+      message:
+          'Your trainer profile is approved. Riders can find and book '
           'you from now on.',
       type: 'account_approved',
     );
@@ -90,17 +94,16 @@ class AdminRepository {
     await _notifications.notify(
       targetUserId: trainer.uid,
       title: 'Application not approved',
-      message: 'We could not verify your trainer application.'
+      message:
+          'We could not verify your trainer application.'
           '${note.isEmpty ? '' : ' Reason: $note'}',
       type: 'account_rejected',
     );
   }
 
   /// Return a previously reviewed account to the pending queue.
-  Future<void> restoreToPending(String uid) => _users.doc(uid).update({
-        'status': 'pending',
-        ..._clearBlockMarkers,
-      });
+  Future<void> restoreToPending(String uid) =>
+      _users.doc(uid).update({'status': 'pending', ..._clearBlockMarkers});
 
   // ── Suspensions ────────────────────────────────────────────────────────
 
@@ -184,8 +187,11 @@ class AdminRepository {
         final list = [
           for (final doc in qs.docs) LeaveReason.fromDoc(doc.id, doc.data()),
         ];
-        list.sort((a, b) => (b.createdAt ?? DateTime(0))
-            .compareTo(a.createdAt ?? DateTime(0)));
+        list.sort(
+          (a, b) => (b.createdAt ?? DateTime(0)).compareTo(
+            a.createdAt ?? DateTime(0),
+          ),
+        );
         return list;
       });
 
@@ -193,46 +199,89 @@ class AdminRepository {
 
   /// Newest first, client-side (§6.2).
   Stream<List<Report>> watchReports() => _reports.snapshots().map((qs) {
-        final list = [
-          for (final doc in qs.docs) Report.fromDoc(doc.id, doc.data()),
-        ];
-        list.sort((a, b) => (b.createdAt ?? DateTime(0))
-            .compareTo(a.createdAt ?? DateTime(0)));
-        return list;
-      });
+    final list = [
+      for (final doc in qs.docs) Report.fromDoc(doc.id, doc.data()),
+    ];
+    list.sort(
+      (a, b) =>
+          (b.createdAt ?? DateTime(0)).compareTo(a.createdAt ?? DateTime(0)),
+    );
+    return list;
+  });
 
+  /// [reporterId]/[reportedUserName] come from the Report the caller is
+  /// holding; they close the loop the reporter was left out of — a filed
+  /// complaint used to resolve into a collection its author cannot read,
+  /// so from their side every report vanished (P2).
   Future<void> closeReport(
     String reportId, {
     required bool upheld,
     String? note,
-  }) =>
-      _reports.doc(reportId).update({
-        'status': upheld ? 'resolved' : 'dismissed',
-        'resolvedAt': FieldValue.serverTimestamp(),
-        if ((note ?? '').trim().isNotEmpty) 'resolutionNote': note!.trim(),
-      });
+    String? reporterId,
+    String? reportedUserName,
+  }) async {
+    await _reports.doc(reportId).update({
+      'status': upheld ? 'resolved' : 'dismissed',
+      'resolvedAt': FieldValue.serverTimestamp(),
+      if ((note ?? '').trim().isNotEmpty) 'resolutionNote': note!.trim(),
+    });
+    if (reporterId == null || reporterId.isEmpty) return;
+    final who = (reportedUserName ?? '').isEmpty
+        ? 'the person'
+        : reportedUserName!;
+    final closing = (note ?? '').trim();
+    await _notifications.notify(
+      targetUserId: reporterId,
+      title: upheld ? 'Your report led to action' : 'Your report was reviewed',
+      message: upheld
+          ? 'Thank you for flagging $who — the team reviewed your report '
+                'and acted on it.'
+                '${closing.isEmpty ? '' : ' $closing'}'
+          : 'The team reviewed your report about $who and did not find '
+                'grounds to act on it this time.'
+                '${closing.isEmpty ? '' : ' $closing'}',
+      type: 'report_update',
+    );
+  }
 
   // ── Appeals ────────────────────────────────────────────────────────────
 
   Stream<List<Appeal>> watchAppeals() => _appeals.snapshots().map((qs) {
-        final list = [
-          for (final doc in qs.docs) Appeal.fromDoc(doc.id, doc.data()),
-        ];
-        list.sort((a, b) => (b.createdAt ?? DateTime(0))
-            .compareTo(a.createdAt ?? DateTime(0)));
-        return list;
-      });
+    final list = [
+      for (final doc in qs.docs) Appeal.fromDoc(doc.id, doc.data()),
+    ];
+    list.sort(
+      (a, b) =>
+          (b.createdAt ?? DateTime(0)).compareTo(a.createdAt ?? DateTime(0)),
+    );
+    return list;
+  });
 
   /// arrayUnion, matching the rider side — a read-modify-write would drop a
   /// reply the user sent concurrently (§6.3).
-  Future<void> replyToAppeal(String appealId, AppealMessage message) =>
-      _appeals.doc(appealId).update({
-        'messages': FieldValue.arrayUnion([message.toMap()]),
-      });
+  ///
+  /// [notifyUserId]: the suspended account the appeal belongs to. In-app
+  /// they live behind the blocked gate, where the thread already shows the
+  /// reply — the notification exists for the push, which is the only channel
+  /// that reaches someone who has stopped opening the app (P2).
+  Future<void> replyToAppeal(
+    String appealId,
+    AppealMessage message, {
+    String? notifyUserId,
+  }) async {
+    await _appeals.doc(appealId).update({
+      'messages': FieldValue.arrayUnion([message.toMap()]),
+    });
+    if (notifyUserId == null || notifyUserId.isEmpty) return;
+    await _notifications.notify(
+      targetUserId: notifyUserId,
+      title: 'Support replied to your appeal',
+      message: message.text,
+      type: 'appeal_update',
+    );
+  }
 
-  Future<void> setAppealStatus(String appealId, String status) =>
-      _appeals.doc(appealId).update({
-        'status': status,
-        'reviewedAt': FieldValue.serverTimestamp(),
-      });
+  Future<void> setAppealStatus(String appealId, String status) => _appeals
+      .doc(appealId)
+      .update({'status': status, 'reviewedAt': FieldValue.serverTimestamp()});
 }

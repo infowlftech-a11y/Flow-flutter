@@ -30,6 +30,10 @@ interface NotificationDoc {
   message?: unknown;
   type?: unknown;
   bookingId?: unknown;
+  /** P2 deep-link payloads — see NotificationRepository.notify. */
+  ticketId?: unknown;
+  chatPartnerId?: unknown;
+  chatPartnerName?: unknown;
   read?: unknown;
   /** Written by lib/dev/seed_content.dart — see the guard below. */
   seeded?: unknown;
@@ -154,6 +158,9 @@ export const onNewNotification = onDocumentCreated(
     const body = readString(doc.message) ?? "";
     const type = readString(doc.type) ?? "system";
     const bookingId = readString(doc.bookingId);
+    const ticketId = readString(doc.ticketId);
+    const chatPartnerId = readString(doc.chatPartnerId);
+    const chatPartnerName = readString(doc.chatPartnerName);
 
     try {
       await getMessaging().send({
@@ -164,8 +171,17 @@ export const onNewNotification = onDocumentCreated(
         notification: { title, body },
         // Read by PushController.handleTap in lib/services/push_service.dart.
         // `bookingId` is what lets a push land on the specific booking
-        // (`/sessions?highlight=…`) instead of a bare list.
-        data: stringData({ type, bookingId, notificationId }),
+        // (`/sessions?highlight=…`) instead of a bare list; `ticketId` and
+        // `chatPartnerId`/`chatPartnerName` do the same for support threads
+        // and conversations (P2).
+        data: stringData({
+          type,
+          bookingId,
+          ticketId,
+          chatPartnerId,
+          chatPartnerName,
+          notificationId,
+        }),
         android: {
           // These are time-critical on a beach: a booking request a trainer
           // sees an hour late is a booking they lost.

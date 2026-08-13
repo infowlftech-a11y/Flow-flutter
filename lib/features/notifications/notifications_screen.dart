@@ -85,16 +85,19 @@ class _NotificationTile extends ConsumerWidget {
   final AppNotification item;
 
   IconData get _icon => switch (item.kind) {
-        NotificationKind.bookingRequest => Symbols.pending_actions_rounded,
-        NotificationKind.bookingConfirmed => Symbols.event_available_rounded,
-        NotificationKind.bookingRejected => Symbols.event_busy_rounded,
-        NotificationKind.bookingCancelled => Symbols.cancel_rounded,
-        NotificationKind.reminder => Symbols.alarm_rounded,
-        NotificationKind.review => Symbols.star_rounded,
-        NotificationKind.message => Symbols.chat_bubble_rounded,
-        NotificationKind.account => Symbols.verified_user_rounded,
-        _ => Symbols.campaign_rounded,
-      };
+    NotificationKind.bookingRequest => Symbols.pending_actions_rounded,
+    NotificationKind.bookingConfirmed => Symbols.event_available_rounded,
+    NotificationKind.bookingRejected => Symbols.event_busy_rounded,
+    NotificationKind.bookingCancelled => Symbols.cancel_rounded,
+    NotificationKind.reminder => Symbols.alarm_rounded,
+    NotificationKind.review => Symbols.star_rounded,
+    NotificationKind.reviewReceived => Symbols.star_rounded,
+    NotificationKind.message => Symbols.chat_bubble_rounded,
+    NotificationKind.support => Symbols.support_agent_rounded,
+    NotificationKind.reportUpdate => Symbols.flag_rounded,
+    NotificationKind.account => Symbols.verified_user_rounded,
+    _ => Symbols.campaign_rounded,
+  };
 
   void _open(BuildContext context, WidgetRef ref) {
     // Tapping marks read, fire-and-forget (§11.2).
@@ -120,23 +123,55 @@ class _NotificationTile extends ConsumerWidget {
         if (isTrainer) {
           leaveTo('/home');
         } else {
-          leaveTo(item.bookingId != null
-              ? '/sessions?highlight=${item.bookingId}'
-              : '/sessions');
+          leaveTo(
+            item.bookingId != null
+                ? '/sessions?highlight=${item.bookingId}'
+                : '/sessions',
+          );
         }
       case NotificationKind.message:
         // Not leaveTo: `/inbox` is a pushed destination, not a shell branch,
         // and `go()` made it the entire stack — no back arrow, and system
         // back left the app. Pop this modal, then push the same inbox route
         // the Discover header pushes, so Back returns to the shell.
+        //
+        // With a sender in the payload the tap lands in that conversation
+        // itself (P2); pre-payload notifications keep the inbox.
         if (context.canPop()) context.pop();
-        context.push('/inbox');
+        final partner = item.chatPartnerId;
+        if (partner == null || partner.isEmpty) {
+          context.push('/inbox');
+        } else {
+          context.push(
+            Uri(
+              path: '/chat/$partner',
+              queryParameters: {
+                if ((item.chatPartnerName ?? '').isNotEmpty)
+                  'name': item.chatPartnerName!,
+              },
+            ).toString(),
+          );
+        }
+      case NotificationKind.support:
+        // The thread the reply landed in, not the ticket list. Fallback for
+        // any notification written before the payload existed.
+        if (context.canPop()) context.pop();
+        context.push(
+          item.ticketId == null
+              ? '/support'
+              : '/support/ticket/${item.ticketId}',
+        );
+      case NotificationKind.reviewReceived:
+        // The trainer's own public profile is where reviews render.
+        if (context.canPop()) context.pop();
+        context.push('/trainer/${ref.read(sessionProvider).uid}');
       case NotificationKind.review:
         leaveTo('/sessions');
+      case NotificationKind.reportUpdate:
       case NotificationKind.account:
-        // Deliberately the sheet, not a screen: the message *is* the payload
-        // — a rejection carries its reason in full — and the account state
-        // it announces is already wherever the gate routed the user.
+      // Deliberately the sheet, not a screen: the message *is* the payload
+      // — a rejection carries its reason in full — and the account state
+      // it announces is already wherever the gate routed the user.
       case NotificationKind.broadcast:
       case NotificationKind.system:
         // No destination — full untruncated text in a sheet (§3.12).
@@ -146,11 +181,12 @@ class _NotificationTile extends ConsumerWidget {
           builder: (sheetContext) => Padding(
             padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
             child: SingleChildScrollView(
-              child: Text(item.message,
-                  style: Theme.of(sheetContext)
-                      .textTheme
-                      .bodyLarge!
-                      .copyWith(height: 1.55)),
+              child: Text(
+                item.message,
+                style: Theme.of(
+                  sheetContext,
+                ).textTheme.bodyLarge!.copyWith(height: 1.55),
+              ),
             ),
           ),
         );
@@ -184,8 +220,10 @@ class _NotificationTile extends ConsumerWidget {
             // Same radius as the row it reveals, or the red corners peek out.
             borderRadius: FlowRadii.card,
           ),
-          child:
-              const Icon(Symbols.delete_outline_rounded, color: Colors.white),
+          child: const Icon(
+            Symbols.delete_outline_rounded,
+            color: Colors.white,
+          ),
         ),
         // Not a FlowCard: the read/unread tint tweens (§10.9), and FlowCard
         // paints a plain Container, which would make the transition snap.
@@ -206,9 +244,10 @@ class _NotificationTile extends ConsumerWidget {
                     : tones.azureBrand.withValues(alpha: .09),
                 borderRadius: FlowRadii.card,
                 border: Border.all(
-                    color: item.read
-                        ? tones.line
-                        : tones.azureBrand.withValues(alpha: .35)),
+                  color: item.read
+                      ? tones.line
+                      : tones.azureBrand.withValues(alpha: .35),
+                ),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -222,34 +261,44 @@ class _NotificationTile extends ConsumerWidget {
                         Row(
                           children: [
                             Expanded(
-                              child: Text(item.title,
-                                  style: inter(
-                                      14, item.read ? 600 : 720,
-                                      color:
-                                          context.scheme.onSurface)),
+                              child: Text(
+                                item.title,
+                                style: inter(
+                                  14,
+                                  item.read ? 600 : 720,
+                                  color: context.scheme.onSurface,
+                                ),
+                              ),
                             ),
-                            Text(timeAgo(item.createdAt),
-                                style: inter(11.5, 520,
-                                    color: tones.textFaint)),
+                            Text(
+                              timeAgo(item.createdAt),
+                              style: inter(11.5, 520, color: tones.textFaint),
+                            ),
                             if (!item.read) ...[
                               const SizedBox(width: 6),
                               Container(
                                 width: 8,
                                 height: 8,
                                 decoration: BoxDecoration(
-                                    color: tones.azureBrand,
-                                    shape: BoxShape.circle),
+                                  color: tones.azureBrand,
+                                  shape: BoxShape.circle,
+                                ),
                               ),
                             ],
                           ],
                         ),
                         const SizedBox(height: 3),
-                        Text(item.message,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: inter(12.5, item.read ? 440 : 540,
-                                color: context.scheme.onSurfaceVariant,
-                                height: 1.4)),
+                        Text(
+                          item.message,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: inter(
+                            12.5,
+                            item.read ? 440 : 540,
+                            color: context.scheme.onSurfaceVariant,
+                            height: 1.4,
+                          ),
+                        ),
                       ],
                     ),
                   ),

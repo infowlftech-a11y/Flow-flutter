@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../firestore_paths.dart';
 import '../models/support.dart';
+import 'notification_repository.dart';
 
 /// An appeal was refused because one is already under review (BUG-016).
 ///
@@ -18,8 +19,9 @@ class DuplicateAppealFailure implements Exception {
 }
 
 class SupportRepository {
-  SupportRepository(this._db);
+  SupportRepository(this._db, this._notifications);
   final FirebaseFirestore _db;
+  final NotificationRepository _notifications;
 
   CollectionReference<Map<String, dynamic>> get _tickets =>
       _db.collection(Col.tickets);
@@ -28,15 +30,16 @@ class SupportRepository {
 
   // ── Tickets (§3.14) ────────────────────────────────────────────────────
 
-  Stream<List<SupportTicket>> watchMyTickets(String uid) => _tickets
-      .where('userId', isEqualTo: uid)
-      .snapshots()
-      .map((qs) {
+  Stream<List<SupportTicket>> watchMyTickets(String uid) =>
+      _tickets.where('userId', isEqualTo: uid).snapshots().map((qs) {
         final list = [
           for (final d in qs.docs) SupportTicket.fromDoc(d.id, d.data()),
         ];
-        list.sort((a, b) => (b.lastMessageAt ?? DateTime(0))
-            .compareTo(a.lastMessageAt ?? DateTime(0)));
+        list.sort(
+          (a, b) => (b.lastMessageAt ?? DateTime(0)).compareTo(
+            a.lastMessageAt ?? DateTime(0),
+          ),
+        );
         return list;
       });
 
@@ -54,18 +57,27 @@ class SupportRepository {
         ];
         list.sort((a, b) {
           if (a.isOpen != b.isOpen) return a.isOpen ? -1 : 1;
-          return (b.lastMessageAt ?? DateTime(0))
-              .compareTo(a.lastMessageAt ?? DateTime(0));
+          return (b.lastMessageAt ?? DateTime(0)).compareTo(
+            a.lastMessageAt ?? DateTime(0),
+          );
         });
         return list;
       });
 
   /// Staff reply on a ticket. `isAdmin` is what renders it on the other side
   /// as coming from support rather than from the user themselves.
+  ///
+  /// [userId]/[subject] identify the owner and thread for the notification —
+  /// the caller (the staff queue) already holds the ticket, so passing them
+  /// beats a second read of a document we just came from. The user this
+  /// tells was named in the order for P2: "someone from support replying to
+  /// the ticket" must reach the phone, not wait to be discovered.
   Future<void> replyAsStaff({
     required String ticketId,
     required String staffId,
     required String text,
+    required String userId,
+    required String subject,
   }) async {
     await _tickets.doc(ticketId).collection(Col.messages).add({
       'text': text,
@@ -73,13 +85,40 @@ class SupportRepository {
       'isAdmin': true,
       'createdAt': FieldValue.serverTimestamp(),
     });
-    await _tickets
-        .doc(ticketId)
-        .update({'lastMessageAt': FieldValue.serverTimestamp()});
+    await _tickets.doc(ticketId).update({
+      'lastMessageAt': FieldValue.serverTimestamp(),
+    });
+    // After the reply is committed — a notification for a write that then
+    // failed would announce a message that does not exist.
+    var preview = text.trim();
+    if (preview.length > 120) preview = '${preview.substring(0, 120)}…';
+    await _notifications.notify(
+      targetUserId: userId,
+      title: 'Support replied — $subject',
+      message: preview,
+      type: 'support_reply',
+      ticketId: ticketId,
+    );
   }
 
-  Future<void> closeTicket(String ticketId) =>
-      _tickets.doc(ticketId).update({'status': 'closed'});
+  /// Closing tells the owner: a ticket silently flipping to "resolved" reads
+  /// as being ignored, and the thread offers REOPEN if they disagree.
+  Future<void> closeTicket(
+    String ticketId, {
+    required String userId,
+    required String subject,
+  }) async {
+    await _tickets.doc(ticketId).update({'status': 'closed'});
+    await _notifications.notify(
+      targetUserId: userId,
+      title: 'Ticket resolved — $subject',
+      message:
+          'Support marked this ticket as resolved. If it is not, open the '
+          'thread and reopen it.',
+      type: 'support_closed',
+      ticketId: ticketId,
+    );
+  }
 
   Stream<SupportTicket?> watchTicket(String id) => _tickets
       .doc(id)
@@ -99,11 +138,8 @@ class SupportRepository {
   ///
   /// Treating a pending timestamp as what it is, the newest message, keeps
   /// the bubble where it was typed.
-  Stream<List<TicketMessage>> watchTicketMessages(String ticketId) => _tickets
-      .doc(ticketId)
-      .collection(Col.messages)
-      .snapshots()
-      .map((qs) {
+  Stream<List<TicketMessage>> watchTicketMessages(String ticketId) =>
+      _tickets.doc(ticketId).collection(Col.messages).snapshots().map((qs) {
         final list = [
           for (final d in qs.docs) TicketMessage.fromDoc(d.id, d.data()),
         ];
@@ -164,9 +200,9 @@ class SupportRepository {
       'isAdmin': false,
       'createdAt': FieldValue.serverTimestamp(),
     });
-    await _tickets
-        .doc(ticketId)
-        .update({'lastMessageAt': FieldValue.serverTimestamp()});
+    await _tickets.doc(ticketId).update({
+      'lastMessageAt': FieldValue.serverTimestamp(),
+    });
   }
 
   Future<void> reopenTicket(String ticketId) =>
@@ -184,17 +220,17 @@ class SupportRepository {
   /// closed thread that the staff queue, which counts only `pending`, never
   /// surfaces. Sorted client-side because an `orderBy` alongside the `where`
   /// would require a composite index, which this app avoids by design (§6.2).
-  Stream<Appeal?> watchMyAppeal(String uid) => _appeals
-      .where('userId', isEqualTo: uid)
-      .snapshots()
-      .map((qs) {
-        if (qs.docs.isEmpty) return null;
-        final appeals = [
-          for (final d in qs.docs) Appeal.fromDoc(d.id, d.data()),
-        ]..sort((a, b) => (b.createdAt ?? DateTime(0))
-            .compareTo(a.createdAt ?? DateTime(0)));
-        return appeals.first;
-      });
+  Stream<Appeal?> watchMyAppeal(
+    String uid,
+  ) => _appeals.where('userId', isEqualTo: uid).snapshots().map((qs) {
+    if (qs.docs.isEmpty) return null;
+    final appeals = [for (final d in qs.docs) Appeal.fromDoc(d.id, d.data())]
+      ..sort(
+        (a, b) =>
+            (b.createdAt ?? DateTime(0)).compareTo(a.createdAt ?? DateTime(0)),
+      );
+    return appeals.first;
+  });
 
   /// Refuses a second appeal while one is still `pending` — per open case,
   /// not per lifetime; a user suspended again may appeal again.

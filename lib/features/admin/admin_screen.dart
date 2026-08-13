@@ -603,6 +603,8 @@ class _ReportCard extends ConsumerWidget {
                   report.id,
                   upheld: true,
                   note: note.text,
+                  reporterId: report.reporterId,
+                  reportedUserName: report.reportedUserName,
                 );
                 if (sheetContext.mounted) Navigator.pop(sheetContext);
                 if (context.mounted) {
@@ -619,17 +621,27 @@ class _ReportCard extends ConsumerWidget {
                 final sure = await confirmAction(
                   sheetContext,
                   title: 'Dismiss this report?',
+                  // P2 changed the second sentence from "is not told either
+                  // way": the reporter now gets a notification with the
+                  // outcome, and your note rides along in it.
                   body:
                       'It closes with no action against '
-                      '${report.reportedUserName}. The rider who filed it is '
-                      'not told either way.',
+                      '${report.reportedUserName}. The person who filed it is '
+                      'told it was reviewed and dismissed — your note is '
+                      'included.',
                   confirmLabel: 'Dismiss report',
                   cancelLabel: 'Keep open',
                 );
                 if (!sure) return;
                 await ref
                     .read(adminRepositoryProvider)
-                    .closeReport(report.id, upheld: false, note: note.text);
+                    .closeReport(
+                      report.id,
+                      upheld: false,
+                      note: note.text,
+                      reporterId: report.reporterId,
+                      reportedUserName: report.reportedUserName,
+                    );
                 if (sheetContext.mounted) Navigator.pop(sheetContext);
                 if (context.mounted) {
                   showFlowToast(context, 'Report dismissed');
@@ -709,6 +721,7 @@ class _AppealCardState extends ConsumerState<_AppealCard> {
           .read(adminRepositoryProvider)
           .replyToAppeal(
             widget.appeal.id,
+            notifyUserId: widget.appeal.userId,
             AppealMessage(
               id: DateTime.now().millisecondsSinceEpoch.toString(),
               senderId: session.uid,

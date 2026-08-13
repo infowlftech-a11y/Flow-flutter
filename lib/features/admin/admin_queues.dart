@@ -197,7 +197,11 @@ class _TicketCard extends ConsumerWidget {
                         if (!ok) return;
                         await ref
                             .read(supportRepositoryProvider)
-                            .closeTicket(ticket.id);
+                            .closeTicket(
+                              ticket.id,
+                              userId: ticket.userId,
+                              subject: ticket.subject,
+                            );
                         if (sheetContext.mounted) {
                           Navigator.pop(sheetContext);
                         }
@@ -224,6 +228,8 @@ class _TicketCard extends ConsumerWidget {
                             ticketId: ticket.id,
                             staffId: ref.read(sessionProvider).uid,
                             text: text,
+                            userId: ticket.userId,
+                            subject: ticket.subject,
                           );
                       if (sheetContext.mounted) Navigator.pop(sheetContext);
                     },

@@ -4,6 +4,7 @@ import '../../core/utils/date_x.dart';
 import '../../core/utils/doc_x.dart';
 import '../firestore_paths.dart';
 import '../models/booking.dart';
+import '../models/cancellation.dart';
 import '../models/catalogue.dart';
 import '../models/payment.dart';
 import '../models/schedule.dart';
@@ -75,9 +76,7 @@ class StatusConflictFailure implements Exception {
 /// right recovery here too.
 class LeadTimeFailure extends SlotTakenFailure {
   const LeadTimeFailure(super.slots)
-      : super(
-          message: 'That hour is too close to now. Pick a later time.',
-        );
+    : super(message: 'That hour is too close to now. Pick a later time.');
 }
 
 class BookingRepository {
@@ -143,16 +142,15 @@ class BookingRepository {
     required String date,
     required Slot start,
     required Slot end,
-  }) =>
-      {
-        'instructorId': instructorId,
-        'date': date,
-        'startTime': start.value,
-        'endTime': end.value,
-        'status': 'occupied',
-        'label': 'Booked',
-        'createdAt': FieldValue.serverTimestamp(),
-      };
+  }) => {
+    'instructorId': instructorId,
+    'date': date,
+    'startTime': start.value,
+    'endTime': end.value,
+    'status': 'occupied',
+    'label': 'Booked',
+    'createdAt': FieldValue.serverTimestamp(),
+  };
 
   /// Hourly bookings are **checked, not locked**: Firestore transactions
   /// cannot read a query, so we re-query the day right before writing and
@@ -174,8 +172,11 @@ class BookingRepository {
   /// snapshot and the confirm used to slip through, because the re-check
   /// only looked at bookings (§8.6).
   Future<void> _assertSlotsFree(
-      String instructorId, String date, List<Slot> wanted,
-      {String? ignoreBookingId}) async {
+    String instructorId,
+    String date,
+    List<Slot> wanted, {
+    String? ignoreBookingId,
+  }) async {
     final taken = <String>{};
     final visible = <String>{};
     try {
@@ -211,7 +212,10 @@ class BookingRepository {
       taken.addAll([for (final s in block.expandBlock()) s.value]);
     }
 
-    final clash = [for (final s in wanted) if (taken.contains(s.value)) s.value];
+    final clash = [
+      for (final s in wanted)
+        if (taken.contains(s.value)) s.value,
+    ];
     if (clash.isNotEmpty) throw SlotTakenFailure(clash);
   }
 
@@ -248,8 +252,11 @@ class BookingRepository {
     }
     final start = sorted.first;
     final hours = sorted.length;
-    final window =
-        BookingMath.window(start, hours, bufferMinutes: bufferMinutes);
+    final window = BookingMath.window(
+      start,
+      hours,
+      bufferMinutes: bufferMinutes,
+    );
     if (!window.isValid) throw ArgumentError(window.error!);
 
     // The grid greys out "too soon" hours from the availability snapshot, so
@@ -259,7 +266,10 @@ class BookingRepository {
     // re-check below already closes this gap for hours someone else took;
     // the lead time needs the same treatment (§8.2, §8.6).
     final tooSoon = BookingMath.pastSlots(date);
-    final late = [for (final s in sorted) if (tooSoon.contains(s)) s.value];
+    final late = [
+      for (final s in sorted)
+        if (tooSoon.contains(s)) s.value,
+    ];
     if (late.isNotEmpty) throw LeadTimeFailure(late);
 
     await _assertSlotsFree(target.providerId, date, sorted);
@@ -306,13 +316,14 @@ class BookingRepository {
       'createdAt': FieldValue.serverTimestamp(),
     });
     batch.set(
-        _occupiedRef(doc.id),
-        _occupiedDoc(
-          instructorId: target.providerId,
-          date: date,
-          start: start,
-          end: window.end,
-        ));
+      _occupiedRef(doc.id),
+      _occupiedDoc(
+        instructorId: target.providerId,
+        date: date,
+        start: start,
+        end: window.end,
+      ),
+    );
     await batch.commit();
 
     await _notifications.notify(
@@ -337,14 +348,18 @@ class BookingRepository {
     required double totalPrice,
     int bufferMinutes = 60,
   }) async {
-    final window =
-        BookingMath.window(start, durationHours, bufferMinutes: bufferMinutes);
+    final window = BookingMath.window(
+      start,
+      durationHours,
+      bufferMinutes: bufferMinutes,
+    );
     if (!window.isValid) throw ArgumentError(window.error!);
     // `window` only rejects a *midnight* overflow, which 17:00 + 4h clears
     // comfortably — the real bound is the 18:00 close (§8.1).
     if (!BookingMath.fitsInDay(start, durationHours)) {
       throw ArgumentError(
-          'A session must finish by ${BookingMath.lastHour}:00.');
+        'A session must finish by ${BookingMath.lastHour}:00.',
+      );
     }
     final slots = [for (var i = 0; i < durationHours; i++) start.plusHours(i)];
     await _assertSlotsFree(instructorId, date, slots);
@@ -376,13 +391,14 @@ class BookingRepository {
     // A walk-in holds hours like any other booking, and with bookings private
     // the occupied doc is the only way another rider's grid can see them.
     batch.set(
-        _occupiedRef(doc.id),
-        _occupiedDoc(
-          instructorId: instructorId,
-          date: date,
-          start: start,
-          end: window.end,
-        ));
+      _occupiedRef(doc.id),
+      _occupiedDoc(
+        instructorId: instructorId,
+        date: date,
+        start: start,
+        end: window.end,
+      ),
+    );
     await batch.commit();
   }
 
@@ -479,40 +495,42 @@ class BookingRepository {
   /// written, so the caller can skip the notification that would otherwise
   /// announce a change that did not happen.
   Future<bool> _writeIfLive(
-          String bookingId, BookingStatus target, Map<String, dynamic> data) =>
-      _db.runTransaction((tx) async {
-        final ref = _col.doc(bookingId);
-        final snap = await tx.get(ref);
-        if (!snap.exists) {
-          throw const StatusConflictFailure('That booking no longer exists.');
-        }
-        // A terminal transition releases the booking's occupied doc (§8.5).
-        // Read before any write — a transaction demands that order — and only
-        // delete what exists: bookings written before the occupied docs did
-        // have none, and their cancel must still land.
-        final occupied = _terminal.contains(target)
-            ? await tx.get(_occupiedRef(bookingId))
-            : null;
-        final current = BookingStatus.parse(snap.data()?.str('status'));
-        // Asking for the state it is already in is a retry, not a conflict:
-        // a cancel issued from two screens, or one that had actually landed.
-        // The same reading `markPaid` takes of a second settlement — and the
-        // reason the safari seat count cannot be decremented twice.
-        if (current == target) return false;
-        if (_terminal.contains(current)) {
-          throw StatusConflictFailure(switch (current) {
-            BookingStatus.completed => 'That session is already finished.',
-            BookingStatus.cancelled => 'That booking was cancelled.',
-            BookingStatus.rejected => 'That booking was already declined.',
-            _ => 'That booking has already moved on.',
-          });
-        }
-        tx.update(ref, data);
-        if (occupied != null && occupied.exists) {
-          tx.delete(_occupiedRef(bookingId));
-        }
-        return true;
+    String bookingId,
+    BookingStatus target,
+    Map<String, dynamic> data,
+  ) => _db.runTransaction((tx) async {
+    final ref = _col.doc(bookingId);
+    final snap = await tx.get(ref);
+    if (!snap.exists) {
+      throw const StatusConflictFailure('That booking no longer exists.');
+    }
+    // A terminal transition releases the booking's occupied doc (§8.5).
+    // Read before any write — a transaction demands that order — and only
+    // delete what exists: bookings written before the occupied docs did
+    // have none, and their cancel must still land.
+    final occupied = _terminal.contains(target)
+        ? await tx.get(_occupiedRef(bookingId))
+        : null;
+    final current = BookingStatus.parse(snap.data()?.str('status'));
+    // Asking for the state it is already in is a retry, not a conflict:
+    // a cancel issued from two screens, or one that had actually landed.
+    // The same reading `markPaid` takes of a second settlement — and the
+    // reason the safari seat count cannot be decremented twice.
+    if (current == target) return false;
+    if (_terminal.contains(current)) {
+      throw StatusConflictFailure(switch (current) {
+        BookingStatus.completed => 'That session is already finished.',
+        BookingStatus.cancelled => 'That booking was cancelled.',
+        BookingStatus.rejected => 'That booking was already declined.',
+        _ => 'That booking has already moved on.',
       });
+    }
+    tx.update(ref, data);
+    if (occupied != null && occupied.exists) {
+      tx.delete(_occupiedRef(bookingId));
+    }
+    return true;
+  });
 
   /// Approve / decline / complete, with the matching rider notification.
   /// Returns early for manual bookings or an empty kiterId (§11.1).
@@ -521,8 +539,11 @@ class BookingRepository {
   /// cancelled or been declined — the notification below is sent only when the
   /// write actually lands, so a refused approval cannot tell the rider their
   /// session is on.
-  Future<void> setStatus(Booking booking, BookingStatus status,
-      {String? declineReason}) async {
+  Future<void> setStatus(
+    Booking booking,
+    BookingStatus status, {
+    String? declineReason,
+  }) async {
     final written = await _writeIfLive(booking.id, status, {
       'status': status.wire,
       'updatedAt': FieldValue.serverTimestamp(),
@@ -543,8 +564,7 @@ class BookingRepository {
         await _notifications.notify(
           targetUserId: booking.kiterId,
           title: 'Booking approved ✅',
-          message:
-              'Your session on ${prettyYmd(booking.date)} is confirmed.',
+          message: 'Your session on ${prettyYmd(booking.date)} is confirmed.',
           type: 'booking_confirmed',
           bookingId: booking.id,
         );
@@ -555,7 +575,10 @@ class BookingRepository {
           title: 'Booking declined',
           message:
               'Your request for ${prettyYmd(booking.date)} was declined.'
-              '${reason.isEmpty ? '' : ' Reason: $reason'}',
+              '${reason.isEmpty ? '' : ' Reason: $reason'}'
+              // The money is the rider's first question, so the answer
+              // rides the same notification (P1: declined always refunds).
+              '${booking.payment.status.isHeldByApp ? ' Your payment is refunded in full.' : ''}',
           type: 'booking_rejected',
           bookingId: booking.id,
         );
@@ -564,7 +587,11 @@ class BookingRepository {
           targetUserId: booking.kiterId,
           title: 'Booking cancelled',
           message:
-              'Your session on ${prettyYmd(booking.date)} was cancelled.',
+              'Your session on ${prettyYmd(booking.date)} was cancelled by '
+              'your trainer.'
+              // A trainer's own cancellation always refunds (P1) — the fee
+              // protects committed hours, never a withdrawal.
+              '${booking.payment.status.isHeldByApp ? ' Your payment is refunded in full.' : ''}',
           type: 'booking_cancelled',
           bookingId: booking.id,
         );
@@ -614,15 +641,16 @@ class BookingRepository {
       }
       if (current == PaymentStatus.refunded) {
         throw const PaymentFailure(
-            'That session was refunded. Reopen it before taking payment.');
+          'That session was refunded. Reopen it before taking payment.',
+        );
       }
-      if (current == PaymentStatus.held ||
-          current == PaymentStatus.paidOut) {
+      if (current == PaymentStatus.held || current == PaymentStatus.paidOut) {
         // Escrow bookings are settled by FLOW, not on the beach — a trainer
         // "collecting" one would clear FLOW's debt to themselves.
         throw const PaymentFailure(
-            'FLOW holds this payment. It is paid out to you after the '
-            'session — there is nothing to collect in person.');
+          'FLOW holds this payment. It is paid out to you after the '
+          'session — there is nothing to collect in person.',
+        );
       }
       tx.update(ref, {
         'paymentStatus': PaymentStatus.paid.wire,
@@ -691,11 +719,22 @@ class BookingRepository {
         });
       });
     }
+    // The trainer's first question is what it does to their hours and their
+    // money, so the notification answers it. Derived exactly the way the
+    // ledger derives it (P1): the preview at the cancel instant.
+    final charged =
+        booking.payment.status.isHeldByApp &&
+        CancellationPolicy.preview(booking).charged;
     await _notifications.notify(
       targetUserId: booking.instructorId,
       title: 'Rider cancelled ⚠️',
       message:
-          '${booking.studentName} cancelled ${booking.title} on ${prettyYmd(booking.date)}.',
+          '${booking.studentName} cancelled ${booking.title} on ${prettyYmd(booking.date)}.'
+          '${!booking.payment.status.isHeldByApp
+              ? ''
+              : charged
+              ? ' Inside 24 h — the session is still paid out to you.'
+              : ' The rider is refunded and the hours are open again.'}',
       type: 'booking_cancelled',
       bookingId: booking.id,
     );
@@ -753,7 +792,7 @@ class BookingRepository {
   }
 
   /// Per-side history hiding.
-  Future<void> hide(String bookingId, {required bool asInstructor}) =>
-      _col.doc(bookingId).update(
-          {asInstructor ? 'hiddenByInstructor' : 'hiddenByGuest': true});
+  Future<void> hide(String bookingId, {required bool asInstructor}) => _col
+      .doc(bookingId)
+      .update({asInstructor ? 'hiddenByInstructor' : 'hiddenByGuest': true});
 }

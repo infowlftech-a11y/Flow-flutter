@@ -33,11 +33,12 @@ void main() {
 
     test('averages and rounds only at display', () {
       Review r(int rating) => Review(
-          id: 'x',
-          trainerId: 't',
-          userId: 'u',
-          userName: 'U',
-          rating: rating);
+        id: 'x',
+        trainerId: 't',
+        userId: 'u',
+        userName: 'U',
+        rating: rating,
+      );
       final s = RatingSummary.from([r(5), r(4), r(4)]);
       expect(s.count, 3);
       expect(s.average, closeTo(4.3333, .0001));
@@ -75,8 +76,11 @@ void main() {
         'participantNames': {'other': ''},
       });
       expect(t.partnerId('me'), 'other');
-      expect(t.partnerName('me'), 'Rider',
-          reason: 'empty stored name falls back to the neutral placeholder');
+      expect(
+        t.partnerName('me'),
+        'Rider',
+        reason: 'empty stored name falls back to the neutral placeholder',
+      );
       // A thread I am somehow not in yields empty, not a throw.
       final solo = ChatThread.fromDoc('id', {
         'participants': ['me'],
@@ -88,16 +92,67 @@ void main() {
 
   group('NotificationKind.parse', () {
     test('covers the wire aliases and fails to system', () {
-      expect(NotificationKind.parse('booking_request'),
-          NotificationKind.bookingRequest);
-      expect(NotificationKind.parse('booking_new'),
-          NotificationKind.bookingRequest,
-          reason: 'legacy alias still delivered by the push backend');
-      expect(NotificationKind.parse('global_broadcast'),
-          NotificationKind.broadcast);
+      expect(
+        NotificationKind.parse('booking_request'),
+        NotificationKind.bookingRequest,
+      );
+      expect(
+        NotificationKind.parse('booking_new'),
+        NotificationKind.bookingRequest,
+        reason: 'legacy alias still delivered by the push backend',
+      );
+      expect(
+        NotificationKind.parse('global_broadcast'),
+        NotificationKind.broadcast,
+      );
       expect(NotificationKind.parse('confetti'), NotificationKind.system);
       expect(NotificationKind.parse(null), NotificationKind.system);
     });
+
+    test('P2 wire types land on their own kinds, not on system', () {
+      expect(NotificationKind.parse('support_reply'), NotificationKind.support);
+      expect(
+        NotificationKind.parse('support_closed'),
+        NotificationKind.support,
+      );
+      expect(
+        NotificationKind.parse('report_update'),
+        NotificationKind.reportUpdate,
+      );
+      expect(
+        NotificationKind.parse('review_received'),
+        NotificationKind.reviewReceived,
+      );
+      expect(
+        NotificationKind.parse('appeal_update'),
+        NotificationKind.account,
+        reason:
+            'an appeal reply is a decision about the account, and the '
+            'sheet that renders account messages is its destination',
+      );
+    });
+  });
+
+  test('AppNotification carries the P2 deep-link payloads', () {
+    final n = AppNotification.fromDoc('n', const {
+      'type': 'support_reply',
+      'ticketId': 'tk1',
+    });
+    expect(n.kind, NotificationKind.support);
+    expect(n.ticketId, 'tk1');
+
+    final m = AppNotification.fromDoc('m', const {
+      'type': 'message',
+      'chatPartnerId': 'sender1',
+      'chatPartnerName': 'Anna',
+    });
+    expect(m.chatPartnerId, 'sender1');
+    expect(m.chatPartnerName, 'Anna');
+
+    // Pre-P2 documents parse with the payloads simply absent.
+    final old = AppNotification.fromDoc('o', const {'type': 'message'});
+    expect(old.ticketId, isNull);
+    expect(old.chatPartnerId, isNull);
   });
 
   test('AppNotification defaults title to the brand, not to empty', () {

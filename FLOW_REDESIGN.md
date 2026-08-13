@@ -664,3 +664,67 @@ are still disabled on wlf-flow. The app writes and enforces the ledger the
 processor will execute (Stripe Connect is the natural fit: rider pays the
 platform, platform transfers to the trainer). Wiring it is provisioning work
 on the owner's side; the seam is `paymentRef` + the executed states.
+
+---
+
+## P2 — Every event notifies, and every notification lands somewhere
+
+**Ordered 2026-08-13:** "Improve the notification system … everything should
+have a notification to it, like someone from the support replying to the tkt
+… and when clicking it, it should take you to the notification purpose
+section." Implemented the same day.
+
+### What was missing
+
+Bookings, chat and account decisions notified; support replies, ticket
+resolutions, report outcomes, appeal replies and received reviews did not.
+A rider could ask support a question and only discover the answer by
+re-opening the ticket by hand. A filed report resolved into a collection its
+author cannot read, so every complaint looked ignored by design.
+
+### New events (writer → recipient, wire type)
+
+| Event | Recipient | Type | Tap lands on |
+|---|---|---|---|
+| Staff replies to a ticket | ticket owner | `support_reply` | that ticket thread |
+| Staff resolves a ticket | ticket owner | `support_closed` | that ticket thread (REOPEN lives there) |
+| Report closed (upheld or dismissed) | reporter | `report_update` | full-text sheet (reports stay write-only) |
+| Staff replies to an appeal | suspended account | `appeal_update` | sheet; the value is the push — gated users stopped opening the app |
+| Rider submits a review | trainer | `review_received` | trainer's own public profile |
+| Rider cancels (P1 escrow) | trainer | enriched `booking_cancelled` | unchanged; copy now quotes the money outcome |
+| Trainer declines/cancels (P1) | rider | enriched copy | unchanged; "refunded in full" said in the notification |
+
+### Deep-link payloads
+
+`notifications` documents gain optional `ticketId`, `chatPartnerId`,
+`chatPartnerName`. A message notification now opens the conversation itself
+(`/chat/<sender>`), not the inbox; older documents without payloads keep the
+old destinations. New route: `/support/ticket/:id` → the existing
+`TicketThreadScreen` (previously reachable only by walking the list).
+`PushController.handleTap` mirrors `_NotificationTile._open` branch for
+branch — one notification, one destination, in-app or from a push.
+
+### Rules delta
+
+**None.** Staff already bypass the create guard (`isStaff()`), a rider→trainer
+review notification rides the existing shared-booking clause (its
+`bookingId` is the permission), and the rules do not close the notification
+field set, so the payloads are additive. 347 emulator tests untouched.
+
+### Push status
+
+`functions/src/push.ts` already turns every notification document into an
+FCM push and now forwards the new payloads; `sendSessionReminders` writes the
+evening-before nudge. Both remain **undeployed** — Cloud Functions are still
+disabled on wlf-flow. Deploy day is `npm --prefix functions run deploy` once
+the service is enabled; no app changes needed.
+
+### Tests
+
++13: parse arms and payload round-trip (social_model_test), support
+reply/resolve notifications (support_thread_test), review notification and
+double-submit guard (flow_review_test), report/appeal outcomes
+(flow_moderation_test), cancel-copy money outcomes (booking_repository_test).
+Three test files updated at construction sites only (new repository
+dependency / new required params) — no assertion weakened; each carries a P2
+comment.

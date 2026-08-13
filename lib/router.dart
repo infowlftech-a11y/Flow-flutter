@@ -116,8 +116,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(
         path: '/',
-        pageBuilder: (context, state) =>
-            _fadePage(state, const SplashScreen()),
+        pageBuilder: (context, state) => _fadePage(state, const SplashScreen()),
       ),
       // Auth is four routes, not one screen with a mode toggle: the front
       // door, and the three things you can do from it.
@@ -182,57 +181,70 @@ final routerProvider = Provider<GoRouter>((ref) {
         branches: [
           // Branch 0 resolves through a Consumer so a role change swaps
           // Explore ⇄ Command Center without a restart (§4.3).
-          StatefulShellBranch(routes: [
-            GoRoute(
-              path: ShellBranch.paths[ShellBranch.home],
-              builder: (context, state) => Consumer(
-                builder: (context, ref, _) =>
-                    ref.watch(sessionProvider).isTrainer
-                        ? const CommandCenterScreen()
-                        : const ExploreScreen(),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: ShellBranch.paths[ShellBranch.home],
+                builder: (context, state) => Consumer(
+                  builder: (context, ref, _) =>
+                      ref.watch(sessionProvider).isTrainer
+                      ? const CommandCenterScreen()
+                      : const ExploreScreen(),
+                ),
               ),
-            ),
-          ]),
-          StatefulShellBranch(routes: [
-            GoRoute(
-              path: ShellBranch.paths[ShellBranch.sessions],
-              builder: (context, state) => SessionsScreen(
-                  highlightBookingId: state.uri.queryParameters['highlight']),
-            ),
-          ]),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: ShellBranch.paths[ShellBranch.sessions],
+                builder: (context, state) => SessionsScreen(
+                  highlightBookingId: state.uri.queryParameters['highlight'],
+                ),
+              ),
+            ],
+          ),
           // Branch 2 — the rider's check-in credential, promoted from a
           // dialog to a destination (§3.6). Trainers never see this tab; the
           // scanner is their side of the same transaction.
-          StatefulShellBranch(routes: [
-            GoRoute(
-              path: ShellBranch.paths[ShellBranch.ticket],
-              builder: (context, state) => const TicketScreen(),
-            ),
-          ]),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: ShellBranch.paths[ShellBranch.ticket],
+                builder: (context, state) => const TicketScreen(),
+              ),
+            ],
+          ),
           // Branch 3 — the trainer's calendar, which used to be a tab *inside*
           // the Command Center. Lifting it to the bar makes the two things a
           // trainer does all day reachable in one tap each rather than one
           // plus a tab.
-          StatefulShellBranch(routes: [
-            GoRoute(
-              path: ShellBranch.paths[ShellBranch.calendar],
-              builder: (context, state) => const CalendarScreen(),
-            ),
-          ]),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: ShellBranch.paths[ShellBranch.calendar],
+                builder: (context, state) => const CalendarScreen(),
+              ),
+            ],
+          ),
           // Branch 4 — earnings, likewise promoted from a sheet behind a stat
           // tile.
-          StatefulShellBranch(routes: [
-            GoRoute(
-              path: ShellBranch.paths[ShellBranch.earnings],
-              builder: (context, state) => const EarningsScreen(),
-            ),
-          ]),
-          StatefulShellBranch(routes: [
-            GoRoute(
-              path: ShellBranch.paths[ShellBranch.profile],
-              builder: (context, state) => const ProfileScreen(),
-            ),
-          ]),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: ShellBranch.paths[ShellBranch.earnings],
+                builder: (context, state) => const EarningsScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: ShellBranch.paths[ShellBranch.profile],
+                builder: (context, state) => const ProfileScreen(),
+              ),
+            ],
+          ),
         ],
       ),
       GoRoute(
@@ -278,6 +290,17 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/support',
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) => const SupportScreen(),
+        routes: [
+          // The destination a support notification deep-links to (P2). As a
+          // child of /support, Back from a pushed thread falls out to the
+          // ticket list — the same place the in-app path comes from.
+          GoRoute(
+            path: 'ticket/:id',
+            parentNavigatorKey: rootNavigatorKey,
+            builder: (context, state) =>
+                TicketThreadScreen(ticketId: state.pathParameters['id']!),
+          ),
+        ],
       ),
       GoRoute(
         path: '/admin',
