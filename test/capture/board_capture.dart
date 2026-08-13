@@ -399,9 +399,27 @@ Future<FakeFirebaseFirestore> _chatDb() async {
 /// The seed with Instant Book switched on for the trainer.
 Future<FakeFirebaseFirestore> _instantDb() async {
   final db = await seededDb();
+  // P11 facts alongside the P5 flag: enough reviews for the rating
+  // breakdown (≥3), a nationality, and a signup date — so the
+  // trainer-profile shot photographs the profile at full richness.
   await db.collection(Col.users).doc('u_trainer').set({
     'instantBook': true,
+    'nationality': 'Swedish',
+    'createdAt': Timestamp.fromDate(DateTime(2026, 3, 15)),
   }, SetOptions(merge: true));
+  for (final (i, rating, comment) in [
+    (1, 4, 'Great session, wind picked up late.'),
+    (2, 5, 'Patient and precise — landed my first jumps.'),
+  ]) {
+    await db.collection(Col.reviews).add({
+      'trainerId': 'u_trainer',
+      'userId': 'r_extra$i',
+      'userName': 'Rider $i',
+      'rating': rating,
+      'comment': comment,
+      'createdAt': Timestamp.fromDate(DateTime(2026, 7, i)),
+    });
+  }
   return db;
 }
 

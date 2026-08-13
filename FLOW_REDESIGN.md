@@ -919,6 +919,26 @@ a safari station's name overran the sheet by 96px. Fixed in
 theme work, so the fix ships with that commit; the test holds it in
 place either way.
 
+## P11 — The coach profile says more, and everything points at it (ordered 2026-08-13)
+
+The profile grew the facts the data already held. A rating breakdown —
+five bars, the shape of the score, shown from three reviews because two
+is an anecdote — plus "On FLOW since <month year>" (both onboarding
+paths always wrote `createdAt`; the model finally reads it) and a
+nationality tile when one was given. Deliberately not added: a
+sessions-taught counter (the rules stop a rider from querying another
+trainer's bookings, and a counter the client writes is a counter a
+client can inflate) and gear (`quiver` is rider data the trainer form
+never collects).
+
+Every rider-facing coach appearance is now a door: the chat header
+(role-resolved — a rider partner on the trainer's side stays inert,
+stations route to the station profile), the booking screen's provider
+card, and a new Trainer row in the session sheet. One helper
+(`providerProfilePath`) owns the role→route switch for all three.
+Station lesson rows stay unlinked on purpose: `StationInstructor` is a
+subcollection row, not an account, so there is no profile to open.
+
 ## P10 — Every ID in the console is a door (ordered 2026-08-13)
 
 Refs stopped being strings to copy between tabs. A ticket card and its

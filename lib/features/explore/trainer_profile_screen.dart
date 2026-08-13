@@ -293,6 +293,16 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
                           ),
                         ],
                       ),
+                      // The shape of the score, not just its average (P11):
+                      // 4.6 of two glowing reviews and one disaster is a
+                      // different trainer than 4.6 of steady fours. Three
+                      // reviews is where a distribution starts being one.
+                      if (reviews case AsyncData(
+                        :final value,
+                      ) when value.length >= 3) ...[
+                        const SizedBox(height: 12),
+                        _RatingBreakdown(reviews: value),
+                      ],
                       // Instant Book (P5), said before the rider scrolls to
                       // the button: no approval wait is a booking-decision
                       // fact, same rank as the rating.
@@ -321,6 +331,28 @@ class _TrainerProfileBodyState extends ConsumerState<_TrainerProfileBody> {
                                 mode: LaunchMode.externalApplication,
                               ),
                       ),
+                      // Tenure and origin (P11) — the trust facts a
+                      // marketplace prints when it has them, and says
+                      // nothing about when it does not. Stacked, not side
+                      // by side: 'ON FLOW SINCE' wrapped inside a
+                      // half-width tile before it was two tiles old.
+                      if (trainer.createdAt case final since?) ...[
+                        const SizedBox(height: 10),
+                        InfoTile(
+                          icon: Symbols.verified_user_rounded,
+                          label: 'On FLOW since',
+                          value:
+                              '${monthsShort[since.month - 1]} ${since.year}',
+                        ),
+                      ],
+                      if (trainer.nationality case final from?) ...[
+                        const SizedBox(height: 10),
+                        InfoTile(
+                          icon: Symbols.flag_rounded,
+                          label: 'From',
+                          value: from,
+                        ),
+                      ],
                       if ((trainer.bio ?? '').isNotEmpty) ...[
                         const SizedBox(height: 24),
                         const SectionHeader('About'),
@@ -955,6 +987,79 @@ class _BottomBar extends ConsumerWidget {
                 ),
               ],
             ),
+    );
+  }
+}
+
+/// Reviews by star, as bars (P11).
+///
+/// Pure display: each band's share of the total, so the eye reads the shape
+/// of the score without arithmetic. Spoken as one sentence to a screen
+/// reader — five rows of "2" would say nothing.
+class _RatingBreakdown extends StatelessWidget {
+  const _RatingBreakdown({required this.reviews});
+
+  final List<Review> reviews;
+
+  @override
+  Widget build(BuildContext context) {
+    final tones = context.tones;
+    final counts = List<int>.filled(5, 0);
+    for (final r in reviews) {
+      counts[r.rating.clamp(1, 5) - 1]++;
+    }
+    return Semantics(
+      label:
+          'Rating breakdown: ${[for (var s = 5; s >= 1; s--) '${counts[s - 1]} $s-star'].join(', ')}',
+      child: ExcludeSemantics(
+        child: Column(
+          children: [
+            for (var stars = 5; stars >= 1; stars--)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 12,
+                      child: Text(
+                        '$stars',
+                        textAlign: TextAlign.right,
+                        style: interNum(11.5, 640, color: tones.textFaint),
+                      ),
+                    ),
+                    const SizedBox(width: 3),
+                    Icon(
+                      Symbols.star_rounded,
+                      size: 11,
+                      fill: 1,
+                      color: tones.textFaint,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(3),
+                        child: LinearProgressIndicator(
+                          value: counts[stars - 1] / reviews.length,
+                          minHeight: 6,
+                          backgroundColor: tones.line,
+                          color: tones.warning,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 20,
+                      child: Text(
+                        '${counts[stars - 1]}',
+                        style: interNum(11.5, 560, color: tones.textFaint),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../core/theme/motion.dart';
@@ -22,6 +23,7 @@ import '../../data/models/booking.dart';
 import '../../data/models/cancellation.dart';
 import '../../data/repositories/booking_repository.dart';
 import '../../providers/providers.dart';
+import '../explore/provider_routes.dart';
 import 'receipt.dart';
 import 'review_composer.dart';
 
@@ -723,6 +725,19 @@ class _SessionSheet extends ConsumerWidget {
               ],
             ),
           ),
+          // P11: the coach on the session is a door to their profile —
+          // role-resolved because safari seats book against a station.
+          // The sheet stays open underneath; back returns to it.
+          if (ref.watch(trainerProfileProvider(b.instructorId)).value
+              case final coach? when providerProfilePath(coach) != null) ...[
+            const SizedBox(height: 6),
+            InfoTile(
+              icon: Symbols.person_rounded,
+              label: 'Trainer',
+              value: b.instructorName,
+              onTap: () => context.push(providerProfilePath(coach)!),
+            ),
+          ],
           // The paper trail (P8): the same facts as this sheet, as a PDF
           // for whoever asks — an insurer, an employer, a dispute. Only
           // where there is a money story to certify; a pending cash-era

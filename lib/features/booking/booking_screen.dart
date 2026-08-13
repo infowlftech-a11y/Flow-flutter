@@ -24,6 +24,7 @@ import '../../data/models/schedule.dart';
 import '../../data/models/wind.dart';
 import '../../data/repositories/booking_repository.dart';
 import '../auth/verify_email_gate.dart';
+import '../explore/provider_routes.dart';
 import '../../providers/providers.dart';
 
 /// The booking flow — who / pick a day / available hours / summary on one
@@ -608,15 +609,22 @@ class _ReviewRow extends StatelessWidget {
   }
 }
 
-class _ProviderCard extends StatelessWidget {
+class _ProviderCard extends ConsumerWidget {
   const _ProviderCard({required this.target});
   final BookingTarget target;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final tones = context.tones;
+    // P11: the card names who the rider is paying — tapping it shows who
+    // that is. Role-resolved, because the same screen books trainers and
+    // stations; unresolved (offline first paint) stays inert rather than
+    // guessing a route.
+    final provider = ref.watch(trainerProfileProvider(target.providerId)).value;
+    final profilePath = provider == null ? null : providerProfilePath(provider);
     return FlowCard(
       padding: const EdgeInsets.all(14),
+      onTap: profilePath == null ? null : () => context.push(profilePath),
       child: Row(
         children: [
           FlowAvatar(url: target.imageUrl, name: target.title, size: 54),

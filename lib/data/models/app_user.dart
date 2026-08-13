@@ -64,6 +64,7 @@ class AppUser {
     this.reviewNote,
     this.travelBufferMinutes,
     this.instantBook = false,
+    this.createdAt,
   });
 
   final String uid;
@@ -118,6 +119,12 @@ class AppUser {
   /// rider write that status when this flag is true on the trainer's doc.
   final bool instantBook;
 
+  /// When the account was created. Both onboarding paths have always
+  /// written it; the model never read it until the trainer profile needed
+  /// "On FLOW since …" (P11) — the tenure line every marketplace prints.
+  /// Null on docs from before the writes existed, and nothing invents one.
+  final DateTime? createdAt;
+
   /// Canonical field names only — the `hostProfile` nested fallbacks,
   /// `businessName`, `profileImage` and the `priceList` string duplicate of
   /// `hourlyRate` all existed to read what a legacy web client wrote (§5.1).
@@ -149,6 +156,7 @@ class AppUser {
     reviewNote: d.str('reviewNote'),
     travelBufferMinutes: d.integer('travelBuffer'),
     instantBook: d.boolean('instantBook'),
+    createdAt: d.date('createdAt'),
   );
 
   bool get isTrainer => role == UserRole.business;

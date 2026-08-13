@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/constants.dart';
 import '../../core/theme/motion.dart';
@@ -15,6 +16,7 @@ import '../../core/widgets/thread.dart';
 import '../../core/utils/date_x.dart';
 import '../../data/models/social.dart';
 import '../../providers/providers.dart';
+import '../explore/provider_routes.dart';
 
 /// One conversation (§3.11).
 ///
@@ -161,24 +163,51 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       _onMessages(value);
     }
 
+    // P11: the person you are talking to is a door to who they are. Role
+    // decides the destination; a rider partner (the trainer's side of the
+    // thread) has no public profile, so their header stays inert.
+    final partner = ref.watch(trainerProfileProvider(widget.partnerId)).value;
+    final profilePath = partner == null ? null : providerProfilePath(partner);
+
     return Scaffold(
       appBar: AppBar(
         // 4, not 0: zero sat the avatar flush against whatever is to its
         // left — the back arrow on device, the raw screen edge anywhere the
         // route cannot pop — and the avatar's corner read as clipped.
         titleSpacing: 4,
-        title: Row(
-          children: [
-            FlowAvatar(name: widget.partnerName, size: 36),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                widget.partnerName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+        title: Semantics(
+          button: profilePath != null,
+          label: profilePath == null
+              ? widget.partnerName
+              : "${widget.partnerName}. View profile",
+          child: InkWell(
+            onTap: profilePath == null ? null : () => context.push(profilePath),
+            borderRadius: FlowRadii.control,
+            child: ConstrainedBox(
+              // The whole toolbar height, not the row's natural 36: a
+              // header this useful should not demand precision aim.
+              constraints: const BoxConstraints(minHeight: 48),
+              child: Row(
+                children: [
+                  FlowAvatar(name: widget.partnerName, size: 36),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      widget.partnerName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (profilePath != null)
+                    Icon(
+                      Symbols.chevron_right_rounded,
+                      size: 20,
+                      color: context.tones.textFaint,
+                    ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
       ),
       body: Column(
