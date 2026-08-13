@@ -1,5 +1,7 @@
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -45,6 +47,27 @@ Future<void> main() async {
   ]);
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // App Check (P6): every Firestore/Auth/Storage call carries a Play
+  // Integrity attestation, so once enforcement is switched on in the
+  // console, requests that do not come from this app — scripts, hand-rolled
+  // clients, replayed tokens — are refused at the door. That is the layer
+  // the escrow design's "back-dated stamp from a hand-rolled client" limit
+  // has been waiting for.
+  //
+  // Debug builds attest with the debug provider, which prints a token to
+  // logcat on first run; paste it under App Check → Apps → Manage debug
+  // tokens or a dev build loses Firestore the moment enforcement starts.
+  // NOT awaited: activation registers interceptors synchronously and the
+  // first token fetch may need the network — startup must not wait on it
+  // (unenforced requests still pass while the first token is in flight).
+  FirebaseAppCheck.instance
+      .activate(
+        providerAndroid: kDebugMode
+            ? const AndroidDebugProvider()
+            : const AndroidPlayIntegrityProvider(),
+      )
+      .ignore();
 
   // Registered before runApp so killed-state pushes are handled (§11.3).
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
