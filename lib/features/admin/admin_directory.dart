@@ -206,7 +206,7 @@ class _UserCard extends ConsumerWidget {
     };
 
     return FlowCard(
-      onTap: () => _openUserSheet(context, ref, user),
+      onTap: () => openAdminUserSheet(context, ref, user),
       child: Row(
         children: [
           FlowAvatar(url: user.photoUrl, name: user.name, size: 44),
@@ -281,7 +281,11 @@ String _roleLabel(AppUser u) {
 }
 
 /// Everything staff can know and do about one account, in one sheet.
-void _openUserSheet(BuildContext context, WidgetRef ref, AppUser user) {
+///
+/// Public (P10): member refs printed anywhere in the console — ticket cards,
+/// the session sheet's parties — open this directly, so an ID is a door
+/// rather than a string to copy into the directory search.
+void openAdminUserSheet(BuildContext context, WidgetRef ref, AppUser user) {
   showFlowSheet<void>(
     context,
     title: user.name.isEmpty ? user.email : user.name,
@@ -342,6 +346,12 @@ class _UserSheetBody extends ConsumerWidget {
             ?.where((r) => r.reportedUserId == user.uid && r.isOpen)
             .length ??
         0;
+    // Newest five across both roles. `date` is YYYY-MM-DD, so string order
+    // is date order.
+    final recentSessions = ([
+      ...asRider,
+      ...asTrainer,
+    ]..sort((a, b) => b.date.compareTo(a.date))).take(5).toList();
 
     final facts = <(String, String)>[
       if (!user.isStaff)
@@ -414,6 +424,26 @@ class _UserSheetBody extends ConsumerWidget {
               ],
             ),
           ),
+        // P10: "show me their sessions" answered in place — newest first,
+        // each row opening the same sheet the Sessions tab uses, so a
+        // dossier and a booking cross-link both ways.
+        if (recentSessions.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text('RECENT SESSIONS', style: microLabel(tones.textFaint, size: 10)),
+          const SizedBox(height: 8),
+          for (final b in recentSessions)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: SessionRow(
+                when: '${prettyYmd(b.date)} · ${b.timeRange}',
+                who: sessionRef(b.id, b.date),
+                priceLabel: money(b.totalPrice),
+                statusLabel: b.status.label.toUpperCase(),
+                statusColor: statusColorFor(context, b.status),
+                onTap: () => openAdminSessionSheet(context, b),
+              ),
+            ),
+        ],
         const SizedBox(height: 12),
         if (user.role == UserRole.business &&
             user.status == AccountStatus.active) ...[
@@ -560,7 +590,9 @@ class _AllSessionsTabState extends ConsumerState<AllSessionsTab> {
                 controller: _search,
                 onChanged: (_) => setState(() {}),
                 decoration: InputDecoration(
-                  hintText: 'Search rider or trainer…',
+                  // Refs match too (filterBookings) — the hint says so, or
+                  // nobody pastes a FLW-… ID into a box that asks for names.
+                  hintText: 'Search name or session ID…',
                   prefixIcon: const Icon(Symbols.search_rounded),
                   suffixIcon: _search.text.isEmpty
                       ? null
@@ -626,7 +658,7 @@ class _AllSessionsTabState extends ConsumerState<AllSessionsTab> {
                           priceLabel: money(b.totalPrice),
                           statusLabel: b.status.label.toUpperCase(),
                           statusColor: statusColorFor(context, b.status),
-                          onTap: () => _openSessionSheet(context, b),
+                          onTap: () => openAdminSessionSheet(context, b),
                         );
                       },
                     ),
@@ -638,7 +670,9 @@ class _AllSessionsTabState extends ConsumerState<AllSessionsTab> {
   }
 }
 
-void _openSessionSheet(BuildContext context, Booking b) {
+/// Public (P10) for the same reason as [openAdminUserSheet]: a session ref
+/// on a ticket or report opens the booking here, wherever it was printed.
+void openAdminSessionSheet(BuildContext context, Booking b) {
   showFlowSheet<void>(
     context,
     title: b.title,
@@ -693,6 +727,54 @@ void _openSessionSheet(BuildContext context, Booking b) {
                 ],
               ),
             ),
+          // P10: the parties are doors, not names. Resolved at tap-render
+          // time from the directory stream the console already holds; a
+          // walk-in booking has no rider account, so its chip simply
+          // does not render.
+          Consumer(
+            builder: (context, ref, _) {
+              final users =
+                  ref.watch(allUsersProvider).value ?? const <AppUser>[];
+              AppUser? byUid(String uid) {
+                if (uid.isEmpty) return null;
+                for (final u in users) {
+                  if (u.uid == uid) return u;
+                }
+                return null;
+              }
+
+              final rider = byUid(b.kiterId);
+              final coach = byUid(b.instructorId);
+              if (rider == null && coach == null) {
+                return const SizedBox.shrink();
+              }
+              return Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    if (rider != null)
+                      MicroAction(
+                        label: 'VIEW RIDER',
+                        icon: Symbols.person_rounded,
+                        filled: false,
+                        onPressed: () =>
+                            openAdminUserSheet(context, ref, rider),
+                      ),
+                    if (coach != null)
+                      MicroAction(
+                        label: 'VIEW COACH',
+                        icon: Symbols.person_rounded,
+                        filled: false,
+                        onPressed: () =>
+                            openAdminUserSheet(context, ref, coach),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
         ],
       );
     },

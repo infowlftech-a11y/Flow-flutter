@@ -919,6 +919,24 @@ a safari station's name overran the sheet by 96px. Fixed in
 theme work, so the fix ships with that commit; the test holds it in
 place either way.
 
+## P10 — Every ID in the console is a door (ordered 2026-08-13)
+
+Refs stopped being strings to copy between tabs. A ticket card and its
+thread sheet render the opener's member ref and the attached session ref
+as buttons; a report card renders its session ref the same way; the
+session sheet grew VIEW RIDER / VIEW COACH; the dossier grew a
+RECENT SESSIONS list whose rows open the session sheet — so
+ticket → booking → person → their history closes without a search box.
+The Sessions search already matched refs; its hint now says so, and the
+layout test's tab marker tracks the new hint.
+
+The user/session sheets went public inside the admin feature
+(`openAdminUserSheet` / `openAdminSessionSheet`) — same sheets, more
+doors. Resolution at tap time is a one-shot repository read: the
+providers are autoDispose, and a cold `.future` self-disposes mid-load
+— test/admin_ref_links_test.dart caught exactly that on its first run,
+walking the whole chain the way support actually works a call.
+
 ## P8 — The booking record PDF (7fba505)
 
 Saved from the session sheet wherever there is a money story: the FLW

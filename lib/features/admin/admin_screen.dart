@@ -16,6 +16,7 @@ import '../../core/widgets/misc.dart';
 import '../../core/widgets/surfaces.dart';
 import '../../core/widgets/sheets.dart';
 import '../../data/models/app_user.dart';
+import '../../data/models/booking.dart';
 import '../../data/models/report.dart';
 import '../../data/models/support.dart';
 import '../../providers/providers.dart';
@@ -502,13 +503,50 @@ class _ReportCard extends ConsumerWidget {
           Text(
             [
               '${report.reporterName} → ${report.reportedUserName}',
-              // The session the complaint is about — searchable in the
-              // Sessions tab.
-              ?report.sessionRef,
               timeAgo(report.createdAt),
             ].join(' · '),
             style: inter(12.5, 500, color: tones.textFaint),
           ),
+          // P10: the session the complaint is about opens right here — a
+          // moderator should see what actually happened on the water before
+          // weighing the report, not paste a ref into another tab.
+          if (report.sessionRef != null) ...[
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: MicroAction(
+                label: report.sessionRef!,
+                icon: Symbols.confirmation_number_rounded,
+                filled: false,
+                // One-shot repository read — the provider may be cold if
+                // this tab is the console's first stop, and a cold
+                // autoDispose `.future` self-disposes and throws (see
+                // admin_queues.dart).
+                onPressed: () async {
+                  final List<Booking> bookings;
+                  try {
+                    bookings = await ref
+                        .read(bookingRepositoryProvider)
+                        .watchAllBookings()
+                        .first;
+                  } catch (_) {
+                    if (context.mounted) {
+                      showFlowToast(context, "Couldn't load the bookings.");
+                    }
+                    return;
+                  }
+                  if (!context.mounted) return;
+                  for (final b in bookings) {
+                    if (b.id == report.sessionId) {
+                      openAdminSessionSheet(context, b);
+                      return;
+                    }
+                  }
+                  showFlowToast(context, "Couldn't find that booking.");
+                },
+              ),
+            ),
+          ],
           if ((report.details ?? '').isNotEmpty) ...[
             const SizedBox(height: 10),
             Text(

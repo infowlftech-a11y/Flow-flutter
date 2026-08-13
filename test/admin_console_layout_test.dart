@@ -133,7 +133,8 @@ const _tabs = <String, String>{
   // P3 (ordered) taught the directory search the member IDs, and the hint
   // says so — this string tracks it.
   'Users': 'Search name, email or ID…',
-  'Sessions': 'Search rider or trainer…',
+  // P10 (ordered): session refs match the search too, and the hint says so.
+  'Sessions': 'Search name or session ID…',
   // P6: the audit row's byline — no seeded data produces this string.
   'Log': 'until 2099-09-01',
 };

@@ -18,6 +18,7 @@ import '../../data/models/app_user.dart';
 import '../../data/models/audit.dart';
 import '../../data/models/support.dart';
 import '../../providers/providers.dart';
+import 'admin_directory.dart' show openAdminSessionSheet, openAdminUserSheet;
 
 /// The three staff queues that had a repository, rules and a provider — and
 /// no screen at all.
@@ -121,19 +122,89 @@ class _TicketCard extends ConsumerWidget {
             [
               ?ticket.topic,
               ticket.userName,
-              ?memberId,
-              // The session the ticket is about — paste it into the
-              // Sessions tab's search to pull the booking.
-              ?ticket.sessionRef,
               ticket.lastMessageAt == null
                   ? 'no replies yet'
                   : timeAgo(ticket.lastMessageAt!),
             ].join(' · '),
             style: inter(12.5, 480, color: tones.textFaint),
           ),
+          // P10: the refs are doors, not strings to copy — the opener's
+          // account and the attached booking open from the card.
+          if (memberId != null || ticket.sessionRef != null) ...[
+            const SizedBox(height: 10),
+            _refChips(context, ref),
+          ],
         ],
       ),
     );
+  }
+
+  Widget _refChips(BuildContext context, WidgetRef ref) => Wrap(
+    spacing: 8,
+    runSpacing: 8,
+    children: [
+      if (memberId != null)
+        MicroAction(
+          label: memberId!,
+          icon: Symbols.badge_rounded,
+          filled: false,
+          onPressed: () => _openOpener(context, ref),
+        ),
+      if (ticket.sessionRef != null)
+        MicroAction(
+          label: ticket.sessionRef!,
+          icon: Symbols.confirmation_number_rounded,
+          filled: false,
+          onPressed: () => _openBooking(context, ref),
+        ),
+    ],
+  );
+
+  // One-shot reads off the repositories, not the providers: the Tickets tab
+  // is often the console's first stop, so `allBookingsProvider` may be cold
+  // at tap time — its `.value` is null then, and its `.future` self-disposes
+  // mid-load (autoDispose with no listener) and throws. Both wrong answers
+  // for a booking that exists; found by test/admin_ref_links_test.dart.
+  Future<void> _openOpener(BuildContext context, WidgetRef ref) async {
+    try {
+      final users = await ref
+          .read(userRepositoryProvider)
+          .watchAllUsers()
+          .first;
+      if (!context.mounted) return;
+      for (final u in users) {
+        if (u.uid == ticket.userId) {
+          openAdminUserSheet(context, ref, u);
+          return;
+        }
+      }
+      showFlowToast(context, 'No account found — it may have been deleted.');
+    } catch (_) {
+      if (context.mounted) {
+        showFlowToast(context, "Couldn't load the directory.");
+      }
+    }
+  }
+
+  Future<void> _openBooking(BuildContext context, WidgetRef ref) async {
+    try {
+      final bookings = await ref
+          .read(bookingRepositoryProvider)
+          .watchAllBookings()
+          .first;
+      if (!context.mounted) return;
+      for (final b in bookings) {
+        if (b.id == ticket.sessionId) {
+          openAdminSessionSheet(context, b);
+          return;
+        }
+      }
+      showFlowToast(context, "Couldn't find that booking.");
+    } catch (_) {
+      if (context.mounted) {
+        showFlowToast(context, "Couldn't load the bookings.");
+      }
+    }
   }
 
   /// The conversation, in a sheet rather than a route: staff are triaging a
@@ -159,6 +230,15 @@ class _TicketCard extends ConsumerWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Same doors as the card (P10), reachable while replying.
+            if (memberId != null || ticket.sessionRef != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: _refChips(sheetContext, ref),
+                ),
+              ),
             // Flexible, so when the keyboard takes the height it is the
             // thread that gives way and scrolls — never the reply field or
             // the buttons, which are what the keyboard was opened for.
