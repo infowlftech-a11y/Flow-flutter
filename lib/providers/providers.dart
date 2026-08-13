@@ -469,11 +469,15 @@ final trainerCompletedProvider = Provider<AsyncValue<List<Booking>>>(
       ),
 );
 
+// Every trainer-facing money figure is the trainer's *take-home* — net of
+// FLOW's platform commission (P14, `Booking.trainerEarning`). The rider still
+// pays the full price everywhere it is shown to them (profile rate, booking,
+// receipt); only what the trainer earns is the 80%.
 final trainerRevenueProvider = Provider<AsyncValue<double>>(
   (ref) => ref
       .watch(trainerCompletedProvider)
       .whenData(
-        (list) => list.fold<double>(0, (acc, b) => acc + (b.totalPrice ?? 0)),
+        (list) => list.fold<double>(0, (acc, b) => acc + b.trainerEarning),
       ),
 );
 
@@ -484,7 +488,7 @@ final trainerMonthRevenueProvider = Provider<AsyncValue<double>>((ref) {
       .whenData(
         (list) => list
             .where((b) => b.date.startsWith(ym))
-            .fold<double>(0, (acc, b) => acc + (b.totalPrice ?? 0)),
+            .fold<double>(0, (acc, b) => acc + b.trainerEarning),
       );
 });
 
@@ -509,7 +513,9 @@ final trainerUnpaidProvider = Provider<AsyncValue<List<Booking>>>(
 final trainerOutstandingProvider = Provider<AsyncValue<double>>(
   (ref) => ref
       .watch(trainerUnpaidProvider)
-      .whenData((list) => list.fold<double>(0, (acc, b) => acc + b.amountDue)),
+      .whenData(
+        (list) => list.fold<double>(0, (acc, b) => acc + b.trainerEarning),
+      ),
 );
 
 /// What FLOW owes the trainer for delivered escrow sessions (P1) — the
@@ -522,7 +528,7 @@ final trainerPayoutDueProvider = Provider<AsyncValue<double>>(
       .whenData(
         (list) => list
             .where((b) => b.awaitsPayout)
-            .fold<double>(0, (acc, b) => acc + b.amountDue),
+            .fold<double>(0, (acc, b) => acc + b.trainerEarning),
       ),
 );
 
@@ -572,7 +578,7 @@ final trainerEarningsWeekProvider = Provider<AsyncValue<EarningsWeek>>((ref) {
       // (§10.7), and a silent misattribution here would be money in the
       // wrong column.
       if (day == null) continue;
-      final amount = b.totalPrice ?? 0;
+      final amount = b.trainerEarning;
 
       if (!day.isBefore(start)) {
         final index = day.difference(start).inDays;

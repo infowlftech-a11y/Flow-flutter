@@ -12,6 +12,11 @@
 //      flattering lie;
 //   3. a booking whose stored date will not parse is skipped, not bucketed
 //      into Monday — silent misattribution here is money in the wrong column.
+//
+// P14 (ordered 2026-08-13): the trainer's ledger is take-home, net of FLOW's
+// 20% platform commission. The input prices below are the rider's full rate;
+// every asserted total is 80% of it (`Booking.trainerEarning`). The delta is a
+// ratio, so it is unchanged by a uniform scaling.
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -54,14 +59,14 @@ void main() {
       _completed(_ymd(_monday.add(const Duration(days: 6))), 20), // Sun
     ]);
 
-    expect(week.byWeekday, [100, 0, 80, 0, 0, 0, 20]);
-    expect(week.total, 200);
+    expect(week.byWeekday, [80, 0, 64, 0, 0, 0, 16]); // 80% of 100/80/20
+    expect(week.total, 160); // 80% of 200
   });
 
   test('a delta against a week that earned nothing is null, not +100%', () {
     final week = _read([_completed(_ymd(_monday), 250)]);
 
-    expect(week.total, 250);
+    expect(week.total, 200); // 80% of 250
     expect(week.deltaVsPrevious, isNull,
         reason: 'a percentage change from zero is undefined — showing +100% '
             'for a first week of trading invents a comparison');
@@ -84,7 +89,7 @@ void main() {
       _completed(_ymd(_monday), 100),
     ]);
 
-    expect(week.total, 100);
+    expect(week.total, 80); // 80% of 100
     expect(week.deltaVsPrevious, isNull,
         reason: 'a session 40 days ago must not count as last week');
   });
@@ -95,9 +100,9 @@ void main() {
       _completed(_ymd(_monday), 60),
     ]);
 
-    expect(week.byWeekday.first, 60,
+    expect(week.byWeekday.first, 48, // 80% of 60
         reason: 'an unparseable date was bucketed into Monday');
-    expect(week.total, 60);
+    expect(week.total, 48);
   });
 
   test('marks today so the chart knows which bar to point at', () {

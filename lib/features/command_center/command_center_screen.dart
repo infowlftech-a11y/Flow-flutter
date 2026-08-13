@@ -766,13 +766,17 @@ class _ManifestCard extends ConsumerWidget {
     // the rider's money and finishing is what queues the payout. The cash
     // settlement question would be a lie here, so it is not asked.
     if (booking.payment.status.isHeldByApp) {
-      final amount = money(booking.amountDue);
+      // FLOW holds the rider's full payment; the payout is the trainer's 80%
+      // share after the platform commission (P14). Both are named so the
+      // difference is the fee, stated rather than a surprise on the ledger.
+      final held = money(booking.amountDue);
+      final payout = money(booking.trainerEarning);
       final sure = await confirmAction(
         context,
         title: 'Finish this session?',
         body:
-            'FLOW holds $amount for it. Finishing marks the session '
-            'delivered and queues your payout.',
+            'FLOW holds $held for it. Finishing marks the session delivered '
+            'and queues your $payout payout (after the 20% FLOW fee).',
         confirmLabel: 'Finish session',
         cancelLabel: 'Not yet',
       );
@@ -792,7 +796,7 @@ class _ManifestCard extends ConsumerWidget {
         return;
       }
       if (context.mounted) {
-        showFlowToast(context, '$amount payout queued 💶');
+        showFlowToast(context, '$payout payout queued 💶');
       }
       return;
     }

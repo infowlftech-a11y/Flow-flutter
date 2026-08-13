@@ -1,3 +1,4 @@
+import '../../core/constants.dart';
 import '../../core/utils/date_x.dart';
 import '../../core/utils/doc_x.dart';
 import 'payment.dart';
@@ -158,6 +159,13 @@ class Booking {
   /// captured amount is the one that must win if a trainer ever changes their
   /// rate after a booking was made.
   double get amountDue => payment.amount ?? totalPrice ?? 0;
+
+  /// The trainer's take-home for this session: [amountDue] less FLOW's
+  /// platform commission (P14). Derived, never stored — the split is policy,
+  /// like the escrow state (P1), so no client can forge a trainer's cut. The
+  /// rider always pays the full [amountDue]; FLOW keeps its share and settles
+  /// this to the trainer.
+  double get trainerEarning => amountDue * FlowConst.trainerShareRate;
 
   /// True when this session is finished and the trainer has not been paid.
   ///

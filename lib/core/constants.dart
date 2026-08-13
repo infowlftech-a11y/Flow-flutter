@@ -295,6 +295,19 @@ abstract final class FlowConst {
   /// Quick-pick chips under the rate field — a starting point, not a limit.
   static const rateSuggestions = [45, 60, 75, 95, 120];
 
+  /// FLOW's platform commission on every booking (P14, ordered 2026-08-13).
+  ///
+  /// The rider always pays the trainer's full rate; FLOW keeps this share and
+  /// settles the remaining 80% to the trainer. A policy rate, not a
+  /// per-booking number — the split is *derived* by [Booking.trainerEarning]
+  /// the way the escrow state is derived (P1), so no client ever writes a
+  /// trainer's cut and none can forge one. Changing the platform's take is a
+  /// one-line change here.
+  static const platformCommissionRate = 0.20;
+
+  /// The trainer's share of a booking — the complement of the commission.
+  static const trainerShareRate = 1 - platformCommissionRate;
+
   static const defaultDisplayRate = 60.0;
   static const defaultBufferMinutes = 60;
   static const bookingDayStripLength = 21;

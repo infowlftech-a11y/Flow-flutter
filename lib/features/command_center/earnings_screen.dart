@@ -89,9 +89,11 @@ class EarningsScreen extends ConsumerWidget {
                         ),
                         const SizedBox(width: 12),
                         Expanded(
-                          // Cash a rider still owes plus payouts FLOW owes (P1) —
-                          // both are money on its way to the trainer, and one figure
-                          // answers the question this tile exists for.
+                          // The trainer's take-home still coming: their 80%
+                          // share (P14) of the cash a rider still owes, plus
+                          // the escrow FLOW will pay out (P1). Both are money
+                          // on its way, and one figure answers the question
+                          // this tile exists for.
                           child: _Stat(
                             label: 'OWED TO YOU',
                             value: money(
@@ -106,6 +108,14 @@ class EarningsScreen extends ConsumerWidget {
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 10),
+                    // The whole ledger is take-home, so it says so once rather
+                    // than pilling every row: the rider paid the full rate,
+                    // FLOW keeps 20%, these are the trainer's 80% (P14).
+                    Text(
+                      "Your earnings after FLOW's 20% platform fee.",
+                      style: inter(11.5, 500, color: context.tones.textFaint),
                     ),
                     const SizedBox(height: 24),
                     const SectionHeader('Completed sessions'),
@@ -123,7 +133,9 @@ class EarningsScreen extends ConsumerWidget {
                           child: SessionRow(
                             when: dayAndTime(b, prettyYmd(b.date)),
                             who: b.studentName,
-                            priceLabel: money(b.amountDue),
+                            // The trainer's take-home (P14) — the ledger is
+                            // net; the caption above says so once.
+                            priceLabel: money(b.trainerEarning),
                             // Escrow rows say the money is coming from FLOW and take
                             // no tap — there is nothing for the trainer to do; the
                             // payout is the processor's job (P1). Cash rows keep

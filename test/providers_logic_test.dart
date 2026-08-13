@@ -328,13 +328,19 @@ void main() {
         b('future', totalPrice: 500),
       ]));
       await settle(c, trainerBookingsProvider);
-      expect(c.read(trainerRevenueProvider).value, 240,
-          reason: 'earned means delivered — unpaid history still counts');
+      // P14: every trainer figure is take-home — net of FLOW's 20% fee and
+      // based on the *captured* amount (`trainerEarning` ← `amountDue`), which
+      // unifies revenue with outstanding/payout (they already used amountDue).
+      // Revenue = 80% of (100 + 95 + 60) = 204: the 'owed' booking's captured
+      // 95 wins over its listed 80, exactly as outstanding asserts below.
+      // Membership is unchanged — the fee scales amounts, not which count.
+      expect(c.read(trainerRevenueProvider).value, closeTo(204, 1e-9),
+          reason: 'earned means delivered — unpaid history still counts, net');
       expect([for (final x in c.read(trainerUnpaidProvider).value!) x.id],
           ['owed'],
           reason: 'untracked history is not debt');
-      expect(c.read(trainerOutstandingProvider).value, 95,
-          reason: 'the captured amount wins over the listed price');
+      expect(c.read(trainerOutstandingProvider).value, closeTo(76, 1e-9),
+          reason: 'the captured amount wins over the listed price, net of fee');
     });
   });
 

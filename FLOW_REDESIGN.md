@@ -894,6 +894,51 @@ start's wall-clock time one day earlier, so the copy needs no time
 arithmetic and is always still ahead when sent. Undeployed until Functions
 are enabled, like its siblings.
 
+## P14 — FLOW takes 20%, the trainer takes 80% (ordered 2026-08-13)
+
+The platform commission. The rider pays the trainer's full rate everywhere
+it is shown to them — the profile price, the booking, the receipt "Amount",
+the escrow hold ("FLOW holds €X") — and FLOW keeps 20%, settling the
+remaining 80% to the trainer. Only the trainer's own *earnings* become the
+net figure.
+
+The split lives in exactly two places so it can never drift: the rate,
+`FlowConst.platformCommissionRate = 0.20` (frozen constants, beside the
+other numeric policy), and the derivation, `Booking.trainerEarning =
+amountDue × 0.80`. Derived, never stored — like the escrow state (P1), so no
+client writes a trainer's cut and none can forge one. Changing the platform's
+take is a one-line edit.
+
+Applied to every trainer-facing money figure, all routed through
+`trainerEarning`: the dashboard "Earned" stat, the earnings screen's week
+chart / all-time / this-week / owed-to-you, each completed-session row, and
+both the escrow payout and the cash-outstanding aggregates. The finish-a-
+session dialog now names both numbers — "FLOW holds €100 … queues your €80
+payout (after the 20% FLOW fee)" — so the gap is the fee, stated rather than
+a surprise, and the earnings ledger carries one caption ("Your earnings after
+FLOW's 20% platform fee") instead of a pill on every row.
+
+Routing revenue through `trainerEarning` also moved its base from
+`totalPrice` to the captured `amountDue`, unifying it with the
+outstanding/payout figures that already used it (the reporting audit had
+flagged the split as a latent inconsistency). For real bookings the two are
+always equal; the change only shows in a synthetic case where a listing's
+rate changed after a booking, where the captured amount is the correct one.
+
+**Deliberately left for later, and flagged honestly:** a cash walk-in the
+trainer sources and collects in person has no mechanism for FLOW to take its
+20% — the same deferred-settlement gap as the escrow payout, which no
+processor executes yet either. The ledger records the correct net earning;
+who physically holds the cash and settles the fee is the future
+processor/reconciliation layer's job. If the intent is that cash walk-ins
+stay 100% to the trainer, the split should be scoped to the escrow
+(app-paid) path — a one-line change in `trainerEarning`.
+
+Tests: `test/platform_commission_test.dart` pins the rate and the
+derivation; `earnings_week_test` and `providers_logic_test` were updated to
+the net figures (the delta, a ratio, is unchanged), each with a P14 note —
+the ordered-change precedent.
+
 ## P9 — Tickets carry a topic and every ID (ordered 2026-08-13)
 
 The new-ticket sheet now requires a topic — one of six
