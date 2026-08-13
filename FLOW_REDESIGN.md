@@ -770,3 +770,57 @@ Functions dependency as P1/P2; one `onWrite` trigger when that lands).
 One pinned test string updated with a comment: the console layout test
 proves the directory open by its search hint, and the hint now says
 "…or ID…" because the search now does.
+
+---
+
+## P4 — Booking.com parity (PROPOSED — awaiting discussion, nothing implemented)
+
+**Ordered 2026-08-13 as a discussion:** "Take Booking.com as a reference, add
+every crucial feature in it, any enhancement to the security of the system or
+the booking system overall tell it to me and let's discuss."
+
+### Already covered (for the record)
+
+Search + filters, favourites, verified-stay reviews (only a completed session
+can review — stricter than booking.com), in-app messaging, escrow with the
+free-cancellation deadline disclosed before paying (P1), notification
+coverage with deep links (P2), member IDs + console dossier (P3), host
+identity checks (IKO credential approval), report-a-listing, no-show charged
+in full, price shown as the final total before confirm.
+
+### Proposed — app-side, buildable now
+
+| # | Feature | Booking.com analogue | Notes |
+|---|---|---|---|
+| 4.1 | **Instant Book (per-trainer opt-in)** | Instant confirmation — their core conversion feature | New trainer setting; createBooking writes `confirmed` directly when on. Flow change → needs approval. Biggest single win in this list. |
+| 4.2 | **Seats-left urgency on safaris** | "Only 2 left at this price" | `seatsLeft` already exists on trips; surface it honestly (real scarcity only, never invented). Presentation-zone. |
+| 4.3 | **Trainer replies to reviews** | Property response | One `reply` field on the review, writable once by the reviewed trainer; renders under the review. Small rules delta. |
+| 4.4 | **Email verification before first booking** | Verified accounts | Firebase `sendEmailVerification` + a soft gate at the pay step. Kills throwaway-account review/booking abuse. |
+| 4.5 | **Staff audit log** | Internal accountability tooling | Console writes every suspend/lift/close to an append-only `auditLog` collection (staff-create, no update/delete). Cheap; makes every ban attributable. |
+
+### Proposed — needs Functions enabled (already written, waiting)
+
+| # | Feature | Notes |
+|---|---|---|
+| 4.6 | Push delivery + session reminders | `onNewNotification` + `sendSessionReminders` are in the repo, undeployed. |
+| 4.7 | **Free-cancellation deadline reminder** | Booking.com's "free cancellation ends tomorrow" nudge — one more nightly job over the same pipeline; the deadline is derivable per booking. |
+| 4.8 | Server-side refund/payout execution | Closes P1's back-dated-stamp limit; prerequisite for real money. |
+
+### Proposed — configuration / platform security
+
+| # | Enhancement | Notes |
+|---|---|---|
+| 4.9 | **Firebase App Check (Play Integrity)** | Blocks every non-app client from Firestore — the "hand-rolled client" threat class (P1's known limit included) largely dies at the door. Config + one SDK call; biggest security win per unit effort. |
+| 4.10 | **MFA for staff accounts** | Accounts that can ban and read every ticket deserve a second factor. Needs Identity Platform tier. |
+| 4.11 | PSP (Stripe Connect) | The P1 seam; real cards, real payouts, PCI handled by the processor. |
+
+### Deliberately not proposed
+
+Loyalty tiers ("Genius") — premature at this population; multi-currency —
+the market prices in EUR and P1 stores currency per booking so it stays
+reversible; map view of spots — real value but a big dependency (maps SDK,
+API billing) for five named beaches a local can enumerate; PDF receipts —
+the session sheet + ticket already carry the reference, revisit when real
+money lands.
+
+Nothing in P4 is implemented. Each row is one order away.
