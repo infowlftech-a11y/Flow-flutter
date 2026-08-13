@@ -8,6 +8,7 @@ import '../../core/utils/date_x.dart';
 import '../../core/utils/haptics.dart';
 import '../../core/widgets/charts.dart';
 import '../../core/widgets/feedback.dart';
+import '../../core/widgets/flow_top_bar.dart';
 import '../../core/widgets/misc.dart';
 import '../../core/widgets/session_card.dart';
 import '../../core/widgets/sheets.dart';
@@ -36,103 +37,117 @@ class EarningsScreen extends ConsumerWidget {
     final payoutDue = ref.watch(trainerPayoutDueProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Earnings')),
-      body: AsyncView<List<Booking>>(
-        value: completed,
-        onRetry: () => ref.invalidate(trainerBookingsProvider),
-        onRefresh: () async => ref.invalidate(trainerBookingsProvider),
-        data: (sessions) => ListView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            FlowCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SectionHeader('This week'),
-                  _Headline(
-                    amount: week.value?.total ?? 0,
-                    delta: week.value?.deltaVsPrevious,
-                  ),
-                  const SizedBox(height: 20),
-                  WeekBars(
-                    bars: [
-                      for (var i = 0; i < _weekdays.length; i++)
-                        WeekBar(
-                          label: _weekdays[i],
-                          value: week.value?.byWeekday[i] ?? 0,
-                          semanticValue:
-                              money(week.value?.byWeekday[i] ?? 0),
-                          highlighted: week.value?.todayIndex == i,
+            // P13: the shared header, same shape as every top-level tab.
+            const FlowTopBar(title: 'Earnings'),
+            const SizedBox(height: 4),
+            Expanded(
+              child: AsyncView<List<Booking>>(
+                value: completed,
+                onRetry: () => ref.invalidate(trainerBookingsProvider),
+                onRefresh: () async => ref.invalidate(trainerBookingsProvider),
+                data: (sessions) => ListView(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+                  children: [
+                    FlowCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SectionHeader('This week'),
+                          _Headline(
+                            amount: week.value?.total ?? 0,
+                            delta: week.value?.deltaVsPrevious,
+                          ),
+                          const SizedBox(height: 20),
+                          WeekBars(
+                            bars: [
+                              for (var i = 0; i < _weekdays.length; i++)
+                                WeekBar(
+                                  label: _weekdays[i],
+                                  value: week.value?.byWeekday[i] ?? 0,
+                                  semanticValue: money(
+                                    week.value?.byWeekday[i] ?? 0,
+                                  ),
+                                  highlighted: week.value?.todayIndex == i,
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _Stat(
+                            label: 'ALL TIME',
+                            value: money(allTime.value ?? 0),
+                          ),
                         ),
-                    ],
-                  ),
-                ],
+                        const SizedBox(width: 12),
+                        Expanded(
+                          // Cash a rider still owes plus payouts FLOW owes (P1) —
+                          // both are money on its way to the trainer, and one figure
+                          // answers the question this tile exists for.
+                          child: _Stat(
+                            label: 'OWED TO YOU',
+                            value: money(
+                              (outstanding.value ?? 0) + (payoutDue.value ?? 0),
+                            ),
+                            tone:
+                                ((outstanding.value ?? 0) +
+                                        (payoutDue.value ?? 0)) >
+                                    0
+                                ? context.tones.warning
+                                : null,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    const SectionHeader('Completed sessions'),
+                    if (sessions.isEmpty)
+                      const EmptyView(
+                        icon: Symbols.receipt_long_rounded,
+                        title: 'Nothing settled yet',
+                        subtitle:
+                            'Sessions you finish appear here with what they earned.',
+                      )
+                    else
+                      for (final b in sessions)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: SessionRow(
+                            when: dayAndTime(b, prettyYmd(b.date)),
+                            who: b.studentName,
+                            priceLabel: money(b.amountDue),
+                            // Escrow rows say the money is coming from FLOW and take
+                            // no tap — there is nothing for the trainer to do; the
+                            // payout is the processor's job (P1). Cash rows keep
+                            // UNPAID + tap-to-settle.
+                            statusLabel: b.awaitsPayout
+                                ? 'FLOW PAYOUT'
+                                : b.payment.isOutstanding
+                                ? 'UNPAID'
+                                : null,
+                            statusColor: b.awaitsPayout
+                                ? context.tones.azureBrand
+                                : context.tones.warning,
+                            // Settled rows do nothing, and say so by not rippling.
+                            // The unpaid ones are the only reason a trainer opens this
+                            // list twice.
+                            onTap: b.payment.isOutstanding
+                                ? () => _settle(context, ref, b)
+                                : null,
+                          ),
+                        ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _Stat(
-                    label: 'ALL TIME',
-                    value: money(allTime.value ?? 0),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  // Cash a rider still owes plus payouts FLOW owes (P1) —
-                  // both are money on its way to the trainer, and one figure
-                  // answers the question this tile exists for.
-                  child: _Stat(
-                    label: 'OWED TO YOU',
-                    value: money((outstanding.value ?? 0) +
-                        (payoutDue.value ?? 0)),
-                    tone: ((outstanding.value ?? 0) +
-                                (payoutDue.value ?? 0)) >
-                            0
-                        ? context.tones.warning
-                        : null,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            const SectionHeader('Completed sessions'),
-            if (sessions.isEmpty)
-              const EmptyView(
-                icon: Symbols.receipt_long_rounded,
-                title: 'Nothing settled yet',
-                subtitle:
-                    'Sessions you finish appear here with what they earned.',
-              )
-            else
-              for (final b in sessions)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: SessionRow(
-                    when: dayAndTime(b, prettyYmd(b.date)),
-                    who: b.studentName,
-                    priceLabel: money(b.amountDue),
-                    // Escrow rows say the money is coming from FLOW and take
-                    // no tap — there is nothing for the trainer to do; the
-                    // payout is the processor's job (P1). Cash rows keep
-                    // UNPAID + tap-to-settle.
-                    statusLabel: b.awaitsPayout
-                        ? 'FLOW PAYOUT'
-                        : b.payment.isOutstanding
-                            ? 'UNPAID'
-                            : null,
-                    statusColor: b.awaitsPayout
-                        ? context.tones.azureBrand
-                        : context.tones.warning,
-                    // Settled rows do nothing, and say so by not rippling.
-                    // The unpaid ones are the only reason a trainer opens this
-                    // list twice.
-                    onTap: b.payment.isOutstanding
-                        ? () => _settle(context, ref, b)
-                        : null,
-                  ),
-                ),
           ],
         ),
       ),
@@ -146,21 +161,24 @@ class EarningsScreen extends ConsumerWidget {
 /// and it is a single tap away from a scrolling list. It moved here with the
 /// ledger itself — it used to sit behind a sheet on the dashboard.
 Future<void> _settle(
-    BuildContext context, WidgetRef ref, Booking booking) async {
+  BuildContext context,
+  WidgetRef ref,
+  Booking booking,
+) async {
   final ok = await confirmAction(
     context,
     title: 'Mark as paid?',
-    body: 'Records that ${booking.studentName} paid '
+    body:
+        'Records that ${booking.studentName} paid '
         '${money(booking.amountDue)} for ${prettyYmd(booking.date)}.',
     confirmLabel: 'Mark paid',
   );
   if (!ok) return;
   Haptics.medium();
   try {
-    await ref.read(bookingRepositoryProvider).markPaid(
-          booking.id,
-          trainerId: booking.instructorId,
-        );
+    await ref
+        .read(bookingRepositoryProvider)
+        .markPaid(booking.id, trainerId: booking.instructorId);
     if (context.mounted) {
       showFlowToast(context, '${money(booking.amountDue)} collected 💶');
     }
@@ -186,8 +204,10 @@ class _Headline extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        Text(money(amount),
-            style: interNum(30, 780, color: context.scheme.onSurface)),
+        Text(
+          money(amount),
+          style: interNum(30, 780, color: context.scheme.onSurface),
+        ),
         const SizedBox(width: 10),
         // Nothing at all when there is no previous week to compare with —
         // see `deltaVsPrevious`. An invented "+100%" would read as a result.
@@ -210,8 +230,11 @@ class _Headline extends StatelessWidget {
                     '${d >= 0 ? '+' : ''}${(d * 100).round()}% vs last week',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: inter(11.5, 600,
-                        color: d >= 0 ? tones.success : tones.danger),
+                    style: inter(
+                      11.5,
+                      600,
+                      color: d >= 0 ? tones.success : tones.danger,
+                    ),
                   ),
                 ),
               ],
@@ -242,9 +265,10 @@ class _Stat extends StatelessWidget {
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
-            child: Text(value,
-                style: interNum(19, 760,
-                    color: tone ?? context.scheme.onSurface)),
+            child: Text(
+              value,
+              style: interNum(19, 760, color: tone ?? context.scheme.onSurface),
+            ),
           ),
         ],
       ),

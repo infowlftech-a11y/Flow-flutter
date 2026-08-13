@@ -15,6 +15,7 @@ import '../../core/utils/haptics.dart';
 import '../../core/utils/refs.dart';
 import '../../core/widgets/buttons.dart';
 import '../../core/widgets/feedback.dart';
+import '../../core/widgets/flow_top_bar.dart';
 import '../../core/widgets/misc.dart';
 import '../../core/widgets/session_card.dart';
 import '../../core/widgets/sheets.dart';
@@ -112,81 +113,111 @@ class _SessionsScreenState extends ConsumerState<SessionsScreen>
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('My sessions'),
-        // All three tabs carry their count once data lands. Labelling only
-        // one of them made the other two read as empty at a glance.
-        bottom: TabBar(
-          controller: _tabs,
-          // Scrollable: three labels that each carry a count cannot be
-          // promised to fit a third of a narrow phone. At 1.3x text they ran
-          // out of their cells and HISTORY painted over ACTIVE — a
-          // non-scrollable TabBar has nowhere to put the excess.
-          isScrollable: true,
-          tabAlignment: TabAlignment.start,
-          tabs: [
-            Tab(child: _tabLabel(buckets, 'UPCOMING', BookingBucket.upcoming)),
-            Tab(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _tabLabel(buckets, 'ACTIVE', BookingBucket.active),
-                  if (buckets.value?[BookingBucket.active]?.isNotEmpty ??
-                      false) ...[
-                    const SizedBox(width: 6),
-                    const _LiveDot(),
-                  ],
-                ],
-              ),
-            ),
-            Tab(child: _tabLabel(buckets, 'HISTORY', BookingBucket.history)),
-          ],
-        ),
-      ),
-      body: AsyncView<BookingBuckets>(
-        value: buckets,
-        onRetry: () => ref.invalidate(riderBookingsProvider),
-        skeleton: const SkeletonList(count: 4, itemHeight: 120),
-        data: (data) => TabBarView(
-          controller: _tabs,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _BookingList(
-              bookings: data[BookingBucket.upcoming]!,
-              bucket: BookingBucket.upcoming,
-              cardKeys: _cardKeys,
-              highlight: _highlight,
-              empty: const EmptyView.scrollable(
-                icon: Symbols.event_available_rounded,
-                title: 'Nothing booked yet',
-                subtitle:
-                    'Find a trainer in Explore and lock in your next session.',
+            // P13: the shared header; the tabs ride its bottom slot so the
+            // bar and its tabs read as one block.
+            FlowTopBar(
+              title: 'My sessions',
+              // All three tabs carry their count once data lands. Labelling
+              // only one of them made the other two read as empty at a
+              // glance.
+              bottom: Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: TabBar(
+                  controller: _tabs,
+                  // Scrollable: three labels that each carry a count cannot
+                  // be promised to fit a third of a narrow phone. At 1.3x
+                  // text they ran out of their cells and HISTORY painted
+                  // over ACTIVE — a non-scrollable TabBar has nowhere to
+                  // put the excess.
+                  isScrollable: true,
+                  tabAlignment: TabAlignment.start,
+                  tabs: [
+                    Tab(
+                      child: _tabLabel(
+                        buckets,
+                        'UPCOMING',
+                        BookingBucket.upcoming,
+                      ),
+                    ),
+                    Tab(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _tabLabel(buckets, 'ACTIVE', BookingBucket.active),
+                          if (buckets
+                                  .value?[BookingBucket.active]
+                                  ?.isNotEmpty ??
+                              false) ...[
+                            const SizedBox(width: 6),
+                            const _LiveDot(),
+                          ],
+                        ],
+                      ),
+                    ),
+                    Tab(
+                      child: _tabLabel(
+                        buckets,
+                        'HISTORY',
+                        BookingBucket.history,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              onRefresh: _refresh,
             ),
-            _BookingList(
-              bookings: data[BookingBucket.active]!,
-              bucket: BookingBucket.active,
-              cardKeys: _cardKeys,
-              highlight: _highlight,
-              empty: const EmptyView.scrollable(
-                icon: Symbols.surfing_rounded,
-                title: 'No live sessions',
-                subtitle:
-                    'When your trainer scans you in, your session shows here.',
+            Expanded(
+              child: AsyncView<BookingBuckets>(
+                value: buckets,
+                onRetry: () => ref.invalidate(riderBookingsProvider),
+                skeleton: const SkeletonList(count: 4, itemHeight: 120),
+                data: (data) => TabBarView(
+                  controller: _tabs,
+                  children: [
+                    _BookingList(
+                      bookings: data[BookingBucket.upcoming]!,
+                      bucket: BookingBucket.upcoming,
+                      cardKeys: _cardKeys,
+                      highlight: _highlight,
+                      empty: const EmptyView.scrollable(
+                        icon: Symbols.event_available_rounded,
+                        title: 'Nothing booked yet',
+                        subtitle:
+                            'Find a trainer in Explore and lock in your next session.',
+                      ),
+                      onRefresh: _refresh,
+                    ),
+                    _BookingList(
+                      bookings: data[BookingBucket.active]!,
+                      bucket: BookingBucket.active,
+                      cardKeys: _cardKeys,
+                      highlight: _highlight,
+                      empty: const EmptyView.scrollable(
+                        icon: Symbols.surfing_rounded,
+                        title: 'No live sessions',
+                        subtitle:
+                            'When your trainer scans you in, your session shows here.',
+                      ),
+                      onRefresh: _refresh,
+                    ),
+                    _BookingList(
+                      bookings: data[BookingBucket.history]!,
+                      bucket: BookingBucket.history,
+                      cardKeys: _cardKeys,
+                      highlight: _highlight,
+                      empty: const EmptyView.scrollable(
+                        icon: Symbols.history_rounded,
+                        title: 'No history yet',
+                        subtitle: 'Completed and past sessions land here.',
+                      ),
+                      onRefresh: _refresh,
+                    ),
+                  ],
+                ),
               ),
-              onRefresh: _refresh,
-            ),
-            _BookingList(
-              bookings: data[BookingBucket.history]!,
-              bucket: BookingBucket.history,
-              cardKeys: _cardKeys,
-              highlight: _highlight,
-              empty: const EmptyView.scrollable(
-                icon: Symbols.history_rounded,
-                title: 'No history yet',
-                subtitle: 'Completed and past sessions land here.',
-              ),
-              onRefresh: _refresh,
             ),
           ],
         ),

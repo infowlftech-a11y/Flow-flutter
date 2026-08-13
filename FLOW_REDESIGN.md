@@ -919,6 +919,23 @@ a safari station's name overran the sheet by 96px. Fixed in
 theme work, so the fix ships with that commit; the test holds it in
 place either way.
 
+## P13 — One top bar (ordered 2026-08-13)
+
+The app's top edge was its least designed zone: Explore had a greeting
+header with round outlined actions while every other tab hung a bare
+20px AppBar title in space, and Ticket centered its title alone.
+`FlowTopBar` (+ `TopBarAction`) is the one shape now — display-size
+title, optional kicker line, badged outlined actions, an optional
+bottom slot Sessions parks its TabBar in — adopted by Explore (which
+pioneered it), Command Center, Sessions, Earnings, Profile and Ticket.
+Deliberately not an AppBar: these screens have no back button and
+nothing Material's toolbar does for them, and the fixed 56px toolbar is
+exactly what kept their titles small. Pushed screens keep their AppBar
+— the back affordance is the point there — and the admin console keeps
+its tab machinery, its actions just wear the same outlined circles.
+Both component suites (render at both scales, tap targets) carry cases
+for the new pieces.
+
 ## P12 — Motion with one accent (ordered 2026-08-13)
 
 Two rough edges owned the whole feel. Tab switches were IndexedStack

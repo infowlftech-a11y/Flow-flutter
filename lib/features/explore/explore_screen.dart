@@ -11,6 +11,7 @@ import '../../core/theme/typography.dart';
 import '../../core/utils/date_x.dart';
 import '../../core/utils/haptics.dart';
 import '../../core/widgets/feedback.dart';
+import '../../core/widgets/flow_top_bar.dart';
 import '../../core/widgets/misc.dart';
 import '../../core/widgets/provider_card.dart';
 import '../../core/widgets/sheets.dart';
@@ -75,67 +76,36 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Hey ${session.displayName.split(' ').first} 🤙',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Find your trainer',
-                          style: Theme.of(context).textTheme.displaySmall,
-                        ),
-                      ],
-                    ),
+            // P13: the header this screen pioneered, now the shared
+            // component every top-level tab uses.
+            FlowTopBar(
+              kicker: 'Hey ${session.displayName.split(' ').first} 🤙',
+              title: 'Find your trainer',
+              actions: [
+                // Messages. Inbox stopped being a tab in the redesign, so
+                // this is now its only entry point — it is a header action
+                // rather than a destination because a rider messages a
+                // trainer far less often than they browse or check a
+                // booking, and it was taking a quarter of the bar.
+                Consumer(
+                  builder: (context, ref, _) => TopBarAction(
+                    icon: Symbols.forum_rounded,
+                    tooltip: 'Messages',
+                    onPressed: () => context.push('/inbox'),
+                    badgeCount: ref.watch(unreadChatCountProvider),
+                    semanticCountLabel: (n) =>
+                        '$n unread message${n == 1 ? '' : 's'}',
                   ),
-                  // Messages. Inbox stopped being a tab in the redesign, so
-                  // this is now its only entry point — it is a header action
-                  // rather than a destination because a rider messages a
-                  // trainer far less often than they browse or check a
-                  // booking, and it was taking a quarter of the bar.
-                  Consumer(
-                    builder: (context, ref, _) {
-                      final unreadChats = ref.watch(unreadChatCountProvider);
-                      return Semantics(
-                        button: true,
-                        child: IconButton.outlined(
-                          onPressed: () => context.push('/inbox'),
-                          tooltip: 'Messages',
-                          icon: BadgedIcon(
-                            count: unreadChats,
-                            icon: Symbols.forum_rounded,
-                            semanticLabelBuilder: (n) =>
-                                '$n unread message${n == 1 ? '' : 's'}',
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  Semantics(
-                    label: unread > 0
-                        ? '$unread unread notification${unread == 1 ? '' : 's'}'
-                        : 'Notifications',
-                    button: true,
-                    child: IconButton.outlined(
-                      onPressed: () => context.push('/notifications'),
-                      tooltip: 'Notifications',
-                      icon: Badge.count(
-                        count: unread,
-                        isLabelVisible: unread > 0,
-                        child: const Icon(Symbols.notifications_rounded),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+                TopBarAction(
+                  icon: Symbols.notifications_rounded,
+                  tooltip: 'Notifications',
+                  onPressed: () => context.push('/notifications'),
+                  badgeCount: unread,
+                  semanticCountLabel: (n) =>
+                      '$n unread notification${n == 1 ? '' : 's'}',
+                ),
+              ],
             ),
             const SizedBox(height: 16),
             Padding(

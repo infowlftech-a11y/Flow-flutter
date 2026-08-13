@@ -18,6 +18,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flow/core/theme/app_theme.dart';
 import 'package:flow/core/widgets/booking_grid.dart';
 import 'package:flow/core/widgets/buttons.dart';
+import 'package:flow/core/widgets/flow_top_bar.dart';
 import 'package:flow/core/widgets/dashboard.dart';
 import 'package:flow/core/widgets/provider_card.dart';
 import 'package:flow/core/widgets/media.dart';
@@ -66,6 +67,15 @@ final _cases = <String, Widget Function()>{
     icon: Icons.close_rounded,
     tooltip: 'Close',
     onTap: _noop,
+  ),
+  // P13's header action — badge on, since the badge is the state that
+  // changes the icon's geometry.
+  'TopBarAction': () => TopBarAction(
+    icon: Icons.notifications_rounded,
+    tooltip: 'Notifications',
+    onPressed: _noop,
+    badgeCount: 9,
+    semanticCountLabel: (n) => '$n unread notifications',
   ),
   'FlowChoiceChip': () =>
       FlowChoiceChip(label: 'El Gouna', selected: false, onTap: _noop),

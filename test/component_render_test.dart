@@ -28,6 +28,7 @@ import 'package:flow/data/models/wind.dart';
 import 'package:flow/core/widgets/gate.dart';
 import 'package:flow/core/widgets/loader.dart';
 import 'package:flow/core/widgets/media.dart';
+import 'package:flow/core/widgets/flow_top_bar.dart';
 import 'package:flow/core/widgets/misc.dart';
 import 'package:flow/core/widgets/picker_field.dart';
 import 'package:flow/core/widgets/surfaces.dart';
@@ -77,6 +78,28 @@ final _cases = <String, Widget Function()>{
   ),
   'ProviderCard.bare': () =>
       ProviderCard(name: 'Marco B.', photoUrl: null, onTap: () {}),
+  // Kicker + long title + two badged actions — the fullest the header gets,
+  // on the narrowest phone it ships on.
+  'FlowTopBar': () => FlowTopBar(
+        kicker: 'Hey Konstantinos 🤙',
+        title: 'Find your trainer',
+        actions: [
+          TopBarAction(
+            icon: Icons.forum_rounded,
+            tooltip: 'Messages',
+            onPressed: () {},
+            badgeCount: 12,
+            semanticCountLabel: (n) => '$n unread messages',
+          ),
+          TopBarAction(
+            icon: Icons.notifications_rounded,
+            tooltip: 'Notifications',
+            onPressed: () {},
+            badgeCount: 3,
+            semanticCountLabel: (n) => '$n unread notifications',
+          ),
+        ],
+      ),
   // Enough values to wrap the tag row twice on a 320px phone at 1.3x.
   'FlowPickerField.tags': () => FlowPickerField(
     values: const ['English', 'German', 'Arabic', 'Portuguese'],

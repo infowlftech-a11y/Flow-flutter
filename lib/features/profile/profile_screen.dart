@@ -12,6 +12,7 @@ import '../../core/utils/haptics.dart';
 import '../../core/utils/refs.dart';
 import '../../core/widgets/buttons.dart';
 import '../../core/widgets/feedback.dart';
+import '../../core/widgets/flow_top_bar.dart';
 import '../../core/widgets/flow_image.dart';
 import '../../core/widgets/misc.dart';
 import '../../core/widgets/sheets.dart';
@@ -30,281 +31,311 @@ class ProfileScreen extends ConsumerWidget {
     final tones = context.tones;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-        children: [
-          // Identity block.
-          Row(
-            children: [
-              GestureDetector(
-                onTap: () => context.push('/profile/edit'),
-                child: Stack(
-                  children: [
-                    FlowAvatar(
-                      url: user?.photoUrl,
-                      name: session.displayName,
-                      size: 76,
-                    ),
-                    Positioned(
-                      right: 0,
-                      bottom: 0,
-                      child: Container(
-                        padding: const EdgeInsets.all(5),
-                        decoration: BoxDecoration(
-                          color: tones.azureBrand,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Theme.of(context).scaffoldBackgroundColor,
-                            width: 2,
-                          ),
-                        ),
-                        child: const Icon(
-                          Symbols.edit_rounded,
-                          size: 12,
-                          color: Colors.white,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // P13: the shared header, same shape as every top-level tab.
+            const FlowTopBar(title: 'Profile'),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+                children: [
+                  // Identity block.
+                  Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () => context.push('/profile/edit'),
+                        child: Stack(
+                          children: [
+                            FlowAvatar(
+                              url: user?.photoUrl,
+                              name: session.displayName,
+                              size: 76,
+                            ),
+                            Positioned(
+                              right: 0,
+                              bottom: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(5),
+                                decoration: BoxDecoration(
+                                  color: tones.azureBrand,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Theme.of(
+                                      context,
+                                    ).scaffoldBackgroundColor,
+                                    width: 2,
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Symbols.edit_rounded,
+                                  size: 12,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      session.displayName,
-                      style: Theme.of(context).textTheme.headlineMedium,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      user?.email ?? '',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        TagPill(
-                          session.isTrainer
-                              ? 'TRAINER'
-                              : (user?.level ?? 'RIDER').toUpperCase(),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              session.displayName,
+                              style: Theme.of(context).textTheme.headlineMedium,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              user?.email ?? '',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: [
+                                TagPill(
+                                  session.isTrainer
+                                      ? 'TRAINER'
+                                      : (user?.level ?? 'RIDER').toUpperCase(),
+                                ),
+                                if (user?.nationality != null)
+                                  TagPill(
+                                    user!.nationality!,
+                                    color: tones.textFaint,
+                                  ),
+                                if ((user?.location ?? user?.homeSpot) != null)
+                                  TagPill(
+                                    user!.location ?? user.homeSpot!,
+                                    icon: Symbols.place_rounded,
+                                    color: tones.textFaint,
+                                  ),
+                              ],
+                            ),
+                          ],
                         ),
-                        if (user?.nationality != null)
-                          TagPill(user!.nationality!, color: tones.textFaint),
-                        if ((user?.location ?? user?.homeSpot) != null)
-                          TagPill(
-                            user!.location ?? user.homeSpot!,
-                            icon: Symbols.place_rounded,
-                            color: tones.textFaint,
+                      ),
+                    ],
+                  ),
+                  // The Staff section stood here. Staff accounts now resolve to
+                  // AppStage.staff and never reach this screen — the console is their
+                  // whole app — so a row pointing at it would be unreachable code
+                  // pretending to be a feature.
+                  const SizedBox(height: 28),
+                  const SectionHeader('Account'),
+                  _SettingsCard(
+                    children: [
+                      _row(
+                        context,
+                        Symbols.badge_rounded,
+                        'Personal details',
+                        subtitle: 'Name, photo, languages and level',
+                        onTap: () => context.push('/profile/edit'),
+                      ),
+                      // The ID support and the console know this account by (P3) —
+                      // derived from the uid, same scheme as the FLW- session refs.
+                      // Tap copies: it exists to be pasted into a ticket or read
+                      // aloud, never memorised.
+                      _row(
+                        context,
+                        Symbols.fingerprint_rounded,
+                        session.isTrainer ? 'Coach ID' : 'Rider ID',
+                        subtitle:
+                            '${memberRef(session.uid, coach: session.isTrainer)} — '
+                            'tap to copy for support',
+                        onTap: () {
+                          Clipboard.setData(
+                            ClipboardData(
+                              text: memberRef(
+                                session.uid,
+                                coach: session.isTrainer,
+                              ),
+                            ),
+                          );
+                          showFlowToast(context, 'ID copied');
+                        },
+                      ),
+                      if (session.isTrainer)
+                        _row(
+                          context,
+                          Symbols.visibility_rounded,
+                          'View my public profile',
+                          subtitle: 'Exactly what riders see before they book',
+                          onTap: () => context.push('/trainer/${session.uid}'),
+                        ),
+                      // Instant Book (P5) — the trainer's side of the switch the
+                      // booking rules read. SwitchListTile rather than _row: the
+                      // state must be visible without opening anything.
+                      if (session.isTrainer)
+                        SwitchListTile(
+                          secondary: const Icon(Symbols.bolt_rounded, size: 22),
+                          title: Text(
+                            'Instant booking',
+                            style: inter(
+                              15,
+                              560,
+                              color: context.scheme.onSurface,
+                            ),
                           ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          // The Staff section stood here. Staff accounts now resolve to
-          // AppStage.staff and never reach this screen — the console is their
-          // whole app — so a row pointing at it would be unreachable code
-          // pretending to be a feature.
-          const SizedBox(height: 28),
-          const SectionHeader('Account'),
-          _SettingsCard(
-            children: [
-              _row(
-                context,
-                Symbols.badge_rounded,
-                'Personal details',
-                subtitle: 'Name, photo, languages and level',
-                onTap: () => context.push('/profile/edit'),
-              ),
-              // The ID support and the console know this account by (P3) —
-              // derived from the uid, same scheme as the FLW- session refs.
-              // Tap copies: it exists to be pasted into a ticket or read
-              // aloud, never memorised.
-              _row(
-                context,
-                Symbols.fingerprint_rounded,
-                session.isTrainer ? 'Coach ID' : 'Rider ID',
-                subtitle:
-                    '${memberRef(session.uid, coach: session.isTrainer)} — '
-                    'tap to copy for support',
-                onTap: () {
-                  Clipboard.setData(
-                    ClipboardData(
-                      text: memberRef(session.uid, coach: session.isTrainer),
-                    ),
-                  );
-                  showFlowToast(context, 'ID copied');
-                },
-              ),
-              if (session.isTrainer)
-                _row(
-                  context,
-                  Symbols.visibility_rounded,
-                  'View my public profile',
-                  subtitle: 'Exactly what riders see before they book',
-                  onTap: () => context.push('/trainer/${session.uid}'),
-                ),
-              // Instant Book (P5) — the trainer's side of the switch the
-              // booking rules read. SwitchListTile rather than _row: the
-              // state must be visible without opening anything.
-              if (session.isTrainer)
-                SwitchListTile(
-                  secondary: const Icon(Symbols.bolt_rounded, size: 22),
-                  title: Text(
-                    'Instant booking',
-                    style: inter(15, 560, color: context.scheme.onSurface),
+                          subtitle: Text(
+                            (user?.instantBook ?? false)
+                                ? 'Riders book and pay without waiting for your '
+                                      'approval'
+                                : 'Off — every request waits for your approval',
+                            maxLines: 2,
+                            style: inter(12.5, 460, color: tones.textFaint),
+                          ),
+                          value: user?.instantBook ?? false,
+                          onChanged: (v) async {
+                            Haptics.select();
+                            try {
+                              await ref
+                                  .read(userRepositoryProvider)
+                                  .setInstantBook(session.uid, v);
+                              if (context.mounted) {
+                                showFlowToast(
+                                  context,
+                                  v
+                                      ? 'Instant booking on — new bookings '
+                                            'confirm themselves ⚡'
+                                      : 'Instant booking off — requests wait '
+                                            'for you again',
+                                );
+                              }
+                            } catch (_) {
+                              if (context.mounted) {
+                                showFlowToast(
+                                  context,
+                                  "Couldn't save that. Try again.",
+                                );
+                              }
+                            }
+                          },
+                        ),
+                      _row(
+                        context,
+                        Symbols.mail_rounded,
+                        'Email address',
+                        subtitle: user?.email ?? '—',
+                        onTap: () =>
+                            _openEmailSheet(context, user?.email ?? ''),
+                      ),
+                    ],
                   ),
-                  subtitle: Text(
-                    (user?.instantBook ?? false)
-                        ? 'Riders book and pay without waiting for your '
-                              'approval'
-                        : 'Off — every request waits for your approval',
-                    maxLines: 2,
-                    style: inter(12.5, 460, color: tones.textFaint),
+                  const SizedBox(height: 20),
+                  const SectionHeader('Notifications'),
+                  _SettingsCard(
+                    children: [
+                      _row(
+                        context,
+                        Symbols.inbox_rounded,
+                        'Notification inbox',
+                        subtitle: 'Everything the app has told you',
+                        onTap: () => context.push('/notifications'),
+                      ),
+                      _row(
+                        context,
+                        Symbols.tune_rounded,
+                        'Push notifications',
+                        subtitle: 'Managed in your phone settings',
+                        onTap: () => _openPushSheet(context),
+                      ),
+                    ],
                   ),
-                  value: user?.instantBook ?? false,
-                  onChanged: (v) async {
-                    Haptics.select();
-                    try {
-                      await ref
-                          .read(userRepositoryProvider)
-                          .setInstantBook(session.uid, v);
-                      if (context.mounted) {
-                        showFlowToast(
-                          context,
-                          v
-                              ? 'Instant booking on — new bookings '
-                                    'confirm themselves ⚡'
-                              : 'Instant booking off — requests wait '
-                                    'for you again',
-                        );
-                      }
-                    } catch (_) {
-                      if (context.mounted) {
-                        showFlowToast(
-                          context,
-                          "Couldn't save that. Try again.",
-                        );
-                      }
-                    }
-                  },
-                ),
-              _row(
-                context,
-                Symbols.mail_rounded,
-                'Email address',
-                subtitle: user?.email ?? '—',
-                onTap: () => _openEmailSheet(context, user?.email ?? ''),
+                  const SizedBox(height: 20),
+                  const SectionHeader('Support'),
+                  _SettingsCard(
+                    children: [
+                      _row(
+                        context,
+                        Symbols.support_agent_rounded,
+                        'Help & support',
+                        subtitle: 'Open a ticket — we answer in the app',
+                        onTap: () => context.push('/support'),
+                      ),
+                      _row(
+                        context,
+                        Symbols.menu_book_rounded,
+                        'How FLOW works',
+                        subtitle: 'Booking, check-in and payment, explained',
+                        onTap: () =>
+                            _openHowItWorksSheet(context, session.isTrainer),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  const SectionHeader('Privacy & data'),
+                  _SettingsCard(
+                    children: [
+                      _row(
+                        context,
+                        Symbols.shield_rounded,
+                        'Security & data',
+                        subtitle: 'What we store, and who can see it',
+                        onTap: () => _openPrivacySheet(context),
+                      ),
+                      _row(
+                        context,
+                        Symbols.gavel_rounded,
+                        'Terms & conditions',
+                        onTap: () => _openTermsSheet(context),
+                      ),
+                      _row(
+                        context,
+                        Symbols.manage_accounts_rounded,
+                        'Manage my account',
+                        subtitle: 'Export or delete everything',
+                        onTap: () => _openAccountSheet(context, ref),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  // Sign out sits alone, and Delete lives one level down inside
+                  // "Manage my account". They used to be adjacent rows in adjacent
+                  // cards, ~60dp apart, with the destructive one *below* the one
+                  // people tap daily — and the tap that costs you your account was
+                  // the easier one to hit by accident.
+                  _SettingsCard(
+                    children: [
+                      _row(
+                        context,
+                        Symbols.logout_rounded,
+                        'Sign out',
+                        onTap: () async {
+                          final ok = await confirmAction(
+                            context,
+                            title: 'Sign out?',
+                            body:
+                                "You'll need your email and password to get back in.",
+                            confirmLabel: 'Sign out',
+                          );
+                          if (ok) await ref.read(signOutProvider)();
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  Center(
+                    child: Text(
+                      FlowConst.appVersionLabel,
+                      style: inter(
+                        11.5,
+                        560,
+                        color: tones.textFaint,
+                        spacing: 1.2,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          const SectionHeader('Notifications'),
-          _SettingsCard(
-            children: [
-              _row(
-                context,
-                Symbols.inbox_rounded,
-                'Notification inbox',
-                subtitle: 'Everything the app has told you',
-                onTap: () => context.push('/notifications'),
-              ),
-              _row(
-                context,
-                Symbols.tune_rounded,
-                'Push notifications',
-                subtitle: 'Managed in your phone settings',
-                onTap: () => _openPushSheet(context),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          const SectionHeader('Support'),
-          _SettingsCard(
-            children: [
-              _row(
-                context,
-                Symbols.support_agent_rounded,
-                'Help & support',
-                subtitle: 'Open a ticket — we answer in the app',
-                onTap: () => context.push('/support'),
-              ),
-              _row(
-                context,
-                Symbols.menu_book_rounded,
-                'How FLOW works',
-                subtitle: 'Booking, check-in and payment, explained',
-                onTap: () => _openHowItWorksSheet(context, session.isTrainer),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          const SectionHeader('Privacy & data'),
-          _SettingsCard(
-            children: [
-              _row(
-                context,
-                Symbols.shield_rounded,
-                'Security & data',
-                subtitle: 'What we store, and who can see it',
-                onTap: () => _openPrivacySheet(context),
-              ),
-              _row(
-                context,
-                Symbols.gavel_rounded,
-                'Terms & conditions',
-                onTap: () => _openTermsSheet(context),
-              ),
-              _row(
-                context,
-                Symbols.manage_accounts_rounded,
-                'Manage my account',
-                subtitle: 'Export or delete everything',
-                onTap: () => _openAccountSheet(context, ref),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          // Sign out sits alone, and Delete lives one level down inside
-          // "Manage my account". They used to be adjacent rows in adjacent
-          // cards, ~60dp apart, with the destructive one *below* the one
-          // people tap daily — and the tap that costs you your account was
-          // the easier one to hit by accident.
-          _SettingsCard(
-            children: [
-              _row(
-                context,
-                Symbols.logout_rounded,
-                'Sign out',
-                onTap: () async {
-                  final ok = await confirmAction(
-                    context,
-                    title: 'Sign out?',
-                    body: "You'll need your email and password to get back in.",
-                    confirmLabel: 'Sign out',
-                  );
-                  if (ok) await ref.read(signOutProvider)();
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          Center(
-            child: Text(
-              FlowConst.appVersionLabel,
-              style: inter(11.5, 560, color: tones.textFaint, spacing: 1.2),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

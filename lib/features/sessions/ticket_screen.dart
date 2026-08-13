@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/utils/date_x.dart';
 import '../../core/utils/refs.dart';
 import '../../core/widgets/feedback.dart';
+import '../../core/widgets/flow_top_bar.dart';
 import '../../core/widgets/ticket.dart';
 import '../../data/models/booking.dart';
 import '../../providers/providers.dart';
@@ -32,77 +33,91 @@ class TicketScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final buckets = ref.watch(riderBucketsProvider);
-
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Your ticket'),
-        centerTitle: true,
-      ),
-      body: AsyncView<BookingBuckets>(
-        value: buckets,
-        onRetry: () => ref.invalidate(riderBookingsProvider),
-        data: (data) {
-          final tickets = [
-            ...?data[BookingBucket.active],
-            ...?data[BookingBucket.upcoming],
-          ].where((b) =>
-                  b.status == BookingStatus.confirmed ||
-                  b.status == BookingStatus.inProgress).toList();
-
-          if (tickets.isEmpty) {
-            return const EmptyView.scrollable(
-              icon: Symbols.confirmation_number_rounded,
-              title: 'No tickets yet',
-              subtitle:
-                  'Once a trainer approves your booking, your check-in code '
-                  'appears here.',
-            );
-          }
-
-          return SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-              child: Column(
-                children: [
-                  Expanded(
-                    child: TicketCarousel(
-                      tickets: [
-                        for (final b in tickets)
-                          SingleChildScrollView(
-                            // Centred, not top-aligned. A ticket is shorter
-                            // than the space it gets, and pinning it to the
-                            // top left ~180dp of gap between the card and the
-                            // page dots, which read as orphaned. `Center`
-                            // inside a scroll view still scrolls once the card
-                            // outgrows the viewport at large text scales.
-                            child: Center(
-                              child: TicketCard(
-                                payload: payloadFor(b),
-                                ticketId: sessionRef(b.id, b.date),
-                                rows: [
-                                  ('SESSION',
-                                      dayAndTime(b, prettyYmd(b.date))),
-                                  ('INSTRUCTOR', b.instructorName),
-                                ],
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Arrive 10 minutes early',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // P13: left-aligned like every other tab — this was the one
+            // screen that centered its title.
+            const FlowTopBar(title: 'Your ticket'),
+            Expanded(child: _TicketBody()),
+          ],
+        ),
       ),
     );
   }
+}
 
+class _TicketBody extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final buckets = ref.watch(riderBucketsProvider);
+
+    return AsyncView<BookingBuckets>(
+      value: buckets,
+      onRetry: () => ref.invalidate(riderBookingsProvider),
+      data: (data) {
+        final tickets =
+            [...?data[BookingBucket.active], ...?data[BookingBucket.upcoming]]
+                .where(
+                  (b) =>
+                      b.status == BookingStatus.confirmed ||
+                      b.status == BookingStatus.inProgress,
+                )
+                .toList();
+
+        if (tickets.isEmpty) {
+          return const EmptyView.scrollable(
+            icon: Symbols.confirmation_number_rounded,
+            title: 'No tickets yet',
+            subtitle:
+                'Once a trainer approves your booking, your check-in code '
+                'appears here.',
+          );
+        }
+
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+            child: Column(
+              children: [
+                Expanded(
+                  child: TicketCarousel(
+                    tickets: [
+                      for (final b in tickets)
+                        SingleChildScrollView(
+                          // Centred, not top-aligned. A ticket is shorter
+                          // than the space it gets, and pinning it to the
+                          // top left ~180dp of gap between the card and the
+                          // page dots, which read as orphaned. `Center`
+                          // inside a scroll view still scrolls once the card
+                          // outgrows the viewport at large text scales.
+                          child: Center(
+                            child: TicketCard(
+                              payload: TicketScreen.payloadFor(b),
+                              ticketId: sessionRef(b.id, b.date),
+                              rows: [
+                                ('SESSION', dayAndTime(b, prettyYmd(b.date))),
+                                ('INSTRUCTOR', b.instructorName),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Arrive 10 minutes early',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 }

@@ -12,6 +12,7 @@ import '../../core/utils/haptics.dart';
 import '../../core/widgets/buttons.dart';
 import '../../core/widgets/dashboard.dart';
 import '../../core/widgets/feedback.dart';
+import '../../core/widgets/flow_top_bar.dart';
 import '../../core/widgets/flow_image.dart';
 import '../../core/widgets/media.dart';
 import '../../core/widgets/misc.dart';
@@ -146,27 +147,6 @@ class _CommandCenterScreenState extends ConsumerState<CommandCenterScreen> {
     final unread = ref.watch(unreadNotificationCountProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Command Center'),
-        actions: [
-          Semantics(
-            label: unread > 0
-                ? '$unread unread notification${unread == 1 ? '' : 's'}'
-                : 'Notifications',
-            button: true,
-            child: IconButton(
-              onPressed: () => context.push('/notifications'),
-              tooltip: 'Notifications',
-              icon: Badge.count(
-                count: unread,
-                isLabelVisible: unread > 0,
-                child: const Icon(Symbols.notifications_rounded),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => runCheckInScan(context, ref),
         icon: const Icon(Symbols.qr_code_scanner_rounded),
@@ -177,10 +157,34 @@ class _CommandCenterScreenState extends ConsumerState<CommandCenterScreen> {
       // trainer the same screen in two places — one of them reachable only by
       // remembering it was behind a tab on a different screen. The dashboard
       // is now what its name says: today.
-      body: _TodayTab(
-        requestsKey: _requestsKey,
-        scrollController: _todayScroll,
-        onRequestsTap: _scrollToRequests,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // P13: the shared header, same shape as every top-level tab.
+            FlowTopBar(
+              title: 'Command Center',
+              actions: [
+                TopBarAction(
+                  icon: Symbols.notifications_rounded,
+                  tooltip: 'Notifications',
+                  onPressed: () => context.push('/notifications'),
+                  badgeCount: unread,
+                  semanticCountLabel: (n) =>
+                      '$n unread notification${n == 1 ? '' : 's'}',
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Expanded(
+              child: _TodayTab(
+                requestsKey: _requestsKey,
+                scrollController: _todayScroll,
+                onRequestsTap: _scrollToRequests,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

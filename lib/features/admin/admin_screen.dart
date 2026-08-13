@@ -107,19 +107,21 @@ class AdminScreen extends ConsumerWidget {
             title: const Text('Admin console'),
             automaticallyImplyLeading: false,
             actions: [
-              IconButton(
+              // The outlined circles every header action wears now (P13).
+              IconButton.outlined(
                 onPressed: () => context.push('/notifications'),
                 tooltip: 'Notifications',
                 icon: const Icon(Symbols.notifications_rounded),
               ),
+              const SizedBox(width: 8),
               // Staff have no Profile tab to sign out from any more, so the
               // console carries it.
-              IconButton(
+              IconButton.outlined(
                 onPressed: () => _confirmSignOut(context, ref),
                 tooltip: 'Sign out',
                 icon: const Icon(Symbols.logout_rounded),
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: 12),
             ],
             bottom: TabBar(
               isScrollable: true,
