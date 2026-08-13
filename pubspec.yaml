@@ -32,6 +32,8 @@ dependencies:
   url_launcher: ^6.3.2
   material_symbols_icons: ^4.2960.0
   firebase_app_check: ^0.4.6
+  pdf: ^3.13.0
+  printing: ^5.15.0
 
 dev_dependencies:
   flutter_test:

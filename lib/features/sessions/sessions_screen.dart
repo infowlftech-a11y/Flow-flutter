@@ -22,6 +22,7 @@ import '../../data/models/booking.dart';
 import '../../data/models/cancellation.dart';
 import '../../data/repositories/booking_repository.dart';
 import '../../providers/providers.dart';
+import 'receipt.dart';
 import 'review_composer.dart';
 
 /// Rider sessions — UPCOMING / ACTIVE / HISTORY (§3.7).
@@ -71,7 +72,7 @@ class _SessionsScreenState extends ConsumerState<SessionsScreen>
     for (final (i, bucket) in const [
       BookingBucket.upcoming,
       BookingBucket.active,
-      BookingBucket.history
+      BookingBucket.history,
     ].indexed) {
       if (buckets[bucket]!.any((b) => b.id == id)) {
         _highlightHandled = true;
@@ -83,10 +84,12 @@ class _SessionsScreenState extends ConsumerState<SessionsScreen>
             if (!mounted) return;
             final ctx = _cardKeys[id]?.currentContext;
             if (ctx == null || !ctx.mounted) return;
-            Scrollable.ensureVisible(ctx,
-                duration: const Duration(milliseconds: 400),
-                alignment: .2,
-                curve: Curves.easeOutCubic);
+            Scrollable.ensureVisible(
+              ctx,
+              duration: const Duration(milliseconds: 400),
+              alignment: .2,
+              curve: Curves.easeOutCubic,
+            );
           });
           // Drop the halo after ~4s.
           Future.delayed(const Duration(seconds: 4), () {
@@ -204,19 +207,24 @@ class _SessionsScreenState extends ConsumerState<SessionsScreen>
   /// heights with the indicator sitting low. It also reads better: the word is
   /// the label, the number is the qualifier.
   Widget _tabLabel(
-      AsyncValue<BookingBuckets> buckets, String label, BookingBucket bucket) {
+    AsyncValue<BookingBuckets> buckets,
+    String label,
+    BookingBucket bucket,
+  ) {
     final list = buckets.value?[bucket];
     return Text.rich(
-      TextSpan(children: [
-        TextSpan(text: label),
-        if (list != null)
-          TextSpan(
-            // Colour deliberately unset so it inherits the TabBar's
-            // selected/unselected label colour along with the rest of the row.
-            text: '  ${list.length}',
-            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-          ),
-      ]),
+      TextSpan(
+        children: [
+          TextSpan(text: label),
+          if (list != null)
+            TextSpan(
+              // Colour deliberately unset so it inherits the TabBar's
+              // selected/unselected label colour along with the rest of the row.
+              text: '  ${list.length}',
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+            ),
+        ],
+      ),
       maxLines: 1,
     );
   }
@@ -232,8 +240,9 @@ class _LiveDot extends StatefulWidget {
 class _LiveDotState extends State<_LiveDot>
     with SingleTickerProviderStateMixin {
   late final AnimationController _c = AnimationController(
-      vsync: this, duration: FlowMotion.pulse)
-    ..repeat(reverse: true);
+    vsync: this,
+    duration: FlowMotion.pulse,
+  )..repeat(reverse: true);
 
   @override
   void dispose() {
@@ -249,7 +258,9 @@ class _LiveDotState extends State<_LiveDot>
         width: 8,
         height: 8,
         decoration: BoxDecoration(
-            color: context.tones.success, shape: BoxShape.circle),
+          color: context.tones.success,
+          shape: BoxShape.circle,
+        ),
       ),
     );
   }
@@ -387,8 +398,8 @@ class _HeroSession extends ConsumerWidget {
     final (countdownTo, countdownLabel) = live
         ? (b.endsAt, 'Time left')
         : ticking
-            ? (starts, 'Until start')
-            : (null, '');
+        ? (starts, 'Until start')
+        : (null, '');
 
     final actions = sessionActionsFor(b);
 
@@ -403,8 +414,8 @@ class _HeroSession extends ConsumerWidget {
             badgeLabel: live
                 ? 'LIVE NOW'
                 : imminent
-                    ? 'STARTS SOON'
-                    : null,
+                ? 'STARTS SOON'
+                : null,
             countdownTo: countdownTo,
             countdownLabel: countdownLabel,
             onTap: () => openSessionSheet(context, b),
@@ -416,7 +427,9 @@ class _HeroSession extends ConsumerWidget {
             children: [
               for (final (i, a) in actions.indexed) ...[
                 if (i > 0) const SizedBox(width: 10),
-                Expanded(child: _ActionButton(booking: b, action: a)),
+                Expanded(
+                  child: _ActionButton(booking: b, action: a),
+                ),
               ],
             ],
           ),
@@ -464,9 +477,11 @@ String _whenLabel(String date) {
   final d = parseYmd(date);
   if (d == null) return '--';
   final now = DateTime.now();
-  final days = DateTime(d.year, d.month, d.day)
-      .difference(DateTime(now.year, now.month, now.day))
-      .inDays;
+  final days = DateTime(
+    d.year,
+    d.month,
+    d.day,
+  ).difference(DateTime(now.year, now.month, now.day)).inDays;
   return switch (days) {
     0 => 'Today',
     1 => 'Tomorrow',
@@ -489,15 +504,15 @@ enum SessionAction { checkIn, showTicket, rate, cancel }
 /// session already past cannot be checked into, and offering "Rate" on a
 /// cancelled booking asks the rider to review something that never happened.
 List<SessionAction> sessionActionsFor(Booking b) => switch (b.status) {
-      BookingStatus.pending => const [SessionAction.cancel],
-      BookingStatus.confirmed => [
-          if (!b.isPast && !b.isSafari) SessionAction.checkIn,
-          SessionAction.cancel,
-        ],
-      BookingStatus.inProgress => const [SessionAction.showTicket],
-      BookingStatus.completed => const [SessionAction.rate],
-      _ => const [],
-    };
+  BookingStatus.pending => const [SessionAction.cancel],
+  BookingStatus.confirmed => [
+    if (!b.isPast && !b.isSafari) SessionAction.checkIn,
+    SessionAction.cancel,
+  ],
+  BookingStatus.inProgress => const [SessionAction.showTicket],
+  BookingStatus.completed => const [SessionAction.rate],
+  _ => const [],
+};
 
 class _ActionButton extends ConsumerWidget {
   const _ActionButton({
@@ -518,27 +533,27 @@ class _ActionButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return switch (action) {
       SessionAction.checkIn => MicroAction(
-          label: 'CHECK IN',
-          icon: Symbols.qr_code_2_rounded,
-          onPressed: () => _handoff(context, (c) => showQrTicket(c, booking)),
-        ),
+        label: 'CHECK IN',
+        icon: Symbols.qr_code_2_rounded,
+        onPressed: () => _handoff(context, (c) => showQrTicket(c, booking)),
+      ),
       SessionAction.showTicket => MicroAction(
-          label: 'SHOW TICKET',
-          icon: Symbols.qr_code_2_rounded,
-          onPressed: () => _handoff(context, (c) => showQrTicket(c, booking)),
-        ),
+        label: 'SHOW TICKET',
+        icon: Symbols.qr_code_2_rounded,
+        onPressed: () => _handoff(context, (c) => showQrTicket(c, booking)),
+      ),
       SessionAction.rate => MicroAction(
-          label: 'RATE',
-          icon: Symbols.star_outline_rounded,
-          filled: false,
-          onPressed: () => _handoff(context, _openRateSheet),
-        ),
+        label: 'RATE',
+        icon: Symbols.star_outline_rounded,
+        filled: false,
+        onPressed: () => _handoff(context, _openRateSheet),
+      ),
       SessionAction.cancel => MicroAction(
-          label: 'CANCEL',
-          filled: false,
-          color: context.tones.danger,
-          onPressed: () => _cancel(context, ref),
-        ),
+        label: 'CANCEL',
+        filled: false,
+        color: context.tones.danger,
+        onPressed: () => _cancel(context, ref),
+      ),
     };
   }
 
@@ -568,16 +583,17 @@ class _ActionButton extends ConsumerWidget {
     final moneyLine = !preview.prepaid
         ? ''
         : booking.status == BookingStatus.pending
-            ? ' Your $amount comes back in full — a request is never '
-                'charged before your trainer accepts it.'
-            : preview.charged
-                ? ' It starts in under 24 hours, so per the cancellation '
-                    'policy you are charged the full $amount.'
-                : ' You are refunded the full $amount.';
+        ? ' Your $amount comes back in full — a request is never '
+              'charged before your trainer accepts it.'
+        : preview.charged
+        ? ' It starts in under 24 hours, so per the cancellation '
+              'policy you are charged the full $amount.'
+        : ' You are refunded the full $amount.';
     final ok = await confirmAction(
       context,
       title: 'Cancel this session?',
-      body: '${booking.title} on ${longYmd(booking.date)} will be cancelled '
+      body:
+          '${booking.title} on ${longYmd(booking.date)} will be cancelled '
           'and your trainer will be notified.$moneyLine',
       confirmLabel: 'Cancel session',
       cancelLabel: 'Keep it',
@@ -646,13 +662,15 @@ class _SessionSheet extends ConsumerWidget {
   /// The rider's answer to "where is my money?", from the escrow ledger.
   /// Null (no row at all) for cash-era bookings — "settled in person" needs
   /// no line item.
-  static String? _moneyLine(Booking b) => switch (CancellationPolicy.settle(b)) {
+  static String? _moneyLine(Booking b) =>
+      switch (CancellationPolicy.settle(b)) {
         EscrowState.none => null,
         EscrowState.held => 'Held by FLOW — trainer is paid after',
         EscrowState.refundDue => 'Refund due — ${money(b.amountDue)}',
-        EscrowState.payoutDue => b.status == BookingStatus.cancelled
-            ? 'Charged — cancelled inside 24 h'
-            : 'Paid — trainer payout queued',
+        EscrowState.payoutDue =>
+          b.status == BookingStatus.cancelled
+              ? 'Charged — cancelled inside 24 h'
+              : 'Paid — trainer payout queued',
         EscrowState.refunded => 'Refunded in full',
         EscrowState.paidOut => 'Paid out to your trainer',
       };
@@ -692,7 +710,10 @@ class _SessionSheet extends ConsumerWidget {
               children: [
                 // The name to quote at support — the same reference the
                 // beach ticket prints, and the one staff can search.
-                _DetailRow(label: 'SESSION ID', value: sessionRef(b.id, b.date)),
+                _DetailRow(
+                  label: 'SESSION ID',
+                  value: sessionRef(b.id, b.date),
+                ),
                 _DetailRow(label: 'WHEN', value: longYmd(b.date)),
                 _DetailRow(label: 'TIME', value: b.timeRange),
                 _DetailRow(label: 'TOTAL', value: money(b.totalPrice)),
@@ -702,6 +723,19 @@ class _SessionSheet extends ConsumerWidget {
               ],
             ),
           ),
+          // The paper trail (P8): the same facts as this sheet, as a PDF
+          // for whoever asks — an insurer, an employer, a dispute. Only
+          // where there is a money story to certify; a pending cash-era
+          // request has nothing to put on paper.
+          if (CancellationPolicy.settle(b) != EscrowState.none ||
+              b.status == BookingStatus.completed) ...[
+            const SizedBox(height: 6),
+            TextButton.icon(
+              onPressed: () => shareReceipt(b),
+              icon: const Icon(Symbols.download_rounded, size: 18),
+              label: const Text('Save receipt (PDF)'),
+            ),
+          ],
           if (actions.isNotEmpty) ...[
             const SizedBox(height: 16),
             for (final (i, a) in actions.indexed) ...[
@@ -773,10 +807,10 @@ class StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => TagPill(
-        status.label.toUpperCase(),
-        color: statusColorFor(context, status),
-        dense: true,
-      );
+    status.label.toUpperCase(),
+    color: statusColorFor(context, status),
+    dense: true,
+  );
 }
 
 /// The QR ticket (§3.7, §12.2): encodes `{"bookingId":…,"trainerId":…}`,
@@ -807,7 +841,8 @@ class _QrTicketDialogState extends ConsumerState<_QrTicketDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final live = ref.watch(bookingByIdProvider(widget.booking.id)).value ??
+    final live =
+        ref.watch(bookingByIdProvider(widget.booking.id)).value ??
         widget.booking;
     final started = live.status == BookingStatus.inProgress;
 
@@ -842,24 +877,29 @@ class _QrTicketDialogState extends ConsumerState<_QrTicketDialog> {
                           icon: Symbols.surfing_rounded,
                           color: context.tones.success,
                           size: 76,
-                          borderRadius:
-                              const BorderRadius.all(Radius.circular(38)),
+                          borderRadius: const BorderRadius.all(
+                            Radius.circular(38),
+                          ),
                         ),
                         const SizedBox(height: 16),
-                        Text('Session started',
-                            style:
-                                Theme.of(context).textTheme.headlineMedium),
+                        Text(
+                          'Session started',
+                          style: Theme.of(context).textTheme.headlineMedium,
+                        ),
                         const SizedBox(height: 6),
-                        Text('Have a great one out there 🤙',
-                            style: Theme.of(context).textTheme.bodyMedium),
+                        Text(
+                          'Have a great one out there 🤙',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
                       ],
                     )
                   : Column(
                       key: const ValueKey('ticket'),
                       children: [
-                        Text('Your beach ticket',
-                            style:
-                                Theme.of(context).textTheme.headlineSmall),
+                        Text(
+                          'Your beach ticket',
+                          style: Theme.of(context).textTheme.headlineSmall,
+                        ),
                         const SizedBox(height: 6),
                         Text(
                           'Show this to ${widget.booking.instructorName} to start.',
@@ -892,16 +932,23 @@ class _QrTicketDialogState extends ConsumerState<_QrTicketDialog> {
                         const SizedBox(height: 14),
                         Text(
                           '${prettyYmd(widget.booking.date)} · ${widget.booking.timeRange}',
-                          style: interNum(14, 640,
-                              color: context.scheme.onSurfaceVariant),
+                          style: interNum(
+                            14,
+                            640,
+                            color: context.scheme.onSurfaceVariant,
+                          ),
                         ),
                         const SizedBox(height: 3),
                         // The spoken fallback when the camera won't play —
                         // the same reference the full ticket screen prints.
                         Text(
                           sessionRef(widget.booking.id, widget.booking.date),
-                          style: interNum(12, 560,
-                              color: context.tones.textFaint, spacing: .5),
+                          style: interNum(
+                            12,
+                            560,
+                            color: context.tones.textFaint,
+                            spacing: .5,
+                          ),
                         ),
                       ],
                     ),
