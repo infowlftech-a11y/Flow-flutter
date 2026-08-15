@@ -17,8 +17,10 @@ import '../../core/widgets/flow_image.dart';
 import '../../core/widgets/misc.dart';
 import '../../core/widgets/sheets.dart';
 import '../../core/widgets/surfaces.dart';
+import '../../core/widgets/theme_swap.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../providers/providers.dart';
+import '../../providers/settings_provider.dart';
 
 /// Profile & settings (§3.13).
 class ProfileScreen extends ConsumerWidget {
@@ -265,6 +267,66 @@ class ProfileScreen extends ConsumerWidget {
                         subtitle: 'Booking, check-in and payment, explained',
                         onTap: () =>
                             _openHowItWorksSheet(context, session.isTrainer),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  // Restored 2026-08-15: removed by 8593e8a (which was about
+                  // staff routing, not theming), leaving the app pinned to
+                  // whatever the phone's system theme said with no way to
+                  // choose — reported as "the app is stuck in dark mode".
+                  const SectionHeader('Appearance'),
+                  _SettingsCard(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(6),
+                        child: SegmentedButton<ThemeMode>(
+                          segments: const [
+                            ButtonSegment(
+                              value: ThemeMode.system,
+                              icon: Icon(
+                                Symbols.brightness_auto_rounded,
+                                size: 17,
+                              ),
+                              label: Text('Auto'),
+                            ),
+                            ButtonSegment(
+                              value: ThemeMode.light,
+                              icon: Icon(Symbols.light_mode_rounded, size: 17),
+                              label: Text('Light'),
+                            ),
+                            ButtonSegment(
+                              value: ThemeMode.dark,
+                              icon: Icon(Symbols.dark_mode_rounded, size: 17),
+                              label: Text('Dark'),
+                            ),
+                          ],
+                          selected: {ref.watch(themeModeProvider)},
+                          // Material 3 replaces the leading icon with a tick
+                          // on the selected segment, and segments size to
+                          // their content — so every selection change
+                          // re-flowed the row and the fill sat over a
+                          // different span than the label under it. Keeping
+                          // the brightness icons holds all three widths
+                          // constant.
+                          showSelectedIcon: false,
+                          onSelectionChanged: (s) {
+                            Haptics.select();
+                            // Through ThemeSwap: the old frame fades out over
+                            // the new theme instead of the whole tree lerping
+                            // per tick.
+                            ThemeSwap.of(context).run(
+                              () => ref
+                                  .read(themeModeProvider.notifier)
+                                  .set(s.first),
+                            );
+                          },
+                          style: ButtonStyle(
+                            side: WidgetStatePropertyAll(
+                              BorderSide(color: tones.line),
+                            ),
+                          ),
+                        ),
                       ),
                     ],
                   ),
