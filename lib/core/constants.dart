@@ -322,7 +322,9 @@ abstract final class FlowConst {
   static const maxTextScale = 1.3;
 
   // Persisted local keys.
-  // `themeMode` used to live here. It is gone with dark mode; any value an
-  // existing install still has under that key is simply never read.
+  // `themeMode` was removed in 391fca3 when dark mode briefly left; dark mode
+  // came back and `settings_provider.dart` (and its frozen test) read this
+  // key throughout — the same name, so installs that kept a value resume it.
+  static const themeModeKey = 'themeMode';
   static String trainerTourDoneKey(String uid) => 'trainerTourDone_$uid';
 }
