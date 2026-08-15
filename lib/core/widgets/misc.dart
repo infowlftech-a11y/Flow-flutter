@@ -190,12 +190,18 @@ class FlowChoiceChip extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  AnimatedDefaultTextStyle(
-                    curve: FlowMotion.curve,
-                    duration: FlowMotion.fast,
-                    style: inter(14, selected ? 660 : 540,
-                        color: selected ? selectedFg : scheme.onSurface),
-                    child: Text(label),
+                  // Flexible so a long label yields to a narrow parent (the
+                  // topic chips in a sheet-width Wrap) and wraps to a second
+                  // line instead of overflowing; at natural size it changes
+                  // nothing, because the Row is already min-sized.
+                  Flexible(
+                    child: AnimatedDefaultTextStyle(
+                      curve: FlowMotion.curve,
+                      duration: FlowMotion.fast,
+                      style: inter(14, selected ? 660 : 540,
+                          color: selected ? selectedFg : scheme.onSurface),
+                      child: Text(label),
+                    ),
                   ),
                   if (onDeleted != null)
                     // A square the full height of the chip. It was 27x27 — a
