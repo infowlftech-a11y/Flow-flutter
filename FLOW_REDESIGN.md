@@ -939,6 +939,28 @@ derivation; `earnings_week_test` and `providers_logic_test` were updated to
 the net figures (the delta, a ratio, is unchanged), each with a P14 note —
 the ordered-change precedent.
 
+## P15 — The two latent ledger bugs, closed (ordered 2026-08-15)
+
+Ordered as "fix any small bug" alongside the APK build. Both sat in
+[lib/providers/providers.dart](lib/providers/providers.dart) (approval-gated),
+documented since the 2026-08-13 audit as BUG-027 and BUG-028:
+
+- **BUG-027** — the three earnings figures (all-time, this-month, week chart)
+  summed on `status == completed` alone, so a refunded-but-completed session
+  would count as earnings at full price. Now guarded by `_earned` (payment
+  status `!= refunded`) in all three. A booking with *no* payment data still
+  counts — `unknown ≠ refunded`, and history must not fall out of "earned".
+  Pinned by `test/earnings_refund_test.dart`.
+- **BUG-028** — week bucketing used `Duration`-based day arithmetic, which
+  truncates one day short across Cairo's midnight DST transition. `_weekStart`
+  and the bucket index now use calendar arithmetic (constructor
+  normalisation + UTC-anchored `_calendarDays`), so a 23-hour day is still
+  one day. The existing frozen `earnings_week_test` pins the unchanged
+  ordinary behaviour.
+
+No flow, routing or persistence change; the providers' shapes and consumers
+are untouched.
+
 ## P9 — Tickets carry a topic and every ID (ordered 2026-08-13)
 
 The new-ticket sheet now requires a topic — one of six

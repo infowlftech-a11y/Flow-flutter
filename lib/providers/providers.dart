@@ -9,6 +9,7 @@ import '../core/utils/date_x.dart';
 import '../data/models/app_user.dart';
 import '../data/models/booking.dart';
 import '../data/models/catalogue.dart';
+import '../data/models/payment.dart';
 import '../data/models/schedule.dart';
 import '../data/models/social.dart';
 import '../data/models/support.dart';
@@ -473,11 +474,20 @@ final trainerCompletedProvider = Provider<AsyncValue<List<Booking>>>(
 // FLOW's platform commission (P14, `Booking.trainerEarning`). The rider still
 // pays the full price everywhere it is shown to them (profile rate, booking,
 // receipt); only what the trainer earns is the 80%.
+
+/// A completed session whose payment was refunded is work delivered but money
+/// returned — it must not stand in any earnings figure (BUG-027). Unreachable
+/// through the app today (`markRefunded` has no UI caller); live the moment a
+/// staff member or the future processor refunds a delivered session.
+bool _earned(Booking b) => b.payment.status != PaymentStatus.refunded;
+
 final trainerRevenueProvider = Provider<AsyncValue<double>>(
   (ref) => ref
       .watch(trainerCompletedProvider)
       .whenData(
-        (list) => list.fold<double>(0, (acc, b) => acc + b.trainerEarning),
+        (list) => list
+            .where(_earned)
+            .fold<double>(0, (acc, b) => acc + b.trainerEarning),
       ),
 );
 
@@ -487,7 +497,7 @@ final trainerMonthRevenueProvider = Provider<AsyncValue<double>>((ref) {
       .watch(trainerCompletedProvider)
       .whenData(
         (list) => list
-            .where((b) => b.date.startsWith(ym))
+            .where((b) => _earned(b) && b.date.startsWith(ym))
             .fold<double>(0, (acc, b) => acc + b.trainerEarning),
       );
 });
@@ -557,15 +567,26 @@ typedef EarningsWeek = ({
 });
 
 /// Monday 00:00 of the week containing [from].
-DateTime _weekStart(DateTime from) {
-  final d = DateTime(from.year, from.month, from.day);
-  return d.subtract(Duration(days: d.weekday - DateTime.monday));
-}
+///
+/// Computed by calendar arithmetic (the constructor normalises an
+/// out-of-range day), never by subtracting a `Duration`: Cairo's DST
+/// transitions fall at midnight, so "n × 24h ago" can land at 23:00 the day
+/// before and shift every bucket (BUG-028).
+DateTime _weekStart(DateTime from) =>
+    DateTime(from.year, from.month, from.day - (from.weekday - DateTime.monday));
+
+/// Whole days from [from] to [to] as the calendar counts them, immune to DST:
+/// both endpoints are re-anchored as UTC dates, where every day is 24h, so a
+/// 23-hour spring-forward day still counts as one day (BUG-028).
+int _calendarDays(DateTime from, DateTime to) =>
+    DateTime.utc(to.year, to.month, to.day)
+        .difference(DateTime.utc(from.year, from.month, from.day))
+        .inDays;
 
 final trainerEarningsWeekProvider = Provider<AsyncValue<EarningsWeek>>((ref) {
   final now = DateTime.now();
   final start = _weekStart(now);
-  final previousStart = start.subtract(const Duration(days: 7));
+  final previousStart = DateTime(start.year, start.month, start.day - 7);
 
   return ref.watch(trainerCompletedProvider).whenData((list) {
     final week = List<double>.filled(7, 0);
@@ -578,10 +599,11 @@ final trainerEarningsWeekProvider = Provider<AsyncValue<EarningsWeek>>((ref) {
       // (§10.7), and a silent misattribution here would be money in the
       // wrong column.
       if (day == null) continue;
+      if (!_earned(b)) continue; // refunded: money returned, not earned
       final amount = b.trainerEarning;
 
       if (!day.isBefore(start)) {
-        final index = day.difference(start).inDays;
+        final index = _calendarDays(start, day);
         if (index >= 0 && index < 7) week[index] += amount;
       } else if (!day.isBefore(previousStart)) {
         previous += amount;
@@ -589,11 +611,7 @@ final trainerEarningsWeekProvider = Provider<AsyncValue<EarningsWeek>>((ref) {
     }
 
     final total = week.fold<double>(0, (a, b) => a + b);
-    final todayOffset = DateTime(
-      now.year,
-      now.month,
-      now.day,
-    ).difference(start).inDays;
+    final todayOffset = _calendarDays(start, now);
 
     return (
       byWeekday: week,

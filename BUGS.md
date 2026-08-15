@@ -924,7 +924,8 @@ it is called out here so the parity is not silently re-broken.
 **Severity:** minor (latent — no UI path reaches it today)
 **Found:** full-audit pass 2026-08-13, reporting sub-audit
 **File:** [lib/providers/providers.dart](lib/providers/providers.dart) — `trainerRevenueProvider` (and month/week variants)
-**Status:** reported only — not fixed (approval-gated file; unreachable today)
+**Status:** FIXED — ordered 2026-08-15 ("fix any small bug"); `_earned` guard on all
+three figures, pinned by `test/earnings_refund_test.dart`
 
 `trainerRevenueProvider`, `trainerMonthRevenueProvider` and
 `trainerEarningsWeekProvider` sum `totalPrice` over bookings whose *status*
@@ -947,7 +948,9 @@ wiring the refund action.
 **Severity:** minor (display distribution only; the week total is correct)
 **Found:** full-audit pass 2026-08-13, reporting sub-audit
 **File:** [lib/providers/providers.dart](lib/providers/providers.dart) — `trainerEarningsWeekProvider` (`.inDays` bucketing)
-**Status:** reported only — not fixed (approval-gated file; cosmetic, once-a-year edge)
+**Status:** FIXED — ordered 2026-08-15 ("fix any small bug"); `_weekStart` and the
+bucket index now use calendar arithmetic (`_calendarDays`, UTC-anchored), never
+`Duration` subtraction
 
 The provider buckets each completed booking into a weekday with
 `day.difference(weekStart).inDays`, and `Duration.inDays` truncates elapsed
