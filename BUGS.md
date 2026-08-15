@@ -962,3 +962,31 @@ the "today" highlight by one. The weekly **total** (a plain sum) is
 unaffected — only the per-bar distribution and highlight, for one week a
 year. Left as documented: the fix is calendar-date differencing rather than
 `Duration.inDays`, in an approval-gated file, for a cosmetic edge.
+
+## BUG-029 — Leaving the Profile tab left its frozen frame over the whole app
+
+**Severity:** major (the shell looks dead; every tab switch away from a
+higher branch shows the old screen forever)
+**Found:** on-device (Galaxy A56, release APK), reproduced over adb
+2026-08-15; screenshot shows the bar selecting Discover with Profile still
+painted
+**File:** [lib/features/shell/app_shell.dart](lib/features/shell/app_shell.dart) — `AnimatedBranchContainer` (P12)
+**Status:** FIXED — ticker stays enabled until the exit fade completes;
+pinned by `test/branch_fade_test.dart`
+
+P12's cross-fade wrapped each branch in `TickerMode(enabled: i ==
+currentIndex)` + `AnimatedOpacity`. The mute is correct at rest and wrong in
+the transition frame: the outgoing branch's fade-out runs on the ticker that
+was muted in that same rebuild, so the animation never advanced and the
+branch stayed at opacity 1. Branches paint in declaration order — Profile is
+branch 5, topmost — so leaving Profile left its stale frame covering every
+tab. Navigation kept working underneath (the stale layer ignores pointers);
+only the pixels were stuck, which is why it read as "the app is stuck".
+Switching low→high looked fine (the incoming branch fades in on top), which
+is how it survived manual testing until Profile — the highest branch — was
+visited.
+
+Fix: the container is stateful; a branch's ticker stays enabled while it is
+current *or* mid-exit, and `AnimatedOpacity.onEnd` mutes it once the fade
+reports done — the battery contract (invisible branches do not animate)
+holds at rest, without freezing the exit.

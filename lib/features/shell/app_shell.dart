@@ -79,7 +79,7 @@ List<int> branchesFor({required bool isTrainer}) => isTrainer
 /// from semantics — a Stack, unlike IndexedStack, would otherwise leave
 /// five invisible screens readable by a screen reader — and ticker-muted,
 /// because an invisible branch that still animates is a battery drain.
-class AnimatedBranchContainer extends StatelessWidget {
+class AnimatedBranchContainer extends StatefulWidget {
   const AnimatedBranchContainer({
     super.key,
     required this.currentIndex,
@@ -90,21 +90,56 @@ class AnimatedBranchContainer extends StatelessWidget {
   final List<Widget> children;
 
   @override
+  State<AnimatedBranchContainer> createState() =>
+      _AnimatedBranchContainerState();
+}
+
+class _AnimatedBranchContainerState extends State<AnimatedBranchContainer> {
+  /// Branches whose ticker must run: the current one, plus any still fading
+  /// out.
+  ///
+  /// The ticker CANNOT be muted the instant a branch stops being current:
+  /// `AnimatedOpacity` animates on that same ticker, so muting immediately
+  /// froze the fade-out at fully opaque — and since branches paint in
+  /// declaration order, leaving a high branch (Profile is last) left its
+  /// frozen frame covering every tab underneath. The bar kept selecting,
+  /// taps kept landing (the stale layer ignores pointers), and the screen
+  /// never changed: "stuck on profile". A branch leaves this set only when
+  /// its fade-out reports done, which restores the battery contract —
+  /// invisible branches do not animate — without freezing the exit.
+  late final Set<int> _ticking = {widget.currentIndex};
+
+  @override
+  void didUpdateWidget(AnimatedBranchContainer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.currentIndex != widget.currentIndex) {
+      _ticking
+        ..add(widget.currentIndex)
+        ..add(oldWidget.currentIndex);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Stack(
       fit: StackFit.expand,
       children: [
-        for (final (i, child) in children.indexed)
+        for (final (i, child) in widget.children.indexed)
           IgnorePointer(
-            ignoring: i != currentIndex,
+            ignoring: i != widget.currentIndex,
             child: ExcludeSemantics(
-              excluding: i != currentIndex,
+              excluding: i != widget.currentIndex,
               child: TickerMode(
-                enabled: i == currentIndex,
+                enabled: _ticking.contains(i),
                 child: AnimatedOpacity(
-                  opacity: i == currentIndex ? 1 : 0,
+                  opacity: i == widget.currentIndex ? 1 : 0,
                   duration: FlowMotion.base,
                   curve: FlowMotion.curve,
+                  onEnd: () {
+                    if (i != widget.currentIndex) {
+                      setState(() => _ticking.remove(i));
+                    }
+                  },
                   child: child,
                 ),
               ),
