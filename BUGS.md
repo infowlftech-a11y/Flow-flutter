@@ -1,4 +1,4 @@
-# Defects found while verifying the multi-party logic
+﻿# Defects found while verifying the multi-party logic
 
 Every finding is logged here when found, before any fix. Includes the ones
 fixed immediately, the cosmetic ones, and the ones deliberately not fixed.
@@ -103,7 +103,7 @@ rules change.
 **Severity:** major
 **Found:** rules suite, while scoping BUG-001
 **File:** [firestore.rules](firestore.rules) — `providerFieldsOnly()`
-**Status:** FIXED — deploy pending
+**Status:** FIXED — deployed to wlf-flow 2026-08-16
 
 `isProvider()` was checked first and carried no field restriction at all, so
 the trainer on a booking could write `instructorId` and hand the session to
@@ -125,7 +125,7 @@ ever becomes a feature, it needs its own rule, written on purpose.
 **Severity:** major
 **Found:** rules suite, `test_rules/reviews.test.mjs`
 **File:** [firestore.rules](firestore.rules) — `reviewedBooking()`
-**Status:** MOSTLY FIXED — deploy pending; one residue stands
+**Status:** MOSTLY FIXED — deployed to wlf-flow 2026-08-16; one residue stands
 
 The rules pinned authorship and the 1-5 range; everything §8.9 specifies
 lived in `ReviewRepository`, which a direct Firestore client does not run.
@@ -152,7 +152,7 @@ write — and requires: `status == 'completed'`, `kiterId == uid()`, and
 **Severity:** major (spoofing and spam surface)
 **Found:** rules suite, `test_rules/misc.test.mjs`
 **File:** [firestore.rules](firestore.rules) — notifications `allow create`
-**Status:** FIXED — deploy pending
+**Status:** FIXED — deployed to wlf-flow 2026-08-16
 
 `allow create: if signedIn()` had no constraint on `targetUserId`, title,
 body or `type`, so any account could write a convincing "Booking cancelled"
@@ -184,7 +184,7 @@ not spoofing across strangers, and no rule can adjudicate it.
 **Severity:** major
 **Found:** rules suite, `test_rules/misc.test.mjs`
 **File:** [firestore.rules](firestore.rules) — safari_trips `allow update`
-**Status:** FIXED — deploy pending; one residue stands
+**Status:** FIXED — deployed to wlf-flow 2026-08-16; one residue stands
 
 `allow update: if signedIn()` was justified in the comment for one field —
 `bookedSeats`, moved by the reserving rider's transaction — but authorised
@@ -651,7 +651,7 @@ one) covers the gap.
 **Found:** this pass, while fixing BUG-012 — reading what `unblockUser`
 restores made it obvious the restored value was user-writable
 **File:** [firestore.rules](firestore.rules) — `privilegedFieldsUnchanged()`
-**Status:** FIXED — deploy pending
+**Status:** FIXED — deployed to wlf-flow 2026-08-16
 
 `privilegedFieldsUnchanged()` named `role`, `status`, `blockedUntil`,
 `blockedAt`, `reviewedAt` and `reviewNote` — but not `statusBeforeBlock`,
@@ -684,7 +684,7 @@ methods. New coverage lives in `test_rules/escrow.test.mjs`.
 **Severity:** critical (money — ledger-corrupting today, PSP-executed loss later)
 **Found:** `test_rules/escrow.test.mjs`, terminal-states group
 **File:** [firestore.rules](firestore.rules) — bookings `allow update`
-**Status:** FIXED — deploy pending
+**Status:** FIXED — deployed to wlf-flow 2026-08-16
 
 BUG-013/014 hardened the *repository*: `_writeIfLive` re-reads `status` in a
 transaction and refuses to move a booking out of `completed`, `cancelled`
@@ -718,7 +718,7 @@ the override, pinned by `staff may move history`.
 **Severity:** major (money)
 **Found:** `test_rules/escrow.test.mjs`, provider-cancel group
 **File:** [firestore.rules](firestore.rules) — `providerFieldsOnly()`
-**Status:** FIXED — deploy pending
+**Status:** FIXED — deployed to wlf-flow 2026-08-16
 
 `cancelledBy` decides who the escrow favours: a *provider* cancel always
 refunds the rider in full (the late fee protects committed hours, never a
@@ -741,7 +741,7 @@ signature is denied.
 **Severity:** major (ledger integrity)
 **Found:** `test_rules/escrow.test.mjs`, held-money group
 **File:** [firestore.rules](firestore.rules) — `providerFieldsOnly()`
-**Status:** FIXED — deploy pending
+**Status:** FIXED — deployed to wlf-flow 2026-08-16
 
 `payment.dart` is explicit that `paid_out` ("FLOW actually transferred the
 held money to the trainer") is *"written by the processor/Functions layer
@@ -766,7 +766,7 @@ escrow-execution door, pinned by `staff still execute the escrow`.
 **Severity:** critical (total blocker — no rider can book a safari seat)
 **Found:** `test_rules/escrow.test.mjs`, safari group
 **File:** [firestore.rules](firestore.rules) — bookings `allow create`
-**Status:** FIXED — deploy pending
+**Status:** FIXED — deployed to wlf-flow 2026-08-16
 
 The BUG-017 pattern, second instance. P5 (Instant Book) constrained the
 booking `create` rule so a rider-written `confirmed` status is accepted only
@@ -818,7 +818,7 @@ cooperation. Flagged so a future `create` field-lockdown includes them.
 **Severity:** major (a suspended account keeps publishing; junk-content surface)
 **Found:** `test_rules/escrow.test.mjs`, publishing group
 **File:** [firestore.rules](firestore.rules) — safari_trips `allow create`
-**Status:** FIXED — deploy pending
+**Status:** FIXED — deployed to wlf-flow 2026-08-16
 
 `allow create: if signedIn() && hostId == uid()` was the whole rule. Every
 *other* user-content create in the file carries `notBlocked()` (BUG-007);

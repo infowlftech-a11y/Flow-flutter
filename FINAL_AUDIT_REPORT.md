@@ -132,12 +132,14 @@ class as the prior pass's BUG-001/003/005/006:
 - **Safari-trip publishing** now requires an approved, non-blocked business,
   consistent with Explore and the suspension model.
 
-**Deploy action required:** these fixes are in `firestore.rules` and take
-effect only once deployed — `firebase deploy --only firestore:rules`. The
-live database still runs the previous rules until then. (Several earlier fixes
-were already marked "deploy pending" in BUGS.md; this pass could not verify
-the live deployment state without project credentials, so treat a redeploy as
-the safe action.)
+**Deployed 2026-08-16.** `firebase deploy --only firestore:rules --project
+wlf-flow` released this file to `cloud.firestore`, so every fix above — and
+every earlier one BUGS.md had marked "deploy pending" — is now in force on the
+live database. Until that ran, the audit's work existed only in the repo: two
+of the findings it closed were critical (BUG-022 made safari reservations
+impossible against the real rules; BUG-019 let a raw client erase settled
+earnings), which is the argument for redeploying after *any* change to
+`firestore.rules` rather than at the end of a pass.
 
 ## UI/UX findings
 
@@ -154,8 +156,10 @@ the safe action.)
 
 ## Remaining risks
 
-- **Live vs local rules drift** — verified on the emulator, not on wlf-flow.
-  A redeploy is required and its success is the owner's to confirm.
+- ~~**Live vs local rules drift**~~ — closed 2026-08-16: the rules were
+  deployed to wlf-flow and the CLI reported them released. They are still
+  *verified* on the emulator rather than against the live database, so the
+  standing discipline is to redeploy on every change to the file.
 - **No test runs the real Dart repositories against the real rules** — the
   standing gap from COVERAGE.md. `test_rules/` uses payloads transcribed from
   the repositories (close, not identical). Closing it needs an

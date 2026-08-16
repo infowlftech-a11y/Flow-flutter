@@ -7,8 +7,15 @@ Every numbered section of §6.2, §6.3, §8, §9, §10 and §11 gets a row.
 
 | Suite | Runs against | Count |
 |---|---|---|
-| `test/` (`flutter test`) | `fake_cloud_firestore` — **rules are not evaluated** | 709 |
-| `test_rules/` (`npm test`) | Firestore emulator — the real `firestore.rules` | 341 |
+| `test/` (`flutter test`) | `fake_cloud_firestore` — **rules are not evaluated** | 813 |
+| `test_rules/` (`npm test`) | Firestore emulator — the real `firestore.rules` | 389 |
+
+813/389 at the 1.0 release. The Dart figure grew past the 709 below through
+the product passes P1–P15 (escrow and the cancellation policy, the platform
+commission, ticket topics, the receipt, the gate table, the branch fade) and
+the two ledger fixes of P15; the rules figure grew by the 29 escrow cases the
+full audit added. The narrative below is kept as the record each earlier
+count was taken against.
 
 709/341 as of the staff-oversight pass (§3.15): `admin_directory_test.dart`
 (filter/search logic), the console layout suite grown to all eight tabs plus

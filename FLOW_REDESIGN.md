@@ -802,7 +802,7 @@ in full, price shown as the final total before confirm.
 
 | # | Feature | Notes |
 |---|---|---|
-| 4.6 | Push delivery + session reminders | `onNewNotification` + `sendSessionReminders` are in the repo, undeployed. |
+| 4.6 | Push delivery + session reminders | All three functions — `onNewNotification`, `sendSessionReminders`, `sendCancelWindowReminders` (P7) — are in the repo, undeployed. |
 | 4.7 | **Free-cancellation deadline reminder** | Booking.com's "free cancellation ends tomorrow" nudge — one more nightly job over the same pipeline; the deadline is derivable per booking. |
 | 4.8 | Server-side refund/payout execution | Closes P1's back-dated-stamp limit; prerequisite for real money. |
 

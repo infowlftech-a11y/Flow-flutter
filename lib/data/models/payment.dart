@@ -2,8 +2,13 @@
 ///
 /// ## What this is for
 ///
-/// FLOW takes no money today: a rider books, and pays the trainer at the
-/// centre. v2.6 wrote a `paymentStatus: 'paid'` field that nothing read and
+/// Money moves through FLOW (P1): a rider pays FLOW at booking and FLOW pays
+/// the trainer after the session, keeping 20% (P14). Cash survives as the
+/// walk-in path, where there is no rider account to charge.
+///
+/// This header used to open "FLOW takes no money today" — true when the file
+/// was written, false since P1, and left standing long enough to reach the
+/// README. v2.6 wrote a `paymentStatus: 'paid'` field that nothing read and
 /// nothing could act on — a no-op that made the database *look* like it
 /// tracked payment while recording nothing, which is worse than an empty
 /// field because it invites trust.
